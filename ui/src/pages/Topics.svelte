@@ -35,9 +35,9 @@
         <a class="card topic-card" href={link.topic(t.slug)}>
           <h2>{t.title}</h2>
           <p class="goal">{t.goal}</p>
-          <StatusBar counts={t.counts} />
+          <StatusBar counts={t.counts} fading={t.fading} />
           <p class="meta">
-            {t.counts.solid}/{total} solid · {plural(t.sessions, 'session')} · {ago(t.updated)}
+            {t.counts.solid}/{total} solid{t.fading ? ` (${t.fading} fading)` : ''} · {plural(t.sessions, 'session')} · {ago(t.updated)}{t.trainingLevel ? ` · level ${t.trainingLevel}` : ''}
           </p>
           {#if t.handoff}<p class="next"><span class="label">Next</span> {t.handoff.next}</p>{/if}
         </a>

@@ -2,6 +2,7 @@
   import { feed } from './lib/feed.svelte.ts';
   import { link, router } from './lib/router.svelte.ts';
   import Now from './pages/Now.svelte';
+  import Progress from './pages/Progress.svelte';
   import Topics from './pages/Topics.svelte';
   import Topic from './pages/Topic.svelte';
   import Log from './pages/Log.svelte';
@@ -16,11 +17,12 @@
 </script>
 
 <header class="topbar">
-  <a class="brand" href={link.now()}><span class="mark" aria-hidden="true"></span>Mind Gym</a>
+  <a class="brand" href={link.now()}><span class="logo" aria-hidden="true"></span>Mind Gym</a>
   <nav>
     <a href={link.now()} class:current={section === 'now'}>
       Now{#if feed.pending && section !== 'now'}<i class="badge" aria-label="waiting for you"></i>{/if}
     </a>
+    <a href={link.progress()} class:current={section === 'progress'}>Progress</a>
     <a href={link.topics()} class:current={section === 'topics'}>Topics</a>
     <a href={link.log()} class:current={section === 'log'}>Log</a>
   </nav>
@@ -36,6 +38,8 @@
 <main>
   {#if route.page === 'now'}
     <Now />
+  {:else if route.page === 'progress'}
+    <Progress />
   {:else if route.page === 'topics'}
     <Topics />
   {:else if route.page === 'topic'}

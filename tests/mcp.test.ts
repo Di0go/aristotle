@@ -3,12 +3,12 @@
 import { after, before, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn, type ChildProcess } from 'node:child_process';
-import { mkdtemp, readdir, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
-import type { FeedState, PublicItem, SessionSummary, Topic, TopicSummary } from '../shared/types.ts';
+import type { FeedState, Progress, PublicItem, ReviewQueue, SessionSummary, Topic, TopicSummary } from '../shared/types.ts';
 
 const PORT = 4799;
 const BASE = `http://localhost:${PORT}`;
@@ -70,10 +70,12 @@ test('lists the tools', async () => {
   assert.deepEqual(tools.map((t) => t.name).sort(), [
     'ask',
     'collect_answers',
+    'due_reviews',
     'end_session',
     'get_topic',
     'list_topics',
     'quiz',
+    'record_practice',
     'show',
     'start_session',
     'update_map',
@@ -202,10 +204,14 @@ test('rejects requests from other sites', async () => {
   assert.equal(res.status, 403);
 });
 
-test('a restarted server keeps the session and the map', async () => {
+async function restart() {
   server.kill();
   await new Promise((r) => server.once('exit', r));
   await startServer();
+}
+
+test('a restarted server keeps the session and the map', async () => {
+  await restart();
   const s = await get<FeedState>('/api/state');
   assert.equal(s.session?.goal, 'Wedge products');
   assert.equal(s.items.length, 1);
@@ -213,4 +219,91 @@ test('a restarted server keeps the session and the map', async () => {
   const files = await readdir(path.join(dataDir, 'topics'));
   assert.deepEqual(files, ['differential-forms.json']);
   assert.match(await readFile(path.join(dataDir, 'topics', files[0]), 'utf8'), /"handoff"/);
+});
+
+test('solid concepts get a review schedule; practice moves it and the training level', async () => {
+  await call('start_session', { topic: 'Spaced', goal: 'Test reviews' });
+  await call('update_map', {
+    concepts: [
+      { id: 'a', label: 'A', status: 'solid' },
+      { id: 'b', label: 'B', deps: ['a'] },
+    ],
+  });
+  let topic = await get<Topic>('/api/topics/spaced');
+  const a = topic.concepts.find((c) => c.id === 'a')!;
+  assert.ok(a.review, 'a solid concept gets a review card');
+  assert.ok(Date.parse(a.review.due) > Date.now() + 86_400_000 * 0.9, 'first review is days away, not minutes');
+  assert.equal(topic.concepts.find((c) => c.id === 'b')!.review, undefined);
+
+  assert.match(textOf(await call('due_reviews')), /Nothing is fading/);
+
+  const right = textOf(await call('record_practice', { results: [{ concept: 'a', outcome: 'right', kind: 'recall' }] }));
+  assert.match(right, /spaced\/a: right, recall was ~\d+%; next review \d{4}-\d{2}-\d{2}/);
+
+  const wrong = textOf(await call('record_practice', { results: [{ concept: 'a', outcome: 'wrong', kind: 'recall' }] }));
+  assert.match(wrong, /now shaky/);
+  topic = await get<Topic>('/api/topics/spaced');
+  assert.equal(topic.concepts.find((c) => c.id === 'a')!.status, 'shaky');
+  assert.equal(topic.concepts.find((c) => c.id === 'a')!.review!.lapses, 1);
+  const feedTypes = (await get<FeedState>('/api/state')).items.map((i) => i.type);
+  assert.equal(feedTypes.at(-1), 'map');
+
+  const level = textOf(
+    await call('record_practice', { results: [{ concept: 'b', outcome: 'right', kind: 'problem' }], difficulty: 1 }),
+  );
+  assert.match(level, /Training level for spaced: 1 → 2\/10/);
+  const miss = textOf(
+    await call('record_practice', { results: [{ concept: 'b', outcome: 'wrong', kind: 'problem' }], difficulty: 2 }),
+  );
+  assert.match(miss, /Training level for spaced: 2 → 1\/10/);
+  assert.match(textOf(await call('record_practice', { results: [{ concept: 'nope', outcome: 'right', kind: 'recall' }] })), /no such concept/);
+
+  // Becoming solid again counts as a successful review on the same card.
+  await call('update_map', { concepts: [{ id: 'a', status: 'solid' }] });
+  topic = await get<Topic>('/api/topics/spaced');
+  assert.equal(topic.concepts.find((c) => c.id === 'a')!.review!.reps, 4);
+});
+
+test('a concept past its review date is fading, and a review session practises it across topics', async () => {
+  // Travel in time: move the review date into the past.
+  const file = path.join(dataDir, 'topics', 'spaced.json');
+  const topic = JSON.parse(await readFile(file, 'utf8')) as Topic;
+  topic.concepts.find((c) => c.id === 'a')!.review!.due = new Date(Date.now() - 3 * 86_400_000).toISOString();
+  await writeFile(file, JSON.stringify(topic));
+  await restart();
+
+  assert.match(textOf(await call('due_reviews')), /1 fading[\s\S]*spaced\/a "A" \(Spaced\): recall ~\d+%/);
+  const [summary] = (await get<TopicSummary[]>('/api/topics')).filter((t) => t.slug === 'spaced');
+  assert.equal(summary.fading, 1);
+
+  const started = textOf(await call('start_session', { kind: 'review', goal: "Review what's fading" }));
+  assert.match(started, /Review session .* started\. 1 concepts are fading/);
+  assert.equal((await get<FeedState>('/api/state')).session?.topicSlug, '');
+
+  const res = await call('update_map', { concepts: [{ id: 'a', status: 'solid' }] });
+  assert.equal(res.isError, true, 'a review session has no topic of its own');
+
+  const ask = call('ask', { prompt: 'Explain A', kind: 'recall', concept: 'spaced/a' });
+  const open = await waitForPending('ask');
+  await answer({ id: open.id, text: 'A is A.' });
+  await ask;
+  assert.match(textOf(await call('record_practice', { results: [{ concept: 'spaced/a', outcome: 'right', kind: 'recall' }] })), /spaced\/a: right/);
+
+  const queue = await get<ReviewQueue>('/api/reviews');
+  assert.equal(queue.fading.length, 0);
+  assert.deepEqual(queue.practised.map((p) => `${p.topic}/${p.id}:${p.result}`), ['spaced/a:right']);
+  const evidence = (await get<Topic>('/api/topics/spaced')).concepts.find((c) => c.id === 'a')!.evidence;
+  assert.equal(evidence.at(-2)?.kind, 'ask', 'the written answer is recorded on the concept in the other topic');
+
+  assert.match(textOf(await call('end_session', { locked: 'A', shaky: 'nothing', next: 'nothing' })), /handoff saved/);
+  const sessions = await get<SessionSummary[]>('/api/sessions');
+  assert.equal(sessions[0].kind, 'review');
+  assert.equal(sessions[0].topicSlug, '');
+
+  const progress = await get<Progress>('/api/progress');
+  assert.ok(progress.solid.length >= 1);
+  assert.equal(progress.solid.at(-1)!.count, 3, 'vector, covector and a');
+  assert.ok(progress.answers.length >= 1);
+  assert.deepEqual(progress.training, [{ topic: 'spaced', title: 'Spaced', level: 1 }]);
+  assert.equal(progress.fading.length, 0);
 });

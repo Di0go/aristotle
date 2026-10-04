@@ -5,14 +5,18 @@ import { EventEmitter } from 'node:events';
 import { mkdir, readdir, readFile, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { TOPICS_DIR } from './config.ts';
+import { gradeReview, retrievability, startReview, type Outcome } from './reviews.ts';
 import { slugify } from './slug.ts';
-import type {
-  ConceptStatus,
-  Evidence,
-  Handoff,
-  MapChange,
-  Topic,
-  TopicSummary,
+import {
+  isFading,
+  type Concept,
+  type ConceptStatus,
+  type FadingConcept,
+  type Evidence,
+  type Handoff,
+  type MapChange,
+  type Topic,
+  type TopicSummary,
 } from '../shared/types.ts';
 
 export interface ConceptInput {
@@ -99,7 +103,10 @@ export class Topics {
         if (input.summary) concept.summary = input.summary;
         if (input.goal) concept.goal = true;
         if (input.note) concept.note = input.note;
-        if (concept.status === 'solid') concept.solidSince = now;
+        if (concept.status === 'solid') {
+          concept.solidSince = now;
+          concept.review = startReview(new Date(now));
+        }
         topic.concepts.push(concept);
         changes.push({ id, label: concept.label, added: true, to: concept.status });
         continue;
@@ -111,8 +118,7 @@ export class Topics {
       if (deps !== undefined) concept.deps = deps;
       if (input.status !== undefined && input.status !== concept.status) {
         changes.push({ id, label: concept.label, from: concept.status, to: input.status });
-        if (input.status === 'solid') concept.solidSince = now;
-        concept.status = input.status;
+        setStatus(concept, input.status, now);
       }
       concept.updated = now;
     }
@@ -130,6 +136,88 @@ export class Topics {
     topic.updated = now;
     await this.save(topic);
     return changes;
+  }
+
+  /**
+   * Records a review or training attempt. Updates the review card of a concept that has one; a wrong
+   * answer on a solid concept makes it shaky. Returns the status change, if any, and the new due date.
+   */
+  async recordPractice(
+    slug: string,
+    conceptId: string,
+    outcome: Outcome,
+    evidence: Omit<Evidence, 'kind' | 'result'>,
+  ): Promise<{ concept: Concept; change?: MapChange; recallBefore?: number } | null> {
+    const topic = this.require(slug);
+    const concept = topic.concepts.find((c) => c.id === slugify(conceptId));
+    if (!concept) return null;
+    const now = new Date(evidence.at);
+    concept.evidence.push({ ...evidence, kind: 'practice', result: outcome });
+    let recallBefore: number | undefined;
+    let change: MapChange | undefined;
+    if (concept.review) {
+      recallBefore = retrievability(concept.review, now);
+      concept.review = gradeReview(concept.review, outcome, now);
+    }
+    if (outcome === 'wrong' && concept.status === 'solid') {
+      change = { id: concept.id, label: concept.label, from: 'solid', to: 'shaky' };
+      concept.status = 'shaky';
+    }
+    concept.updated = evidence.at;
+    topic.updated = evidence.at;
+    await this.save(topic);
+    return { concept, ...(change ? { change } : {}), ...(recallBefore !== undefined ? { recallBefore } : {}) };
+  }
+
+  /** Moves the training level by `delta` (clamped to 1-10) and returns it. */
+  async adjustTraining(slug: string, delta: number): Promise<{ from: number; to: number }> {
+    const topic = this.require(slug);
+    const from = topic.training?.level ?? 1;
+    const to = Math.min(10, Math.max(1, from + delta));
+    topic.training = { level: to, updated: new Date().toISOString() };
+    await this.save(topic);
+    return { from, to };
+  }
+
+  /** Solid concepts past their review date, least likely to be recalled first. */
+  fading(topicSlug?: string, now = new Date()): FadingConcept[] {
+    const out: FadingConcept[] = [];
+    for (const topic of this.topics.values()) {
+      if (topicSlug && topic.slug !== topicSlug) continue;
+      for (const c of topic.concepts) {
+        if (!isFading(c, now.getTime())) continue;
+        const last = c.evidence.at(-1)?.at;
+        out.push({
+          topic: topic.slug,
+          topicTitle: topic.title,
+          id: c.id,
+          label: c.label,
+          ...(c.summary ? { summary: c.summary } : {}),
+          due: c.review!.due,
+          recall: retrievability(c.review!, now),
+          ...(last ? { lastPractised: last } : {}),
+        });
+      }
+    }
+    return out.sort((a, b) => a.recall - b.recall);
+  }
+
+  /** Solid concepts coming due within `days`. */
+  upcoming(days: number, now = new Date()): number {
+    const limit = now.getTime() + days * 86_400_000;
+    let n = 0;
+    for (const topic of this.topics.values()) {
+      for (const c of topic.concepts) {
+        if (c.status !== 'solid' || !c.review) continue;
+        const due = Date.parse(c.review.due);
+        if (due > now.getTime() && due <= limit) n++;
+      }
+    }
+    return n;
+  }
+
+  all(): Topic[] {
+    return [...this.topics.values()];
   }
 
   async setFocus(slug: string, concept: string) {
@@ -180,17 +268,36 @@ export class Topics {
   }
 }
 
+/** Changes a concept's status, keeping its review card in step: becoming solid counts as a successful
+ * review (or starts the card), and falling from solid counts as a lapse. */
+function setStatus(concept: Concept, status: ConceptStatus, nowIso: string) {
+  const now = new Date(nowIso);
+  if (status === 'solid') {
+    concept.solidSince = nowIso;
+    concept.review = concept.review ? gradeReview(concept.review, 'right', now) : startReview(now);
+  } else if (concept.status === 'solid' && concept.review) {
+    concept.review = gradeReview(concept.review, 'wrong', now);
+  }
+  concept.status = status;
+}
+
 export function summarize(topic: Topic): TopicSummary {
   const counts: Record<ConceptStatus, number> = { unknown: 0, shaky: 0, solid: 0 };
-  for (const c of topic.concepts) counts[c.status]++;
+  let fading = 0;
+  for (const c of topic.concepts) {
+    counts[c.status]++;
+    if (isFading(c)) fading++;
+  }
   return {
     slug: topic.slug,
     title: topic.title,
     goal: topic.goal,
     updated: topic.updated,
     counts,
+    fading,
     sessions: topic.sessions.length,
     ...(topic.handoff ? { handoff: topic.handoff } : {}),
+    ...(topic.training ? { trainingLevel: topic.training.level } : {}),
   };
 }
 
@@ -208,14 +315,20 @@ export function describeTopic(topic: Topic): string {
     const wrong = ev.filter((e) => e.result === 'wrong').length;
     const dk = ev.filter((e) => e.result === 'dont-know').length;
     const asks = ev.filter((e) => e.kind === 'ask').length;
-    const record = ev.length ? ` | checks: ${right} right, ${wrong} wrong, ${dk} don't know, ${asks} written` : '';
-    const flags = [c.goal ? 'GOAL' : '', topic.focus === c.id ? 'FOCUS' : ''].filter(Boolean).join(', ');
+    const practice = ev.filter((e) => e.kind === 'practice');
+    const record =
+      (ev.length ? ` | checks: ${right} right, ${wrong} wrong, ${dk} don't know, ${asks} written` : '') +
+      (practice.length ? ` | practice: ${practice.map((e) => e.result).join(' ')}` : '');
+    const fading = isFading(c);
+    const review = c.review && c.status === 'solid' ? ` | review ${fading ? 'OVERDUE since' : 'due'} ${c.review.due.slice(0, 10)}` : '';
+    const flags = [c.goal ? 'GOAL' : '', topic.focus === c.id ? 'FOCUS' : '', fading ? 'FADING' : ''].filter(Boolean).join(', ');
     return (
       `- ${c.id} "${c.label}" [${c.status}]${flags ? ` (${flags})` : ''}` +
       (c.deps.length ? ` <- ${c.deps.join(', ')}` : '') +
       (c.summary ? `\n    ${c.summary}` : '') +
       (c.note ? `\n    note: ${c.note}` : '') +
-      record
+      record +
+      review
     );
   });
   const h = topic.handoff;
@@ -223,6 +336,7 @@ export function describeTopic(topic: Topic): string {
     `# ${topic.title} (${topic.slug})`,
     `Goal: ${topic.goal}`,
     `Sessions: ${topic.sessions.length}`,
+    topic.training ? `Training level: ${topic.training.level}/10` : '',
     h ? `\nLast handoff (${h.at.slice(0, 10)}):\n  Locked in: ${h.locked}\n  Still shaky: ${h.shaky}\n  Next: ${h.next}` : '',
     `\nConcepts (${topic.concepts.length}), "a <- b" means a depends on b:`,
     lines.length ? lines.join('\n') : '(none yet)',

@@ -5,12 +5,17 @@
   import FeedList from '../lib/FeedList.svelte';
   import MapGraph from '../lib/MapGraph.svelte';
   import StatusBar from '../lib/StatusBar.svelte';
-  import type { ConceptStatus } from '../../../shared/types.ts';
+  import ReviewPanel from '../lib/ReviewPanel.svelte';
+  import { isFading, type ConceptStatus } from '../../../shared/types.ts';
 
   let mapOpen = $state(false);
   let count = 0;
 
   const topic = $derived(feed.currentTopic);
+  const reviewing = $derived(feed.session?.kind === 'review');
+  const hasPanel = $derived(Boolean(topic) || reviewing);
+  const fading = $derived(topic?.concepts.filter((c) => isFading(c)).length ?? 0);
+  const KIND_LABEL = { learn: '', review: 'Review', train: 'Training' } as const;
   const counts = $derived.by(() => {
     const c: Record<ConceptStatus, number> = { unknown: 0, shaky: 0, solid: 0 };
     for (const x of topic?.concepts ?? []) c[x.status]++;
@@ -37,16 +42,22 @@
   });
 </script>
 
-<div class="now" class:has-map={topic}>
+<div class="now" class:has-map={hasPanel}>
   <section class="feed-col">
     {#if feed.session}
       <header class="session-head">
         <div>
-          <a class="eyebrow" href={link.topic(feed.session.topicSlug)}>{feed.session.topic}</a>
+          {#if reviewing}
+            <a class="eyebrow" href={link.progress()}>Review</a>
+          {:else}
+            <a class="eyebrow" href={link.topic(feed.session.topicSlug)}>
+              {KIND_LABEL[feed.session.kind ?? 'learn'] ? `${KIND_LABEL[feed.session.kind ?? 'learn']} · ` : ''}{feed.session.topic}
+            </a>
+          {/if}
           <h1>{feed.session.goal}</h1>
         </div>
-        {#if topic}
-          <button class="map-toggle" onclick={() => (mapOpen = !mapOpen)} aria-expanded={mapOpen}>Map</button>
+        {#if hasPanel}
+          <button class="map-toggle" onclick={() => (mapOpen = !mapOpen)} aria-expanded={mapOpen}>{reviewing ? 'Queue' : 'Map'}</button>
         {/if}
       </header>
     {/if}
@@ -72,13 +83,17 @@
     {/if}
   </section>
 
-  {#if topic}
+  {#if reviewing}
+    <aside class="map-panel card" class:open={mapOpen}>
+      <ReviewPanel onclose={() => (mapOpen = false)} />
+    </aside>
+  {:else if topic}
     <aside class="map-panel card" class:open={mapOpen}>
       <header>
         <a href={link.topic(topic.slug)}>{topic.title}</a>
         <button class="close" onclick={() => (mapOpen = false)} aria-label="Close map">×</button>
       </header>
-      <StatusBar {counts} legend />
+      <StatusBar {counts} {fading} legend />
       <MapGraph {topic} direction="TB" fit onselect={(id) => (location.hash = link.topic(topic.slug, id))} />
       {#if focus}
         <p class="focus-line"><span class="label">Now</span> {focus.label}</p>

@@ -6,7 +6,7 @@ The idea: Eero Alvar's "Bodybuilding for the Mind". Struggle is the training sig
 
 ## When teaching
 
-The method is the `teach` skill (`.claude/skills/teach/SKILL.md`): use it whenever he wants to learn something or continue. The essentials:
+The method is in the skills: `teach` for lessons (use it whenever he wants to learn something or continue), `review` for fading concepts, `train` for problems. The essentials:
 
 - **He reads and answers in the Mind Gym, not the terminal.** Teaching content goes through `show`, graded questions through `quiz`, open questions through `ask`. Keep terminal replies to a line or two ("Next step is up."), since he may not be looking at the terminal.
 - Call `start_session` (topic and goal) when a sitting starts or the topic changes, and `end_session` with a handoff when he stops.
@@ -22,5 +22,6 @@ The method is the `teach` skill (`.claude/skills/teach/SKILL.md`): use it whenev
 - Claude Code reaches the server through `server/bridge.ts` (stdio, see `.mcp.json`), which starts the server if it isn't running.
 - `pnpm check` (types), `pnpm test` (end to end: real server, MCP client, HTTP answers), `pnpm start` (build the interface and restart the server), `pnpm gym status|start|stop|restart`.
 - After changing server code run `pnpm gym restart`; after changing the interface run `pnpm build`.
+- The server backs up `data/` to the private GitHub repo by itself (`server/backup.ts`); don't commit `data/` by hand.
 - `data/` is his learning history. Never delete or rewrite it by hand. Session logs (`data/sessions/`) are append-only JSON Lines; topic maps (`data/topics/`) change only through the server.
 - Run `pnpm check` and `pnpm test` before calling a change done.

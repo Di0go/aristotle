@@ -1,7 +1,8 @@
-// Hash routing: #/, #/topics, #/topics/<slug>?c=<concept>, #/log, #/log/<session>.
+// Hash routing: #/, #/progress, #/topics, #/topics/<slug>?c=<concept>, #/log, #/log/<session>.
 
 export type Route =
   | { page: 'now' }
+  | { page: 'progress' }
   | { page: 'topics' }
   | { page: 'topic'; slug: string; concept?: string }
   | { page: 'log' }
@@ -15,6 +16,7 @@ function parse(hash: string): Route {
   if (parts[0] === 'topics') return { page: 'topics' };
   if (parts[0] === 'log' && parts[1]) return { page: 'session', id: parts[1] };
   if (parts[0] === 'log') return { page: 'log' };
+  if (parts[0] === 'progress') return { page: 'progress' };
   return { page: 'now' };
 }
 
@@ -33,6 +35,7 @@ export const router = new Router();
 
 export const link = {
   now: () => '#/',
+  progress: () => '#/progress',
   topics: () => '#/topics',
   topic: (slug: string, concept?: string) =>
     `#/topics/${encodeURIComponent(slug)}${concept ? `?c=${encodeURIComponent(concept)}` : ''}`,

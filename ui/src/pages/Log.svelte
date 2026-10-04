@@ -1,7 +1,7 @@
 <script lang="ts">
   import { feed } from '../lib/feed.svelte.ts';
   import { link } from '../lib/router.svelte.ts';
-  import { duration, formatDay, formatTime, plural } from '../lib/format.ts';
+  import { formatDay, formatTime, plural } from '../lib/format.ts';
   import type { SessionSummary } from '../../../shared/types.ts';
 
   let sessions = $state<SessionSummary[] | null>(null);
@@ -48,12 +48,12 @@
               <a class="card session-row" href={link.session(s.id)}>
                 <span class="when">{formatTime(s.startedAt)}</span>
                 <span class="what">
-                  <strong>{s.topic}</strong>
+                  <strong>{s.kind === 'train' ? `Training · ${s.topic}` : s.topic}</strong>
                   <span>{s.goal}</span>
                   {#if s.handoff}<span class="muted">Next: {s.handoff.next}</span>{/if}
                 </span>
                 <span class="stats muted">
-                  {duration(s.startedAt, s.lastAt)}
+                  {s.activeMinutes ? `${s.activeMinutes} min` : 'under a minute'}
                   {#if s.steps}<br />{plural(s.steps, 'step')}{/if}
                   {#if s.quizTotal}<br />quizzes {s.quizRight}/{s.quizTotal}{/if}
                   {#if s.asks}<br />{plural(s.asks, 'written answer')}{/if}

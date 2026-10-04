@@ -1,7 +1,7 @@
 <script lang="ts">
   // A topic's knowledge map as a graph: concepts are nodes, prerequisites point to what builds on them.
   import dagre from '@dagrejs/dagre';
-  import type { Concept, Topic } from '../../../shared/types.ts';
+  import { isFading, type Concept, type Topic } from '../../../shared/types.ts';
 
   let {
     topic,
@@ -109,6 +109,7 @@
         <g
           class="node {n.concept.status}"
           class:goal={n.concept.goal}
+          class:fading={isFading(n.concept)}
           class:focus={topic.focus === n.concept.id}
           class:selected={selected === n.concept.id}
           class:clickable={Boolean(onselect)}
@@ -118,7 +119,7 @@
           onclick={() => onselect?.(n.concept.id)}
           onkeydown={(e) => onKey(e, n.concept.id)}
         >
-          <title>{n.concept.label}: {STATUS_TEXT[n.concept.status]}{n.concept.summary ? `. ${n.concept.summary}` : ''}</title>
+          <title>{n.concept.label}: {isFading(n.concept) ? 'solid, fading (due for review)' : STATUS_TEXT[n.concept.status]}{n.concept.summary ? `. ${n.concept.summary}` : ''}</title>
           {#if topic.focus === n.concept.id}<rect class="halo" x="-5" y="-5" width={n.w + 10} height={n.h + 10} rx="13" />{/if}
           <rect class="box" width={n.w} height={n.h} rx="9" />
           {#if n.concept.goal}<rect class="goal-ring" x="3" y="3" width={n.w - 6} height={n.h - 6} rx="6" />{/if}

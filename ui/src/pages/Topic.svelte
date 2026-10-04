@@ -1,11 +1,11 @@
 <script lang="ts">
   import { feed } from '../lib/feed.svelte.ts';
   import { link } from '../lib/router.svelte.ts';
-  import { ago, duration, formatDay, formatTime, plural } from '../lib/format.ts';
+  import { ago, formatDay, formatTime, plural } from '../lib/format.ts';
   import MapGraph from '../lib/MapGraph.svelte';
   import StatusBar from '../lib/StatusBar.svelte';
   import ConceptPanel from '../lib/ConceptPanel.svelte';
-  import type { ConceptStatus, SessionSummary } from '../../../shared/types.ts';
+  import { isFading, type ConceptStatus, type SessionSummary } from '../../../shared/types.ts';
 
   let { slug, concept = undefined }: { slug: string; concept?: string } = $props();
 
@@ -19,6 +19,7 @@
     for (const x of topic?.concepts ?? []) c[x.status]++;
     return c;
   });
+  const fading = $derived(topic?.concepts.filter((c) => isFading(c)).length ?? 0);
   const chosen = $derived(topic?.concepts.find((c) => c.id === selected) ?? null);
   const groups = $derived(
     (['solid', 'shaky', 'unknown'] as const).map((status) => ({
@@ -58,8 +59,12 @@
       <h1>{topic.title}</h1>
       <p>{topic.goal}</p>
       <div class="topic-stats">
-        <StatusBar {counts} legend />
-        <span class="muted">{plural(topic.sessions.length, 'session')} · last studied {ago(topic.updated)}</span>
+        <StatusBar {counts} {fading} legend />
+        <span class="muted">
+          {plural(topic.sessions.length, 'session')} · last studied {ago(topic.updated)}{topic.training
+            ? ` · training level ${topic.training.level}/10`
+            : ''}
+        </span>
       </div>
     </header>
 
@@ -75,8 +80,9 @@
       <section class="card map-card">
         <MapGraph {topic} direction="TB" selected={selected} onselect={(id) => select(id === selected ? null : id)} />
         <p class="map-help muted">
-          Each arrow runs from a concept to what builds on it. Green is solid, amber is shaky,
-          dashed is not yet, and an inner ring marks a goal. Click a concept for its history.
+          Each arrow runs from a concept to what builds on it. Green is solid, a dotted green outline is solid
+          but fading (due for review), amber is shaky, dashed is not yet, and an inner ring marks a goal.
+          Click a concept for its history.
         </p>
       </section>
       {#if chosen}
@@ -114,7 +120,7 @@
                 <span class="when">{formatDay(s.startedAt)} <span class="muted">{formatTime(s.startedAt)}</span></span>
                 <span class="what">{s.goal}</span>
                 <span class="stats muted">
-                  {duration(s.startedAt, s.lastAt)}{s.quizTotal ? ` · quizzes ${s.quizRight}/${s.quizTotal}` : ''}{s.asks ? ` · ${plural(s.asks, 'written answer')}` : ''}
+                  {s.kind === 'train' ? 'training · ' : ''}{s.activeMinutes ? `${s.activeMinutes} min` : 'under a minute'}{s.quizTotal ? ` · quizzes ${s.quizRight}/${s.quizTotal}` : ''}{s.asks ? ` · ${plural(s.asks, 'written answer')}` : ''}
                 </span>
               </a>
             </li>

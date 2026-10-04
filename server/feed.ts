@@ -19,6 +19,7 @@ import {
   type QuizItem,
   type QuizResponse,
   type Session,
+  type SessionKind,
   type SessionSummary,
 } from '../shared/types.ts';
 
@@ -111,6 +112,7 @@ export function summarizeSession(record: SessionRecord): SessionSummary | null {
   }
   return {
     id: s.id,
+    kind: s.kind ?? 'learn',
     topic: s.topic,
     topicSlug: s.topicSlug ?? slugify(s.topic),
     goal: s.goal,
@@ -118,11 +120,33 @@ export function summarizeSession(record: SessionRecord): SessionSummary | null {
     lastAt: record.lastAt ?? s.startedAt,
     ...(s.endedAt ? { endedAt: s.endedAt } : {}),
     steps: record.items.filter((i) => i.type === 'block' && i.kind === 'step').length,
+    activeMinutes: activeMinutes(record),
     quizRight,
     quizTotal,
     asks: record.items.filter((i) => i.type === 'ask' && i.answeredAt).length,
     ...(record.handoff ? { handoff: record.handoff } : {}),
   };
+}
+
+const IDLE_MS = 15 * 60_000;
+
+/** Minutes between the session's events, leaving out gaps long enough to mean he was away. */
+function activeMinutes(record: SessionRecord): number {
+  const times = [record.session!.startedAt, record.session!.endedAt];
+  for (const item of record.items) {
+    times.push(item.at);
+    if (isInteractive(item)) times.push(item.answeredAt);
+  }
+  const ms = times
+    .filter((t): t is string => Boolean(t))
+    .map(Date.parse)
+    .sort((a, b) => a - b);
+  let total = 0;
+  for (let i = 1; i < ms.length; i++) {
+    const gap = ms[i] - ms[i - 1];
+    if (gap <= IDLE_MS) total += gap;
+  }
+  return Math.round(total / 60_000);
 }
 
 export class Feed {
@@ -162,10 +186,11 @@ export class Feed {
     this.events.emit('event', event);
   }
 
-  async startSession(topic: string, topicSlug: string, goal: string): Promise<Session> {
+  async startSession(topic: string, topicSlug: string, goal: string, kind: SessionKind = 'learn'): Promise<Session> {
     const now = new Date();
     const session: Session = {
-      id: `${stamp(now)}-${topicSlug}`,
+      id: `${stamp(now)}-${topicSlug || kind}`,
+      kind,
       topic,
       topicSlug,
       goal,
@@ -270,7 +295,8 @@ export function publicItem(item: Item): PublicItem {
   };
 }
 
+/** Local date and time down to the millisecond, so session files sort in the order they were started. */
 function stamp(d: Date): string {
-  const p = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
+  const p = (n: number, w = 2) => String(n).padStart(w, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}${p(d.getMilliseconds(), 3)}`;
 }

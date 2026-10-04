@@ -70,10 +70,15 @@ export function isInteractive<T extends { type: string }>(item: T): item is T & 
   return item.type === 'quiz' || item.type === 'ask';
 }
 
+/** learn: a lesson on one topic; review: fading concepts across topics; train: problems on one topic. */
+export type SessionKind = 'learn' | 'review' | 'train';
+
 export interface Session {
   id: string;
-  /** The topic's title. */
+  kind?: SessionKind;
+  /** The topic's title ("Review" for a review session). */
   topic: string;
+  /** Empty for a review session, which spans topics. */
   topicSlug: string;
   goal: string;
   startedAt: string;
@@ -87,10 +92,27 @@ export type ConceptStatus = 'unknown' | 'shaky' | 'solid';
 export interface Evidence {
   at: string;
   session: string;
-  item: string;
-  kind: 'quiz' | 'ask';
-  /** Quiz answers only. */
-  result?: 'right' | 'wrong' | 'dont-know';
+  /** The feed item it came from, if any. */
+  item?: string;
+  /** quiz and ask: checks during a lesson; practice: reviews and training problems. */
+  kind: 'quiz' | 'ask' | 'practice';
+  /** Quiz answers and practice. */
+  result?: 'right' | 'partial' | 'wrong' | 'dont-know';
+  practice?: 'recall' | 'problem';
+  /** Training problems: difficulty on the topic's 1-10 scale. */
+  difficulty?: number;
+}
+
+/** An FSRS review card, stored with ISO dates. */
+export interface ReviewState {
+  due: string;
+  stability: number;
+  difficulty: number;
+  scheduledDays: number;
+  reps: number;
+  lapses: number;
+  state: number;
+  last?: string;
 }
 
 export interface Concept {
@@ -110,7 +132,14 @@ export interface Concept {
   updated: string;
   /** When it last became solid. */
   solidSince?: string;
+  /** Spaced-review schedule, from the first time it became solid. */
+  review?: ReviewState;
   evidence: Evidence[];
+}
+
+/** Solid, but due for review. */
+export function isFading(concept: Pick<Concept, 'status' | 'review'>, now = Date.now()): boolean {
+  return concept.status === 'solid' && Boolean(concept.review) && Date.parse(concept.review!.due) <= now;
 }
 
 /** What a session leaves for the next one ("done for now"). */
@@ -133,6 +162,8 @@ export interface Topic {
   focus?: string;
   handoff?: Handoff;
   sessions: string[];
+  /** Difficulty of training problems, 1-10, raised as he solves them. */
+  training?: { level: number; updated: string };
 }
 
 export interface MapChange {
@@ -150,12 +181,16 @@ export interface TopicSummary {
   goal: string;
   updated: string;
   counts: Record<ConceptStatus, number>;
+  /** Solid concepts due for review. */
+  fading: number;
   sessions: number;
   handoff?: Handoff;
+  trainingLevel?: number;
 }
 
 export interface SessionSummary {
   id: string;
+  kind: SessionKind;
   topic: string;
   topicSlug: string;
   goal: string;
@@ -163,10 +198,44 @@ export interface SessionSummary {
   lastAt: string;
   endedAt?: string;
   steps: number;
+  /** Time actually spent: gaps over 15 minutes between events don't count. */
+  activeMinutes: number;
   quizRight: number;
   quizTotal: number;
   asks: number;
   handoff?: Handoff;
+}
+
+export interface FadingConcept {
+  topic: string;
+  topicTitle: string;
+  id: string;
+  label: string;
+  summary?: string;
+  due: string;
+  /** Estimated chance he'd recall it now, 0 to 1. */
+  recall: number;
+  lastPractised?: string;
+}
+
+export interface ReviewQueue {
+  fading: FadingConcept[];
+  /** Concepts practised in the current session, in order. */
+  practised: { topic: string; id: string; label: string; result: string; at: string }[];
+  upcoming: number;
+}
+
+export interface Progress {
+  /** Solid concepts across all topics at the end of each day with activity. */
+  solid: { day: string; count: number }[];
+  /** Answers per week (weeks start on Monday), by result. */
+  answers: { week: string; right: number; partial: number; wrong: number }[];
+  /** Minutes per week, by session kind. */
+  minutes: { week: string; learn: number; review: number; train: number }[];
+  fading: FadingConcept[];
+  /** Due within the next seven days. */
+  upcoming: number;
+  training: { topic: string; title: string; level: number }[];
 }
 
 /** An unanswered quiz reaches the interface without its answer key. */

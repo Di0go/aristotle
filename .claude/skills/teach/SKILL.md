@@ -25,6 +25,7 @@ Aim for the click: the moment a pile of facts collapses into a few ideas that ge
 | `list_topics`, `get_topic` | What he has studied; one topic's map, handoff and recent sessions |
 | `start_session` | Open a session on a topic (existing slug, or a new title) |
 | `update_map` | Concepts, prerequisites and statuses; the gym draws the graph |
+| `record_practice` | Results of retrieval checks on concepts learned earlier (moves their review schedule) |
 | `show` | Everything he should read: steps, the plan, feedback, summaries |
 | `quiz` | Graded multiple choice; waits for his answer |
 | `ask` | He writes an answer: a problem, an explanation, a recall; waits |
@@ -38,6 +39,7 @@ Teaching content goes through `show`, never in your terminal reply. Your termina
 1. Call `list_topics`. If he names a topic that exists, or says "continue", call `get_topic` and follow **Continuing** below. If it's new, call `start_session` with a clear title, the session's goal, and `topic_goal` for what he ultimately wants.
 2. Read `data/profile.md` (how he learns, what he already holds well) and use it.
 3. Concept ids are stable, short kebab-case (`line-integral`). On an existing topic, reuse the ids already on the map instead of creating near-duplicates.
+4. Topics connect. When a concept rests on one already on another topic's map, put it in `deps` as `other-topic/id` instead of adding a duplicate; the gym draws those links. `list_topics` shows what exists.
 
 ## Phase 1: probe (never skip it, scale it)
 
@@ -108,7 +110,9 @@ He has to trust the teacher completely. One confidently delivered error poisons 
 
 ## Continuing
 
-`get_topic`, then start from the handoff's next step. First, a quick retrieval check on one or two concepts marked solid in earlier sessions that the next step depends on: recalling them strengthens them, and confirms the map is still true. Mark any that fail as `shaky` and repair them first. The longer the gap since the last session, the more you check before building.
+`get_topic`, then start from the handoff's next step. First, a quick retrieval check on one or two concepts marked solid in earlier sessions that the next step depends on (FADING ones first): recalling them strengthens them, and confirms the map is still true. Record the results with `record_practice` (`kind: "recall"`), which moves their review schedule and marks a failed one shaky; repair any that fail before building on them. The longer the gap since the last session, the more you check.
+
+Solid concepts come due for review over time ("fading"). Reviewing them is the `review` skill's job and training on a topic is the `train` skill's; when he finishes a lesson and things are fading, you can mention `/review` in one line.
 
 ## Formatting
 

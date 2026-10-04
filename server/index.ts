@@ -60,6 +60,9 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ro
     return topic ? json(res, 200, topic) : json(res, 404, { error: 'No such topic' });
   }
   if (req.method === 'GET' && route === '/api/sessions') return json(res, 200, await gym.listSessions());
+  if (req.method === 'GET' && route === '/api/progress') return json(res, 200, await gym.progress());
+  if (req.method === 'GET' && route === '/api/reviews') return json(res, 200, gym.reviewQueue());
+  if (req.method === 'GET' && route === '/api/backup') return json(res, 200, gym.backup.state());
   if (req.method === 'GET' && route.startsWith('/api/sessions/')) {
     const record = await gym.readSession(decodeURIComponent(route.slice('/api/sessions/'.length)));
     if (!record?.session) return json(res, 404, { error: 'No such session' });

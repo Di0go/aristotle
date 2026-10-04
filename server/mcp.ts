@@ -12,7 +12,7 @@ import * as z from 'zod';
 import { KEEPALIVE_MS, URL_CLEAN, WAIT_MS } from './config.ts';
 import type { Gym } from './gym.ts';
 import { describeTopic } from './topics.ts';
-import type { AskItem, MapChange, QuizItem, QuizQuestion, TopicSummary } from '../shared/types.ts';
+import type { AskItem, FadingConcept, MapChange, QuizItem, QuizQuestion, TopicSummary } from '../shared/types.ts';
 
 type Extra = RequestHandlerExtra<ServerRequest, ServerNotification>;
 
@@ -30,7 +30,7 @@ const STATUSES =
 const conceptParam = z
   .string()
   .optional()
-  .describe('Id of the map concept this is about');
+  .describe('Id of the map concept this is about; "topic/id" for a concept in another topic');
 
 export function createMcpServer(gym: Gym): McpServer {
   const mcp = new McpServer(
@@ -82,20 +82,83 @@ export function createMcpServer(gym: Gym): McpServer {
     {
       title: 'Start a session',
       description:
-        'Start a learning session in the Mind Gym. Clears the "Now" view, opens a new session log and links it to a topic. ' +
-        'Pass an existing topic slug to continue that topic (check `list_topics` first), or a new title to create one. ' +
-        'Call it when a sitting starts and whenever the topic changes.',
+        'Start a session in the Mind Gym. Clears the "Now" view and opens a new session log. ' +
+        'kind "learn" (a lesson) and "train" (problems) are on one topic: pass an existing topic slug to continue it (check `list_topics` first), ' +
+        'or a new title to create one. kind "review" practises fading concepts across all topics and takes no topic. ' +
+        'Call it when a sitting starts and whenever the topic or kind changes.',
       inputSchema: {
-        topic: z.string().min(1).describe('Existing topic slug, or the title of a new topic, e.g. "Differential forms"'),
+        kind: z.enum(['learn', 'review', 'train']).default('learn'),
+        topic: z.string().optional().describe('Existing topic slug, or the title of a new topic, e.g. "Differential forms". Not for review'),
         goal: z.string().min(1).describe('What he wants from this session, in one sentence'),
         topic_goal: z.string().optional().describe("For a new topic: what he ultimately wants from it. Defaults to the session's goal"),
       },
     },
-    async ({ topic, goal, topic_goal }) => {
-      const { session, topic: t, created } = await gym.startSession(topic, goal, topic_goal);
-      if (created) return text(`New topic "${t.title}" (${t.slug}) created; session ${session.id} started. The map is empty.`);
+    async ({ kind, topic, goal, topic_goal }) => {
+      if (kind !== 'review' && !topic) return error(`A ${kind} session needs a topic.`);
+      const { session, topic: t, created } = await gym.startSession(topic ?? '', goal, topic_goal, kind);
+      if (!t) {
+        const fading = gym.topics.fading();
+        return text(
+          `Review session ${session.id} started. ${fading.length} concepts are fading:\n${fading.map(formatFading).join('\n') || '(none)'}`,
+        );
+      }
+      if (created) return text(`New topic "${t.title}" (${t.slug}) created; ${kind} session ${session.id} started. The map is empty.`);
       const s = formatSummary(gym.topics.list().find((x) => x.slug === t.slug)!);
-      return text(`Session ${session.id} started on an existing topic:\n${s}\nCall get_topic for the full map.`);
+      return text(`${kind} session ${session.id} started on an existing topic:\n${s}\nCall get_topic for the full map.`);
+    },
+  );
+
+  mcp.registerTool(
+    'due_reviews',
+    {
+      title: 'List fading concepts',
+      description:
+        'List solid concepts that are due for review ("fading"), least likely to be recalled first, with an estimate of his chance of recalling each now. ' +
+        'Spaced review: practising a concept just as it starts to fade is what makes it last.',
+      inputSchema: {
+        topic: z.string().optional().describe('Only this topic (slug)'),
+        limit: z.number().int().min(1).max(50).default(15),
+      },
+    },
+    async ({ topic, limit }) => {
+      const fading = gym.topics.fading(topic);
+      const upcoming = gym.topics.upcoming(7);
+      if (fading.length === 0) return text(`Nothing is fading${topic ? ` in ${topic}` : ''}. ${upcoming} concepts come due in the next 7 days.`);
+      return text(
+        `${fading.length} fading${topic ? ` in ${topic}` : ''} (${upcoming} more due within 7 days):\n` +
+          fading.slice(0, limit).map(formatFading).join('\n'),
+      );
+    },
+  );
+
+  mcp.registerTool(
+    'record_practice',
+    {
+      title: 'Record practice results',
+      description:
+        'Record how he did on review questions and training problems, after you have judged his answers. ' +
+        'Each result moves that concept\'s review schedule (right pushes the next review further out, partial a little, wrong brings it back and makes a solid concept shaky). ' +
+        'For training problems, pass the `difficulty` you set them at: clean solves at or above the topic\'s training level raise it, a miss lowers it. ' +
+        'Quizzes and asks in lessons are recorded automatically; use this for reviews and training.',
+      inputSchema: {
+        results: z
+          .array(
+            z.object({
+              concept: z.string().min(1).describe('Concept id, or "topic/id" outside the session\'s topic'),
+              outcome: z.enum(['right', 'partial', 'wrong']),
+              kind: z.enum(['recall', 'problem']).describe('recall: remembering or explaining it; problem: applying it to solve something'),
+            }),
+          )
+          .min(1),
+        difficulty: z.number().int().min(1).max(10).optional().describe('For problems: the difficulty you pitched them at, 1-10'),
+      },
+    },
+    async ({ results, difficulty }) => {
+      try {
+        return text((await gym.recordPractice(results, difficulty)).join('\n'));
+      } catch (err) {
+        return error((err as Error).message);
+      }
     },
   );
 
@@ -335,12 +398,11 @@ function shuffle(q: QuizQuestion): QuizQuestion {
 }
 
 function formatQuiz(item: QuizItem, gym: Gym): string {
-  const known = new Set(gym.currentTopic()?.concepts.map((c) => c.id));
   const missing = new Set<string>();
   const lines = item.questions.map((q, i) => {
     const r = item.responses?.[i];
     const tag = q.concept ?? q.strand;
-    if (q.concept && !known.has(q.concept)) missing.add(q.concept);
+    if (q.concept && !gym.resolve(q.concept)) missing.add(q.concept);
     const label = `Q${i + 1}${tag ? ` [${tag}]` : ''}`;
     const right = `"${q.options[q.correct]}"`;
     let line: string;
@@ -363,7 +425,14 @@ function formatAsk(item: AskItem): string {
 function formatSummary(t: TopicSummary): string {
   const { solid, shaky, unknown } = t.counts;
   const next = t.handoff ? ` | next: ${t.handoff.next}` : '';
-  return `- ${t.slug}: "${t.title}" (${solid} solid, ${shaky} shaky, ${unknown} unknown; ${t.sessions} sessions; last ${t.updated.slice(0, 10)})${next}`;
+  const fading = t.fading ? `, ${t.fading} fading` : '';
+  const level = t.trainingLevel ? `; training level ${t.trainingLevel}/10` : '';
+  return `- ${t.slug}: "${t.title}" (${solid} solid${fading}, ${shaky} shaky, ${unknown} unknown; ${t.sessions} sessions; last ${t.updated.slice(0, 10)}${level})${next}`;
+}
+
+function formatFading(f: FadingConcept): string {
+  const last = f.lastPractised ? `, last practised ${f.lastPractised.slice(0, 10)}` : '';
+  return `- ${f.topic}/${f.id} "${f.label}" (${f.topicTitle}): recall ~${Math.round(f.recall * 100)}%, due since ${f.due.slice(0, 10)}${last}${f.summary ? `\n    ${f.summary}` : ''}`;
 }
 
 function formatChange(c: MapChange): string {
