@@ -11,7 +11,9 @@ pnpm install
 bash scripts/install-service.sh   # once: runs the gym at login (a systemd user service, no root)
 ```
 
-Open http://gym.test, press **Claude** in the top bar (or `Ctrl+``), then **Start Claude**. Claude Code runs inside the gym, on your own login; talk to it in the box at the bottom of *Now*, or in the terminal drawer. Prefer your own terminal? Run `claude` in this folder instead: the gym starts by itself if it isn't running.
+Open http://gym.test and type what you want to learn into **What do you want to learn?** on *Now*, or pick *Continue*, *Review* or *Train*. The gym starts Claude Code inside itself (on your own login) with that request; the same buttons are on *Topics*, each topic's page and *Progress*. Talk to Claude in the box at the bottom of *Now*, or open the terminal drawer with **Claude** in the top bar (`Ctrl+``). Prefer your own terminal? Run `claude` in this folder: the gym starts by itself if it isn't running.
+
+The buttons run these skills, which you can also type yourself:
 
 | In Claude | What it does |
 |---|---|

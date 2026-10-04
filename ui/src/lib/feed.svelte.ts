@@ -18,8 +18,8 @@ class LiveFeed {
   /** Bumped on every topic change, so pages can refetch summaries. */
   topicVersion = $state(0);
 
-  /** The first question still waiting for the learner, if any. */
-  pending = $derived(this.items.find((i) => isInteractive(i) && !i.answeredAt) ?? null);
+  /** The first question still waiting for the learner, if any. Once a session has ended, nothing is. */
+  pending = $derived(this.session?.endedAt ? null : (this.items.find((i) => isInteractive(i) && !i.answeredAt) ?? null));
   currentTopic = $derived(this.session ? (this.topics[this.session.topicSlug] ?? null) : null);
 
   private source: EventSource | null = null;

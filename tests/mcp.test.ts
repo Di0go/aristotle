@@ -374,3 +374,22 @@ test('preview_svg renders an SVG to a PNG in either theme', async () => {
   assert.equal(bad.isError, true);
   assert.match(textOf(bad), /Could not render/);
 });
+
+test('run starts the command with the request as its first message, or types it in when running', async () => {
+  const { ws, messages } = await openTerminal(BASE);
+  await until(() => messages.some((m) => m.type === 'state'));
+  const output = () => messages.filter((m) => m.type === 'output').map((m) => m.data).join('');
+
+  // Not running: the request becomes an argument. Bash takes it as a script path, which shows it arrived intact.
+  ws.send(JSON.stringify({ type: 'run', text: '/teach the french revolution', initial: 'Use the teach skill to teach me: the french revolution' }));
+  await until(() => /bash: Use the teach skill to teach me: the french revolution: /.test(output()));
+  await until(() => messages.some((m) => m.type === 'exit'));
+
+  // Running: the request is typed in.
+  ws.send(JSON.stringify({ type: 'start' }));
+  await until(() => messages.filter((m) => m.type === 'state' && m.running).length >= 2);
+  ws.send(JSON.stringify({ type: 'run', text: 'echo typed-$((6*7))' }));
+  await until(() => /typed-42/.test(output()));
+  ws.send(JSON.stringify({ type: 'stop' }));
+  ws.close();
+});

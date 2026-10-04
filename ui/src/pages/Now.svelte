@@ -1,15 +1,21 @@
 <script lang="ts">
   import { tick } from 'svelte';
   import { feed } from '../lib/feed.svelte.ts';
+  import { claude } from '../lib/claude.svelte.ts';
   import { link } from '../lib/router.svelte.ts';
   import FeedList from '../lib/FeedList.svelte';
   import MapGraph from '../lib/MapGraph.svelte';
   import StatusBar from '../lib/StatusBar.svelte';
   import ReviewPanel from '../lib/ReviewPanel.svelte';
   import Composer from '../lib/Composer.svelte';
+  import StartPanel from '../lib/StartPanel.svelte';
   import { isFading, type ConceptStatus } from '../../../shared/types.ts';
 
   let mapOpen = $state(false);
+  /** Set when something was started from the interface, until the new session appears. */
+  let startedFrom = $state<string | null>(null);
+  const waiting = $derived(startedFrom !== null && (feed.session?.id ?? '') === startedFrom);
+  const idle = $derived(!feed.session || Boolean(feed.session.endedAt));
   let count = 0;
 
   const topic = $derived(feed.currentTopic);
@@ -63,22 +69,27 @@
       </header>
     {/if}
 
-    {#if feed.items.length === 0}
+    {#if feed.items.length === 0 && feed.session && !idle}
       <div class="empty">
-        <h1>{feed.session ? 'Session started' : 'Nothing here yet'}</h1>
-        <p>
-          {#if feed.session}
-            Claude is getting ready.
-          {:else}
-            Tell Claude what you want to learn: <code>/teach</code> and a topic, <code>/review</code>, or <code>/train</code>.
-            Use the box below, or Claude Code in <code>~/Projects/Learn</code>.
-          {/if}
-        </p>
+        <h1>Session started</h1>
+        <p>Claude is getting ready.</p>
       </div>
-    {:else}
+    {:else if feed.items.length}
       <FeedList items={feed.items} pendingId={feed.pending?.id ?? null} />
       {#if feed.session?.endedAt}
-        <p class="hint">Session ended. Start a new one whenever you like.</p>
+        <p class="hint">Session ended.</p>
+      {/if}
+    {/if}
+
+    {#if idle}
+      {#if waiting}
+        <div class="starting card">
+          <i class="run-dot busy"></i>
+          <span>Claude is getting ready. The lesson will appear here.</span>
+          {#if claude.asking}<button class="link" onclick={() => claude.toggle(true)}>Claude is asking something: open the terminal</button>{/if}
+        </div>
+      {:else}
+        <StartPanel onstarted={() => (startedFrom = feed.session?.id ?? '')} />
       {/if}
     {/if}
     <Composer />

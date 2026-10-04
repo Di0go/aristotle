@@ -5,6 +5,7 @@
   import MapGraph from '../lib/MapGraph.svelte';
   import StatusBar from '../lib/StatusBar.svelte';
   import ConceptPanel from '../lib/ConceptPanel.svelte';
+  import { actions } from '../lib/actions.ts';
   import { isFading, type ConceptStatus, type SessionSummary } from '../../../shared/types.ts';
 
   let { slug, concept = undefined }: { slug: string; concept?: string } = $props();
@@ -64,6 +65,11 @@
       <a class="eyebrow" href={link.topics()}>Topics</a>
       <h1>{topic.title}</h1>
       <p>{topic.goal}</p>
+      <div class="topic-actions">
+        <button class="primary" onclick={() => actions.continueTopic(slug)}>{topic.concepts.length ? 'Continue lesson' : 'Start lesson'}</button>
+        {#if counts.solid >= 2}<button class="ghost" onclick={() => actions.train(slug)}>Train</button>{/if}
+        {#if fading}<button class="ghost" onclick={() => actions.review(slug)}>Review {fading} fading</button>{/if}
+      </div>
       <div class="topic-stats">
         <StatusBar {counts} {fading} legend />
         <span class="muted">

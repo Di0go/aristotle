@@ -2,6 +2,7 @@
   import { feed } from '../lib/feed.svelte.ts';
   import { link } from '../lib/router.svelte.ts';
   import { ago, plural } from '../lib/format.ts';
+  import { actions } from '../lib/actions.ts';
   import StepChart from '../lib/charts/StepChart.svelte';
   import StackedColumns from '../lib/charts/StackedColumns.svelte';
   import TableView from '../lib/charts/TableView.svelte';
@@ -76,7 +77,7 @@
       <div class="card tile">
         <span class="tile-label">Fading now</span>
         <span class="tile-value">{progress.fading.length}</span>
-        <span class="tile-sub">{progress.fading.length ? 'Run /review in Claude Code' : 'Nothing to review'}</span>
+        <span class="tile-sub">{progress.fading.length ? 'Due for practice' : 'Nothing to review'}</span>
       </div>
       <div class="card tile">
         <span class="tile-label">Due in the next 7 days</span>
@@ -95,7 +96,10 @@
       {#if fadingByTopic.length === 0}
         <p class="muted">Nothing is fading. {progress.upcoming ? `${plural(progress.upcoming, 'concept')} come due in the next 7 days.` : ''}</p>
       {:else}
-        <p class="muted">Solid once, now due for practice. Recalling them just as they fade is what makes them last. Type <code>/review</code> in Claude Code.</p>
+        <div class="fading-intro">
+          <p class="muted">Solid once, now due for practice. Recalling them just as they fade is what makes them last.</p>
+          <button class="primary" onclick={() => actions.review()}>Review now</button>
+        </div>
         <div class="fading-groups">
           {#each fadingByTopic as g (g.slug)}
             <div class="card fading-group">

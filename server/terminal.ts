@@ -21,6 +21,7 @@ export type TerminalMessage =
 
 type ClientMessage =
   | { type: 'start'; resume?: boolean }
+  | { type: 'run'; text: string; initial?: string }
   | { type: 'stop' }
   | { type: 'input'; data: string }
   | { type: 'send'; text: string }
@@ -39,10 +40,12 @@ export class Terminal {
     return this.proc !== null;
   }
 
-  start(resume = false) {
+  /** Starts Claude Code; `prompt` becomes its first message. */
+  start(resume = false, prompt?: string) {
     if (this.proc) return;
     const [file, ...args] = COMMAND.split(' ');
     if (resume) args.push('--continue');
+    if (prompt) args.push(prompt);
     const home = os.homedir();
     this.buffer = '';
     this.bracketedPaste = false;
@@ -77,6 +80,18 @@ export class Terminal {
     this.proc?.kill();
   }
 
+  /**
+   * A request from the interface. If Claude Code is running, `text` is typed in (slash commands work there, and
+   * queue while it is busy). If not, Claude Code starts with `initial` as its first message: an opening message
+   * that begins with "/" is only put in the input box, not sent, so `initial` says the same thing in words.
+   */
+  run(text: string, initial = text) {
+    const clean = text.trim();
+    if (!clean) return;
+    if (this.proc) this.send(clean);
+    else this.start(false, initial.trim() || clean);
+  }
+
   /** Types a message into Claude Code and submits it, as if typed at the prompt. */
   send(text: string) {
     if (!this.proc) return;
@@ -103,6 +118,9 @@ export class Terminal {
       else if (msg.type === 'stop') this.stop();
       else if (msg.type === 'input' && typeof msg.data === 'string') this.proc?.write(msg.data);
       else if (msg.type === 'send' && typeof msg.text === 'string') this.send(msg.text);
+      else if (msg.type === 'run' && typeof msg.text === 'string') {
+        this.run(msg.text, typeof msg.initial === 'string' ? msg.initial : undefined);
+      }
       else if (msg.type === 'resize') this.resize(msg.cols, msg.rows);
     });
     ws.on('close', () => this.clients.delete(ws));

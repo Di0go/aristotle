@@ -91,6 +91,13 @@ class Claude {
     this.post({ type: 'send', text });
   }
 
+  /** Asks Claude to do something: `command` is typed in if it is running here, otherwise it starts with `initial`. */
+  run(command: string, initial: string) {
+    this.asking = false;
+    this.recent = '';
+    this.post({ type: 'run', text: command, initial });
+  }
+
   resize(cols: number, rows: number) {
     this.post({ type: 'resize', cols, rows });
   }

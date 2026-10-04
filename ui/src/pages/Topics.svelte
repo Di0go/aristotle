@@ -3,9 +3,11 @@
   import { link } from '../lib/router.svelte.ts';
   import { ago, plural } from '../lib/format.ts';
   import StatusBar from '../lib/StatusBar.svelte';
+  import StartPanel from '../lib/StartPanel.svelte';
   import type { TopicSummary } from '../../../shared/types.ts';
 
   let topics = $state<TopicSummary[] | null>(null);
+  let adding = $state(false);
 
   $effect(() => {
     void feed.topicVersion;
@@ -16,19 +18,21 @@
 </script>
 
 <div class="page">
-  <header class="page-head">
-    <h1>Topics</h1>
-    <p>Everything you've worked on, and how much of each map is solid.</p>
+  <header class="page-head with-action">
+    <div>
+      <h1>Topics</h1>
+      <p>Everything you've worked on, and how much of each map is solid.</p>
+    </div>
+    <button class="primary" onclick={() => (adding = !adding)} aria-expanded={adding}>New topic</button>
   </header>
+
+  {#if adding || topics?.length === 0}
+    <div class="start-wrap"><StartPanel compact onstarted={() => (adding = false)} /></div>
+  {/if}
 
   {#if topics === null}
     <p class="muted">Loading…</p>
-  {:else if topics.length === 0}
-    <div class="empty">
-      <h1>No topics yet</h1>
-      <p>Start one from Claude Code: <code>/teach</code> and whatever you want to learn.</p>
-    </div>
-  {:else}
+  {:else if topics.length}
     <div class="topic-grid">
       {#each topics as t (t.slug)}
         {@const total = t.counts.solid + t.counts.shaky + t.counts.unknown}
