@@ -487,3 +487,14 @@ test('images: only licences that allow reuse get through', () => {
   }
   assert.equal(allowed('CC BY 4.0', 'personality'), false, 'restricted');
 });
+
+test('a question can carry the step that leads into it, in one call', async () => {
+  await call('start_session', { topic: 'Differential forms', goal: 'One call per step' });
+  const res = textOf(await call('ask', { prompt: 'Why?', kind: 'explain', lead: { markdown: 'Here is the step.', title: 'The step', concept: 'vector' } }));
+  assert.match(res, /No answer yet/);
+  const items = (await get<FeedState>('/api/state')).items;
+  const [step, ask] = items.slice(-2);
+  assert.equal(step.type, 'block');
+  assert.equal(step.type === 'block' && step.markdown, 'Here is the step.');
+  assert.equal(ask.type, 'ask');
+});

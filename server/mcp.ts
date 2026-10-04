@@ -22,6 +22,7 @@ type Extra = RequestHandlerExtra<ServerRequest, ServerNotification>;
 const text = (t: string): CallToolResult => ({ content: [{ type: 'text', text: t }] });
 const error = (t: string): CallToolResult => ({ ...text(t), isError: true });
 
+/** Everything a lesson's Markdown can hold. Written out once, in `show`; quiz and ask point here. */
 const MATH_AND_DIAGRAMS =
   'Markdown is rendered with LaTeX maths ($...$ inline, $$...$$ on its own lines; write a literal dollar as \\$), ' +
   '```mermaid code blocks as diagrams, and inline <svg> elements (which may animate with SMIL <animate>; the gym adds play and replay buttons). ' +
@@ -36,6 +37,16 @@ const MATH_AND_DIAGRAMS =
   '```plate (a real image with numbered markers: {title, src, alt, credit, license, source, markers:[{x:%, y:%, label, detail?}]}; take images from find_images, which checks the licence, and place markers with view_image). ' +
   'Hand-built interactive figures (explorables): ```explorable {"id":"heart-rate","age":24,"start":"resting"|"asleep"|"called"|"round"|"transplant"} (brake and accelerator sliders driving a beating heart and its trace; shows the brake is fast and the accelerator slow) and ' +
   '```explorable {"id":"stress-hormones","minutes":10,"second":false} (heart rate, adrenaline and cortisol over two hours after a stressor, with a second-round option).';
+const SAME_MARKDOWN = 'Markdown is rendered as in `show` (maths, hover terms, callouts, figures, kit blocks).';
+
+const leadParam = z
+  .object({
+    markdown: z.string().min(1),
+    title: z.string().optional(),
+    concept: z.string().optional(),
+  })
+  .optional()
+  .describe('A teaching step to show just before the question, in the same call (saves a round trip): the step and its check together');
 
 const STATUSES =
   'Statuses: "unknown" = he has not shown he holds it; "shaky" = partly (needed help, inconsistent, or holds a misconception: say which in `note`); ' +
@@ -331,7 +342,7 @@ export function createMcpServer(gym: Gym): McpServer {
         'Write every option as a bare claim of similar length and form, with no reasoning in it, so the right one cannot be spotted by its wording; ' +
         'put the reasoning in `explanation`. Each wrong option should be a mistake he might really make. ' +
         'Tag each question with its map `concept` so the answer is recorded on the map. ' +
-        MATH_AND_DIAGRAMS,
+        SAME_MARKDOWN,
       inputSchema: {
         questions: z
           .array(
@@ -346,15 +357,17 @@ export function createMcpServer(gym: Gym): McpServer {
           )
           .min(1)
           .max(5),
+        lead: leadParam,
       },
     },
-    async ({ questions }, extra) => {
+    async ({ questions, lead }, extra) => {
       if (!gym.feed.session) return error('No session: call start_session first.');
       for (const [i, q] of questions.entries()) {
         if (q.correct >= q.options.length) {
           return error(`Question ${i + 1}: correct is ${q.correct} but there are ${q.options.length} options.`);
         }
       }
+      await showLead(gym, lead);
       const item = await gym.feed.add({ type: 'quiz', questions: questions.map(shuffle) });
       const answered = await waitForLearner(gym, item.id, extra);
       if (answered?.type !== 'quiz') return notAnswered();
@@ -371,7 +384,7 @@ export function createMcpServer(gym: Gym): McpServer {
         'Ask the learner to write an answer in the Mind Gym and wait for it: a problem to solve without help, ' +
         'a concept to explain in his own words, or something to recall from memory. Producing an answer is a heavier, more telling check than recognising one. ' +
         'The interface gives him a text box with a live maths preview. Critique what he writes with `show` (kind "feedback"). ' +
-        MATH_AND_DIAGRAMS,
+        SAME_MARKDOWN,
       inputSchema: {
         prompt: z.string().min(1).describe('The question, in Markdown'),
         kind: z
@@ -380,10 +393,12 @@ export function createMcpServer(gym: Gym): McpServer {
           .describe('problem: solve it; explain: put it in your own words; recall: answer from memory; open: anything else'),
         concept: conceptParam,
         placeholder: z.string().optional().describe('Hint text shown in the empty box'),
+        lead: leadParam,
       },
     },
-    async ({ prompt, kind, concept, placeholder }, extra) => {
+    async ({ prompt, kind, concept, placeholder, lead }, extra) => {
       if (!gym.feed.session) return error('No session: call start_session first.');
+      await showLead(gym, lead);
       const item = await gym.feed.add({
         type: 'ask',
         kind,
@@ -541,6 +556,13 @@ function renderSvg(svg: string, dark: boolean): Promise<Buffer> {
     );
     child.stdin?.end(themed);
   });
+}
+
+/** The step that leads into a question, when it comes in the same call. */
+async function showLead(gym: Gym, lead?: { markdown: string; title?: string; concept?: string }) {
+  if (!lead) return;
+  await gym.feed.add({ type: 'block', kind: 'step', markdown: lead.markdown, ...(lead.title ? { title: lead.title } : {}), ...(lead.concept ? { concept: lead.concept } : {}) });
+  if (lead.concept) await gym.focus(lead.concept);
 }
 
 /** Waits for the learner, sending progress notifications so the call doesn't look idle. */

@@ -35,6 +35,8 @@ export class Gym {
   readonly roadmaps: Roadmaps;
   readonly backup = new Backup();
   private summaries = new Map<string, { mtime: number; summary: SessionSummary | null }>();
+  /** The map changes in each session log, cached by modification time like the summaries. */
+  private mapChanges = new Map<string, { mtime: number; changes: { at: string; key: string; to?: string; removed?: boolean }[] }>();
 
   constructor(feed: Feed, topics: Topics, roadmaps: Roadmaps) {
     this.feed = feed;
@@ -233,11 +235,19 @@ export class Gym {
     const byDay = new Map<string, number>();
     const changes: { at: string; key: string; to?: string; removed?: boolean }[] = [];
     for (const name of await sessionFiles()) {
-      const record = await readSession(path.join(SESSIONS_DIR, name));
-      for (const item of record.items) {
-        if (item.type !== 'map') continue;
-        for (const c of item.changes) changes.push({ at: item.at, key: `${item.topic}/${c.id}`, to: c.to, removed: c.removed });
+      const file = path.join(SESSIONS_DIR, name);
+      const mtime = (await stat(file)).mtimeMs;
+      let cached = this.mapChanges.get(file);
+      if (!cached || cached.mtime !== mtime) {
+        const found: { at: string; key: string; to?: string; removed?: boolean }[] = [];
+        for (const item of (await readSession(file)).items) {
+          if (item.type !== 'map') continue;
+          for (const c of item.changes) found.push({ at: item.at, key: `${item.topic}/${c.id}`, to: c.to, removed: c.removed });
+        }
+        cached = { mtime, changes: found };
+        this.mapChanges.set(file, cached);
       }
+      changes.push(...cached.changes);
     }
     changes.sort((a, b) => a.at.localeCompare(b.at));
     for (const c of changes) {

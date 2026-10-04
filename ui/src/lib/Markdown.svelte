@@ -3,19 +3,21 @@
   import { feed } from './feed.svelte.ts';
   import { link } from './router.svelte.ts';
   import { renderMarkdown, renderInline } from './markdown.ts';
-  import Sequence from './Sequence.svelte';
-  import Balance from './kit/Balance.svelte';
-  import Timeline from './kit/Timeline.svelte';
-  import Flow from './kit/Flow.svelte';
-  import Plate from './kit/Plate.svelte';
-  import HeartRate from './explorables/HeartRate.svelte';
-  import StressHormones from './explorables/StressHormones.svelte';
-
+  // Figures load on first use, so a lesson without them never downloads them.
+  type Loader = () => Promise<{ default: unknown }>;
+  const Sequence: Loader = () => import('./Sequence.svelte');
   /** Hand-built interactive figures, placed with ```explorable {"id": "...", ...options}. */
-  const EXPLORABLES: Record<string, unknown> = { 'heart-rate': HeartRate, 'stress-hormones': StressHormones };
-
+  const EXPLORABLES: Record<string, Loader> = {
+    'heart-rate': () => import('./explorables/HeartRate.svelte'),
+    'stress-hormones': () => import('./explorables/StressHormones.svelte'),
+  };
   /** The visual kit: a fenced block in one of these languages becomes that component, filled from its JSON. */
-  const KIT = { balance: Balance, timeline: Timeline, flow: Flow, plate: Plate } as const;
+  const KIT: Record<string, Loader> = {
+    balance: () => import('./kit/Balance.svelte'),
+    timeline: () => import('./kit/Timeline.svelte'),
+    flow: () => import('./kit/Flow.svelte'),
+    plate: () => import('./kit/Plate.svelte'),
+  };
 
   let { source, inline = false }: { source: string; inline?: boolean } = $props();
 
@@ -43,55 +45,55 @@
     }
   });
 
-  // Step-through sequences and the visual kit's figures become live components.
+  // Step-through sequences, explorables and the visual kit's figures become live components.
   $effect(() => {
     void html;
     const mounted: ReturnType<typeof mount>[] = [];
-    for (const code of el?.querySelectorAll<HTMLElement>('pre > code.language-sequence') ?? []) {
-      const pre = code.parentElement!;
+    let gone = false;
+    const place = (pre: HTMLElement, load: Loader, props: Record<string, unknown>) => {
       const host = document.createElement('div');
+      host.className = 'figure-loading';
       pre.replaceWith(host);
-      mounted.push(mount(Sequence, { target: host, props: { source: code.textContent ?? '' } }));
+      void load().then((m) => {
+        if (gone) return;
+        host.className = '';
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        mounted.push(mount(m.default as any, { target: host, props }));
+      });
+    };
+    const json = (pre: HTMLElement, code: HTMLElement, what: string) => {
+      try {
+        return JSON.parse(code.textContent ?? '');
+      } catch (err) {
+        pre.classList.add('diagram-error');
+        pre.title = `This ${what} could not be read: ${(err as Error).message}`;
+        return undefined;
+      }
+    };
+    for (const code of el?.querySelectorAll<HTMLElement>('pre > code.language-sequence') ?? []) {
+      place(code.parentElement!, Sequence, { source: code.textContent ?? '' });
     }
     for (const code of el?.querySelectorAll<HTMLElement>('pre > code.language-explorable') ?? []) {
       const pre = code.parentElement!;
-      let spec: { id?: string } & Record<string, unknown>;
-      try {
-        spec = JSON.parse(code.textContent ?? '{}');
-      } catch (err) {
-        pre.classList.add('diagram-error');
-        pre.title = `This explorable could not be read: ${(err as Error).message}`;
-        continue;
-      }
-      const Component = EXPLORABLES[spec.id ?? ''];
-      if (!Component) {
+      const spec = json(pre, code, 'explorable');
+      if (!spec) continue;
+      const load = EXPLORABLES[spec.id ?? ''];
+      if (!load) {
         pre.classList.add('diagram-error');
         pre.title = `No explorable called "${spec.id}". Available: ${Object.keys(EXPLORABLES).join(', ')}`;
         continue;
       }
-      const host = document.createElement('div');
-      pre.replaceWith(host);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      mounted.push(mount(Component as any, { target: host, props: { spec } }));
+      place(pre, load, { spec });
     }
-    for (const [lang, Component] of Object.entries(KIT)) {
+    for (const [lang, load] of Object.entries(KIT)) {
       for (const code of el?.querySelectorAll<HTMLElement>(`pre > code.language-${lang}`) ?? []) {
         const pre = code.parentElement!;
-        let spec: unknown;
-        try {
-          spec = JSON.parse(code.textContent ?? '');
-        } catch (err) {
-          pre.classList.add('diagram-error');
-          pre.title = `This ${lang} figure could not be read: ${(err as Error).message}`;
-          continue;
-        }
-        const host = document.createElement('div');
-        pre.replaceWith(host);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        mounted.push(mount(Component as any, { target: host, props: { spec } }));
+        const spec = json(pre, code, `${lang} figure`);
+        if (spec) place(pre, load, { spec });
       }
     }
     return () => {
+      gone = true;
       for (const m of mounted) void unmount(m);
     };
   });

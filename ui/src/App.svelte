@@ -11,14 +11,28 @@
   import './lib/tabs.svelte.ts';
   import { link, router } from './lib/router.svelte.ts';
   import Now from './pages/Now.svelte';
-  import Progress from './pages/Progress.svelte';
-  import KnowledgeMap from './pages/KnowledgeMap.svelte';
-  import Topic from './pages/Topic.svelte';
-  import Roadmaps from './pages/Roadmaps.svelte';
-  import Roadmap from './pages/Roadmap.svelte';
-  import Log from './pages/Log.svelte';
-  import SessionView from './pages/SessionView.svelte';
-  import Lesson from './pages/Lesson.svelte';
+
+  // Pages other than Now load on first visit (the map pages bring the graph layout engine with them).
+  import type { Component } from 'svelte';
+  type Page = () => Promise<{ default: Component<Record<string, unknown>> }>;
+  const pages: Record<string, Page> = {
+    progress: () => import('./pages/Progress.svelte') as never,
+    map: () => import('./pages/KnowledgeMap.svelte') as never,
+    roadmaps: () => import('./pages/Roadmaps.svelte') as never,
+    roadmap: () => import('./pages/Roadmap.svelte') as never,
+    topic: () => import('./pages/Topic.svelte') as never,
+    lesson: () => import('./pages/Lesson.svelte') as never,
+    log: () => import('./pages/Log.svelte') as never,
+    session: () => import('./pages/SessionView.svelte') as never,
+  };
+  /** What the current page is told: its slug or id, and for a topic the selected concept. */
+  const pageProps = $derived.by((): Record<string, unknown> => {
+    const r = router.route;
+    if (r.page === 'topic') return { slug: r.slug, concept: r.concept };
+    if ('slug' in r) return { slug: r.slug };
+    if ('id' in r) return { id: r.id };
+    return {};
+  });
 
   feed.start();
   claude.connect();
@@ -51,31 +65,20 @@
       <button onclick={() => (railOpen = true)} aria-label="Open the library">
         <svg viewBox="0 0 18 18" aria-hidden="true"><path d="M3 5h12M3 9h12M3 13h12" /></svg>
       </button>
-      <a class="mobile-brand" href={link.now()}>mind-gym</a>
+      <a class="mobile-brand" href={link.now()}><svg class="mobile-mark" viewBox="0 0 32 32" aria-hidden="true"><path d="M22.6 9.2 A9 9 0 1 0 25 16.2" fill="none" stroke="var(--acc)" stroke-width="3.2" stroke-linecap="round" /><circle cx="16" cy="16" r="2.6" fill="currentColor" /></svg>mind-gym</a>
       {#if feed.pending}<a class="turn" href={link.now()}>Your turn</a>{/if}
     </header>
     <TabBar />
     <main class="page-area">
       {#if route.page === 'now'}
         <Now />
-      {:else if route.page === 'progress'}
-        <Progress />
-      {:else if route.page === 'map'}
-        <KnowledgeMap />
-      {:else if route.page === 'roadmaps'}
-        <Roadmaps />
-      {:else if route.page === 'roadmap'}
-        {#key route.slug}<Roadmap slug={route.slug} />{/key}
-      {:else if route.page === 'topics'}
-        <Roadmaps />
-      {:else if route.page === 'topic'}
-        {#key route.slug}<Topic slug={route.slug} concept={route.concept} />{/key}
-      {:else if route.page === 'lesson'}
-        {#key route.slug}<Lesson slug={route.slug} />{/key}
-      {:else if route.page === 'log'}
-        <Log />
       {:else}
-        {#key route.id}<SessionView id={route.id} />{/key}
+        {@const r = route}
+        {#await pages[r.page === 'topics' ? 'roadmaps' : r.page]() then m}
+          {#key 'slug' in r ? r.slug : 'id' in r ? r.id : r.page}
+            <m.default {...pageProps} />
+          {/key}
+        {/await}
       {/if}
     </main>
   </div>

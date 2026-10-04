@@ -190,7 +190,15 @@ body.resizing {
   }
 
   .mobile-brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
     color: var(--fg);
+  }
+
+  .mobile-mark {
+    width: 20px;
+    height: 20px;
   }
 
   .mobile-bar .turn {

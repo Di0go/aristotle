@@ -478,3 +478,18 @@
 .kit-ticks button.seen {
   background: var(--acc);
 }
+
+/* A figure on its way in: holds the space so the page doesn't jump when it arrives. */
+.figure-loading {
+  min-height: 220px;
+  margin: 1.8em 0;
+  border-radius: var(--radius-lg);
+  background: var(--b1);
+  animation: pulse-bg 1.4s ease-in-out infinite;
+}
+
+@keyframes pulse-bg {
+  50% {
+    opacity: 0.55;
+  }
+}
