@@ -19,7 +19,8 @@ The method is in the skills: `teach` for lessons (use it whenever he wants to le
 ## Working on the app
 
 - Stack: Svelte 5 + Vite interface (`ui/`), a plain Node HTTP server run directly as TypeScript (`server/`), types shared in `shared/`. The MCP endpoint is `/mcp` on the same server.
-- Claude Code reaches the server through `server/bridge.ts` (stdio, see `.mcp.json`), which starts the server if it isn't running.
+- Claude Code reaches the server through `server/bridge.ts` (stdio, see `.mcp.json`), which starts the server if it isn't running. The server can also run Claude Code itself, in a pseudo-terminal streamed to the interface (`server/terminal.ts`); its WebSocket must only ever accept the gym's own Origin.
+- When installed, `mind-gym.service` (systemd user service, `scripts/install-service.sh`) runs the server at login; `server/control.ts` goes through systemd when it is enabled.
 - `pnpm check` (types), `pnpm test` (end to end: real server, MCP client, HTTP answers), `pnpm start` (build the interface and restart the server), `pnpm gym status|start|stop|restart`.
 - After changing server code run `pnpm gym restart`; after changing the interface run `pnpm build`.
 - The server backs up `data/` to the private GitHub repo by itself (`server/backup.ts`); don't commit `data/` by hand.

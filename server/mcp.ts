@@ -1,5 +1,6 @@
 // The tools Claude Code uses to teach through the interface.
 
+import { execFile } from 'node:child_process';
 import { randomInt } from 'node:crypto';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
@@ -331,6 +332,29 @@ export function createMcpServer(gym: Gym): McpServer {
   );
 
   mcp.registerTool(
+    'preview_svg',
+    {
+      title: 'Preview an SVG',
+      description:
+        'Render an SVG to an image and look at it before showing it to the learner: check that labels are legible and not overlapping, ' +
+        'that nothing is cut off, and that the drawing says what it should. The gym shows inline SVG in light and dark themes; ' +
+        'use currentColor for lines and text so they follow the theme, and preview with dark: true to check.',
+      inputSchema: {
+        svg: z.string().min(1).describe('The SVG markup, starting with <svg'),
+        dark: z.boolean().default(false).describe("Render on the dark theme's background and text colour"),
+      },
+    },
+    async ({ svg, dark }) => {
+      try {
+        const png = await renderSvg(svg, dark);
+        return { content: [{ type: 'image', data: png.toString('base64'), mimeType: 'image/png' }] };
+      } catch (err) {
+        return error(`Could not render the SVG: ${(err as Error).message}`);
+      }
+    },
+  );
+
+  mcp.registerTool(
     'end_session',
     {
       title: 'End the session',
@@ -355,6 +379,29 @@ export function createMcpServer(gym: Gym): McpServer {
   );
 
   return mcp;
+}
+
+const THEME = {
+  light: { background: '#ffffff', ink: '#1f1e1c' },
+  dark: { background: '#1d1c1a', ink: '#ebe8e2' },
+};
+
+/** SVG to PNG with rsvg-convert, on the gym's card colours, so currentColor renders as it would in the gym. */
+function renderSvg(svg: string, dark: boolean): Promise<Buffer> {
+  const theme = dark ? THEME.dark : THEME.light;
+  const themed = svg.replace(/<svg\b/, `<svg color="${theme.ink}"`);
+  return new Promise((resolve, reject) => {
+    const child = execFile(
+      'rsvg-convert',
+      ['--background-color', theme.background, '--zoom', '2', '--format', 'png'],
+      { encoding: 'buffer', maxBuffer: 20 * 1024 * 1024, timeout: 15_000 },
+      (err, stdout, stderr) => {
+        if (err) reject(new Error(String(stderr || err.message).trim()));
+        else resolve(stdout);
+      },
+    );
+    child.stdin?.end(themed);
+  });
 }
 
 /** Waits for the learner, sending progress notifications so the call doesn't look idle. */

@@ -6,15 +6,19 @@ import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
+import { WebSocketServer } from 'ws';
 import { ALLOWED_NAMES, ALLOWED_PORTS, HOST, PORT, UI_DIR, URL_CLEAN } from './config.ts';
 import { PID_FILE } from './control.ts';
 import { AnswerError, publicItem } from './feed.ts';
 import { Gym } from './gym.ts';
 import { createMcpServer } from './mcp.ts';
+import { Terminal } from './terminal.ts';
 import type { AskAnswerBody, FeedEvent, QuizAnswerBody } from '../shared/types.ts';
 
 const gym = await Gym.load();
 const feed = gym.feed;
+const terminal = new Terminal();
+const sockets = new WebSocketServer({ noServer: true });
 
 const server = http.createServer(async (req, res) => {
   try {
@@ -32,6 +36,18 @@ const server = http.createServer(async (req, res) => {
     if (!res.headersSent) send(res, 500, 'Server error');
     else res.end();
   }
+});
+
+// The terminal runs Claude Code, so it is only ever reachable from the gym's own pages: a browser always
+// sends an Origin on a WebSocket, and other sites (or a rebound DNS name) fail the Host and Origin checks.
+server.on('upgrade', (req, socket, head) => {
+  const url = new URL(req.url ?? '/', 'http://localhost');
+  if (url.pathname !== '/api/terminal' || !localHost(req.headers.host) || !req.headers.origin || !localOrigin(req.headers.origin)) {
+    socket.write('HTTP/1.1 403 Forbidden\r\n\r\n');
+    socket.destroy();
+    return;
+  }
+  sockets.handleUpgrade(req, socket, head, (ws) => terminal.attach(ws));
 });
 
 async function handleMcp(req: http.IncomingMessage, res: http.ServerResponse) {
@@ -188,6 +204,7 @@ server.listen(PORT, HOST, () => {
 
 function shutdown() {
   rmSync(PID_FILE, { force: true });
+  terminal.stop();
   server.close();
   server.closeAllConnections();
   process.exit(0);

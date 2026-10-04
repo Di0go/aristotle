@@ -8,6 +8,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import WebSocket from 'ws';
 import type { FeedState, Progress, PublicItem, ReviewQueue, SessionSummary, Topic, TopicSummary } from '../shared/types.ts';
 
 const PORT = 4799;
@@ -18,7 +19,14 @@ let client: Client;
 
 async function startServer() {
   server = spawn('node', ['server/index.ts'], {
-    env: { ...process.env, GYM_PORT: String(PORT), GYM_DATA_DIR: dataDir, GYM_WAIT_MS: '1500' },
+    env: {
+      ...process.env,
+      GYM_PORT: String(PORT),
+      GYM_DATA_DIR: dataDir,
+      GYM_WAIT_MS: '1500',
+      GYM_CLAUDE_CMD: 'bash --norc --noprofile',
+      PS1: '$ ',
+    },
     stdio: 'inherit',
   });
   for (let i = 0; i < 50; i++) {
@@ -74,6 +82,7 @@ test('lists the tools', async () => {
     'end_session',
     'get_topic',
     'list_topics',
+    'preview_svg',
     'quiz',
     'record_practice',
     'show',
@@ -306,4 +315,62 @@ test('a concept past its review date is fading, and a review session practises i
   assert.ok(progress.answers.length >= 1);
   assert.deepEqual(progress.training, [{ topic: 'spaced', title: 'Spaced', level: 1 }]);
   assert.equal(progress.fading.length, 0);
+});
+
+function openTerminal(origin?: string): Promise<{ ws: WebSocket; messages: { type: string; data?: string; running?: boolean }[] }> {
+  return new Promise((resolve, reject) => {
+    const ws = new WebSocket(`ws://localhost:${PORT}/api/terminal`, origin ? { origin } : {});
+    const messages: { type: string; data?: string; running?: boolean }[] = [];
+    ws.on('message', (raw) => messages.push(JSON.parse(String(raw))));
+    ws.on('open', () => resolve({ ws, messages }));
+    ws.on('error', reject);
+  });
+}
+
+async function until(check: () => boolean, ms = 5000) {
+  const end = Date.now() + ms;
+  while (!check()) {
+    if (Date.now() > end) throw new Error('Timed out');
+    await new Promise((r) => setTimeout(r, 30));
+  }
+}
+
+test('the terminal runs the command, takes messages, and only opens to the gym itself', async () => {
+  await assert.rejects(openTerminal(), /403/, 'no Origin');
+  await assert.rejects(openTerminal('https://example.com'), /403/, 'another site');
+
+  const { ws, messages } = await openTerminal(BASE);
+  await until(() => messages.some((m) => m.type === 'state'));
+  assert.equal(messages[0].running, false);
+
+  ws.send(JSON.stringify({ type: 'resize', cols: 120, rows: 30 }));
+  ws.send(JSON.stringify({ type: 'start' }));
+  await until(() => messages.some((m) => m.type === 'state' && m.running));
+
+  ws.send(JSON.stringify({ type: 'send', text: 'echo gym-$((40+2)) $COLUMNS' }));
+  const output = () => messages.filter((m) => m.type === 'output').map((m) => m.data).join('');
+  await until(() => /gym-42 120/.test(output()));
+
+  // A second window catches up on what is already on screen.
+  const late = await openTerminal(BASE);
+  await until(() => late.messages.some((m) => m.type === 'output' && /gym-42/.test(m.data ?? '')));
+  late.ws.close();
+
+  ws.send(JSON.stringify({ type: 'stop' }));
+  await until(() => messages.some((m) => m.type === 'state' && m.running === false && messages.indexOf(m) > 0));
+  ws.close();
+});
+
+test('preview_svg renders an SVG to a PNG in either theme', async () => {
+  const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 40"><line x1="10" y1="20" x2="110" y2="20" stroke="currentColor"/><text x="10" y="15" fill="currentColor">v</text></svg>';
+  for (const dark of [false, true]) {
+    const res = await call('preview_svg', { svg, dark });
+    const [image] = res.content as { type: string; data: string; mimeType: string }[];
+    assert.equal(image.type, 'image');
+    assert.equal(image.mimeType, 'image/png');
+    assert.equal(Buffer.from(image.data, 'base64').subarray(1, 4).toString(), 'PNG');
+  }
+  const bad = await call('preview_svg', { svg: '<svg><line' });
+  assert.equal(bad.isError, true);
+  assert.match(textOf(bad), /Could not render/);
 });

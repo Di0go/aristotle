@@ -221,6 +221,9 @@ nav a.current {
 
 .status {
   margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .pill {
@@ -1706,5 +1709,232 @@ textarea.note {
 @media (max-width: 640px) {
   .atlas {
     padding: 14px 12px 12px;
+  }
+}
+
+/* Claude Code in the gym */
+
+.claude-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+  padding: 5px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  font-size: 0.9em;
+  cursor: pointer;
+}
+
+.claude-button:hover,
+.claude-button.active {
+  border-color: var(--accent);
+}
+
+.claude-button.asking {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.run-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--line-strong);
+}
+
+.run-dot.on {
+  background: var(--right);
+}
+
+.run-dot.busy {
+  background: var(--accent);
+  animation: halo 1.2s ease-in-out infinite;
+}
+
+:root {
+  --drawer-space: 0px;
+}
+
+.drawer {
+  position: fixed;
+  z-index: 30;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border-top: 1px solid var(--line);
+  box-shadow: 0 -8px 30px rgb(0 0 0 / 0.08);
+  transform: translateY(100%);
+  visibility: hidden;
+  transition: transform 0.18s ease, visibility 0s linear 0.18s;
+}
+
+.drawer.open {
+  transform: none;
+  visibility: visible;
+  transition: transform 0.18s ease;
+}
+
+.drawer-grip {
+  height: 8px;
+  margin-top: -4px;
+  cursor: ns-resize;
+  touch-action: none;
+}
+
+.drawer-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 2px 16px 8px;
+  font-size: 0.9em;
+}
+
+.drawer-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+}
+
+.drawer-state {
+  font-size: 0.92em;
+}
+
+.drawer-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 8px;
+}
+
+.ghost {
+  padding: 5px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: none;
+  cursor: pointer;
+}
+
+.ghost:hover {
+  border-color: var(--accent);
+}
+
+.primary.small {
+  padding: 5px 12px;
+  font-size: 0.95em;
+}
+
+.xterm-host {
+  flex: 1;
+  min-height: 0;
+  padding: 0 0 6px 12px;
+}
+
+.xterm-host .xterm {
+  height: 100%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .drawer,
+  .drawer.open {
+    transition: none;
+  }
+}
+
+/* The message box at the bottom of Now */
+
+.composer {
+  position: sticky;
+  bottom: var(--drawer-space);
+  z-index: 5;
+  margin-top: 24px;
+  padding: 12px 0 16px;
+  background: linear-gradient(to bottom, transparent, var(--bg) 18px);
+}
+
+.composer-row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+}
+
+.composer textarea {
+  margin: 0;
+  flex: 1;
+  resize: none;
+  min-height: 44px;
+  max-height: 160px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.composer .primary {
+  height: 44px;
+}
+
+.composer-off {
+  margin: 0;
+  font-size: 0.88em;
+  color: var(--muted);
+  text-align: center;
+}
+
+.asking {
+  display: block;
+  width: 100%;
+  margin-bottom: 8px;
+  padding: 8px 14px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+@media (max-width: 640px) {
+  .claude-button {
+    padding: 5px 8px;
+  }
+}
+
+.claude-glyph {
+  display: none;
+  font-family: var(--mono);
+  font-weight: 700;
+}
+
+@media (max-width: 420px) {
+  .claude-label {
+    display: none;
+  }
+
+  .claude-glyph {
+    display: inline;
+  }
+
+  nav {
+    gap: 0;
+  }
+
+  nav a {
+    padding: 5px 6px;
+    font-size: 0.88em;
+  }
+
+  .topbar {
+    gap: 6px;
+    padding: 10px 10px;
+  }
+
+  .status {
+    gap: 6px;
   }
 }

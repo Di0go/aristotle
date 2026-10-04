@@ -6,6 +6,7 @@
   import MapGraph from '../lib/MapGraph.svelte';
   import StatusBar from '../lib/StatusBar.svelte';
   import ReviewPanel from '../lib/ReviewPanel.svelte';
+  import Composer from '../lib/Composer.svelte';
   import { isFading, type ConceptStatus } from '../../../shared/types.ts';
 
   let mapOpen = $state(false);
@@ -69,18 +70,18 @@
           {#if feed.session}
             Claude is getting ready.
           {:else}
-            Open Claude Code in <code>~/Projects/Learn</code> and say what you want to learn, or type <code>/teach</code>.
+            Tell Claude what you want to learn: <code>/teach</code> and a topic, <code>/review</code>, or <code>/train</code>.
+            Use the box below, or Claude Code in <code>~/Projects/Learn</code>.
           {/if}
         </p>
       </div>
     {:else}
       <FeedList items={feed.items} pendingId={feed.pending?.id ?? null} />
       {#if feed.session?.endedAt}
-        <p class="hint">Session ended. Start a new one from Claude Code whenever you like.</p>
-      {:else if !feed.pending}
-        <p class="hint">Questions and comments go to Claude in the terminal.</p>
+        <p class="hint">Session ended. Start a new one whenever you like.</p>
       {/if}
     {/if}
+    <Composer />
   </section>
 
   {#if reviewing}

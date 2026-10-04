@@ -117,7 +117,7 @@ Solid concepts come due for review over time ("fading"). Reviewing them is the `
 ## Formatting
 
 - Maths in LaTeX: `$...$` inline, `$$...$$` on its own lines; `\$` for a literal dollar.
-- Diagrams: a mermaid block for small structural pictures inside a step; inline SVG when geometry matters (use a `viewBox` and `currentColor` so it works in dark mode).
+- Diagrams: a mermaid block for small structural pictures inside a step. When a picture would make the idea click (geometry, a mechanism, a process), ask the `illustrator` subagent for an SVG, telling it the idea and what is already established; it checks its drawing in both themes and returns the SVG to put in `show`. For a quick SVG of your own, check it with `preview_svg` before showing it.
 - One step fits on one screen: a few short paragraphs at most.
 
 ## Profile

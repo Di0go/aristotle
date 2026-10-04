@@ -13,6 +13,11 @@ export const LOG_FILE = path.join(STATE_DIR, 'server.log');
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+/** The systemd user service from scripts/install-service.sh, when installed. */
+const SERVICE = 'mind-gym.service';
+const systemctl = (...args: string[]) => spawnSync('systemctl', ['--user', ...args, SERVICE], { stdio: 'ignore' }).status === 0;
+export const serviceEnabled = () => systemctl('is-enabled', '--quiet');
+
 export async function isRunning(): Promise<boolean> {
   try {
     return (await fetch(`http://localhost:${PORT}/api/health`, { signal: AbortSignal.timeout(1000) })).ok;
@@ -31,11 +36,14 @@ export async function start(): Promise<boolean> {
       stdio: ['ignore', log, log],
     });
   }
-  spawn(process.execPath, [path.join(ROOT, 'server/index.ts')], {
-    cwd: ROOT,
-    detached: true,
-    stdio: ['ignore', log, log],
-  }).unref();
+  if (serviceEnabled()) systemctl('start');
+  else {
+    spawn(process.execPath, [path.join(ROOT, 'server/index.ts')], {
+      cwd: ROOT,
+      detached: true,
+      stdio: ['ignore', log, log],
+    }).unref();
+  }
   for (let i = 0; i < 50; i++) {
     if (await isRunning()) return true;
     await sleep(100);
@@ -44,6 +52,10 @@ export async function start(): Promise<boolean> {
 }
 
 export async function stop(): Promise<void> {
+  if (serviceEnabled()) {
+    systemctl('stop');
+    return;
+  }
   let pid: number;
   try {
     pid = Number(readFileSync(PID_FILE, 'utf8'));
