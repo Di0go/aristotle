@@ -3,6 +3,7 @@ import path from 'node:path';
 export const ROOT = path.resolve(import.meta.dirname, '..');
 export const DATA_DIR = process.env.GYM_DATA_DIR ?? path.join(ROOT, 'data');
 export const SESSIONS_DIR = path.join(DATA_DIR, 'sessions');
+export const TOPICS_DIR = path.join(DATA_DIR, 'topics');
 export const UI_DIR = path.join(ROOT, 'dist', 'ui');
 
 export const HOST = '127.0.0.1';

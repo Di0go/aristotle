@@ -6,85 +6,152 @@ import { appendFile, mkdir, readdir, readFile } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { SESSIONS_DIR } from './config.ts';
-import type {
-  AskItem,
-  FeedEvent,
-  FeedState,
-  Item,
-  PublicItem,
-  QuizItem,
-  QuizResponse,
-  Session,
+import { slugify } from './slug.ts';
+import {
+  isInteractive,
+  type AskItem,
+  type FeedEvent,
+  type FeedState,
+  type Handoff,
+  type InteractiveItem,
+  type Item,
+  type PublicItem,
+  type QuizItem,
+  type QuizResponse,
+  type Session,
+  type SessionSummary,
 } from '../shared/types.ts';
 
-type Op =
+export type Op =
   | { op: 'session'; session: Session }
   | { op: 'add'; item: Item }
   | { op: 'answer'; id: string; at: string; responses?: QuizResponse[]; response?: string }
-  | { op: 'delivered'; id: string };
+  | { op: 'delivered'; id: string }
+  | { op: 'end'; at: string; handoff: Handoff };
 
 type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
 type NewItem = DistributiveOmit<Item, 'id' | 'at'>;
-type Interactive = QuizItem | AskItem;
 
 export class AnswerError extends Error {}
 
+/** A session rebuilt from its log. */
+export interface SessionRecord {
+  session: Session | null;
+  items: Item[];
+  handoff?: Handoff;
+  lastAt?: string;
+}
+
+export function applyOp(state: SessionRecord, op: Op) {
+  switch (op.op) {
+    case 'session':
+      state.session = op.session;
+      state.items = [];
+      state.handoff = undefined;
+      state.lastAt = op.session.startedAt;
+      break;
+    case 'add':
+      state.items.push(op.item);
+      state.lastAt = op.item.at;
+      break;
+    case 'answer': {
+      const item = findInteractive(state.items, op.id);
+      if (!item) break;
+      item.answeredAt = op.at;
+      if (item.type === 'quiz') item.responses = op.responses;
+      else item.response = op.response;
+      state.lastAt = op.at;
+      break;
+    }
+    case 'delivered': {
+      const item = findInteractive(state.items, op.id);
+      if (item) item.delivered = true;
+      break;
+    }
+    case 'end':
+      state.handoff = op.handoff;
+      if (state.session) state.session.endedAt = op.at;
+      state.lastAt = op.at;
+      break;
+  }
+}
+
+function findInteractive(items: Item[], id: string): InteractiveItem | undefined {
+  const item = items.find((i) => i.id === id);
+  return item && isInteractive(item) ? item : undefined;
+}
+
+export async function readSession(file: string): Promise<SessionRecord> {
+  const state: SessionRecord = { session: null, items: [] };
+  const lines = (await readFile(file, 'utf8')).split('\n').filter(Boolean);
+  for (const line of lines) {
+    try {
+      applyOp(state, JSON.parse(line) as Op);
+    } catch {
+      // A torn last line from a crash: skip it, keep the rest.
+    }
+  }
+  return state;
+}
+
+export async function sessionFiles(): Promise<string[]> {
+  await mkdir(SESSIONS_DIR, { recursive: true });
+  return (await readdir(SESSIONS_DIR)).filter((f) => f.endsWith('.jsonl')).sort();
+}
+
+export function summarizeSession(record: SessionRecord): SessionSummary | null {
+  const s = record.session;
+  if (!s) return null;
+  let quizRight = 0;
+  let quizTotal = 0;
+  for (const item of record.items) {
+    if (item.type !== 'quiz' || !item.responses) continue;
+    quizTotal += item.responses.length;
+    quizRight += item.responses.filter((r) => r.correct).length;
+  }
+  return {
+    id: s.id,
+    topic: s.topic,
+    topicSlug: s.topicSlug ?? slugify(s.topic),
+    goal: s.goal,
+    startedAt: s.startedAt,
+    lastAt: record.lastAt ?? s.startedAt,
+    ...(s.endedAt ? { endedAt: s.endedAt } : {}),
+    steps: record.items.filter((i) => i.type === 'block' && i.kind === 'step').length,
+    quizRight,
+    quizTotal,
+    asks: record.items.filter((i) => i.type === 'ask' && i.answeredAt).length,
+    ...(record.handoff ? { handoff: record.handoff } : {}),
+  };
+}
+
 export class Feed {
-  session: Session | null = null;
-  items: Item[] = [];
+  private record: SessionRecord = { session: null, items: [] };
   readonly events = new EventEmitter<{ event: [FeedEvent] }>();
   private file: string | null = null;
   private writing: Promise<void> = Promise.resolve();
-  private waiters = new Map<string, Set<(item: Interactive) => void>>();
+  private waiters = new Map<string, Set<(item: InteractiveItem) => void>>();
+
+  get session() {
+    return this.record.session;
+  }
+
+  get items() {
+    return this.record.items;
+  }
 
   static async load(): Promise<Feed> {
     const feed = new Feed();
-    await mkdir(SESSIONS_DIR, { recursive: true });
-    const files = (await readdir(SESSIONS_DIR)).filter((f) => f.endsWith('.jsonl')).sort();
-    const last = files.at(-1);
-    if (last) await feed.replay(path.join(SESSIONS_DIR, last));
+    const last = (await sessionFiles()).at(-1);
+    if (last) {
+      feed.file = path.join(SESSIONS_DIR, last);
+      feed.record = await readSession(feed.file);
+    }
     return feed;
   }
 
-  private async replay(file: string) {
-    this.file = file;
-    const lines = (await readFile(file, 'utf8')).split('\n').filter(Boolean);
-    for (const line of lines) {
-      try {
-        this.apply(JSON.parse(line) as Op);
-      } catch {
-        // A torn last line from a crash: skip it, keep the rest.
-      }
-    }
-  }
-
-  private apply(op: Op) {
-    switch (op.op) {
-      case 'session':
-        this.session = op.session;
-        this.items = [];
-        break;
-      case 'add':
-        this.items.push(op.item);
-        break;
-      case 'answer': {
-        const item = this.interactive(op.id);
-        if (!item) break;
-        item.answeredAt = op.at;
-        if (item.type === 'quiz') item.responses = op.responses;
-        else item.response = op.response;
-        break;
-      }
-      case 'delivered': {
-        const item = this.interactive(op.id);
-        if (item) item.delivered = true;
-        break;
-      }
-    }
-  }
-
   private async commit(op: Op) {
-    this.apply(op);
+    applyOp(this.record, op);
     const file = this.file;
     if (!file) throw new Error('No session file');
     this.writing = this.writing.then(() => appendFile(file, JSON.stringify(op) + '\n'));
@@ -95,27 +162,30 @@ export class Feed {
     this.events.emit('event', event);
   }
 
-  private interactive(id: string): Interactive | undefined {
-    const item = this.items.find((i) => i.id === id);
-    return item && item.type !== 'block' ? item : undefined;
-  }
-
-  async startSession(topic: string, goal: string): Promise<Session> {
+  async startSession(topic: string, topicSlug: string, goal: string): Promise<Session> {
     const now = new Date();
     const session: Session = {
-      id: `${stamp(now)}-${slugify(topic)}`,
+      id: `${stamp(now)}-${topicSlug}`,
       topic,
+      topicSlug,
       goal,
       startedAt: now.toISOString(),
     };
     this.file = path.join(SESSIONS_DIR, `${session.id}.jsonl`);
+    await mkdir(SESSIONS_DIR, { recursive: true });
     await this.commit({ op: 'session', session });
     this.emit({ type: 'session', session });
     return session;
   }
 
+  async endSession(handoff: Handoff) {
+    if (!this.session) return;
+    await this.commit({ op: 'end', at: handoff.at, handoff });
+    this.emit({ type: 'session', session: this.session });
+  }
+
   async add(fields: NewItem): Promise<Item> {
-    if (!this.session) await this.startSession('Unsorted', 'No session was started');
+    if (!this.session) throw new Error('No session: call start_session first.');
     const item = { ...fields, id: randomUUID(), at: new Date().toISOString() } as Item;
     await this.commit({ op: 'add', item });
     this.emit({ type: 'item', item: publicItem(item) });
@@ -123,7 +193,7 @@ export class Feed {
   }
 
   async answerQuiz(id: string, picks: { choice: number | null; note?: string }[]): Promise<QuizItem> {
-    const item = this.interactive(id);
+    const item = findInteractive(this.items, id);
     if (!item || item.type !== 'quiz') throw new AnswerError('No such quiz');
     if (item.answeredAt) throw new AnswerError('Already answered');
     if (picks.length !== item.questions.length) throw new AnswerError('One pick per question');
@@ -141,7 +211,7 @@ export class Feed {
   }
 
   async answerAsk(id: string, text: string): Promise<AskItem> {
-    const item = this.interactive(id);
+    const item = findInteractive(this.items, id);
     if (!item || item.type !== 'ask') throw new AnswerError('No such question');
     if (item.answeredAt) throw new AnswerError('Already answered');
     if (!text.trim()) throw new AnswerError('Empty answer');
@@ -150,21 +220,21 @@ export class Feed {
     return item;
   }
 
-  private answered(item: Interactive) {
+  private answered(item: InteractiveItem) {
     this.emit({ type: 'item', item: publicItem(item) });
     for (const resolve of this.waiters.get(item.id) ?? []) resolve(item);
     this.waiters.delete(item.id);
   }
 
   /** Resolves with the answered item, or null on timeout or abort. */
-  waitFor(id: string, ms: number, signal?: AbortSignal): Promise<Interactive | null> {
-    const item = this.interactive(id);
+  waitFor(id: string, ms: number, signal?: AbortSignal): Promise<InteractiveItem | null> {
+    const item = findInteractive(this.items, id);
     if (!item) return Promise.resolve(null);
     if (item.answeredAt) return Promise.resolve(item);
     return new Promise((resolve) => {
       const set = this.waiters.get(id) ?? new Set();
       this.waiters.set(id, set);
-      const done = (value: Interactive | null) => {
+      const done = (value: InteractiveItem | null) => {
         clearTimeout(timer);
         signal?.removeEventListener('abort', onAbort);
         set.delete(done);
@@ -178,15 +248,13 @@ export class Feed {
   }
 
   async markDelivered(id: string) {
-    const item = this.interactive(id);
+    const item = findInteractive(this.items, id);
     if (item && !item.delivered) await this.commit({ op: 'delivered', id });
   }
 
   /** Answers given in the interface that Claude hasn't received yet. */
-  undelivered(): Interactive[] {
-    return this.items.filter(
-      (i): i is Interactive => i.type !== 'block' && Boolean(i.answeredAt) && !i.delivered,
-    );
+  undelivered(): InteractiveItem[] {
+    return this.items.filter((i): i is InteractiveItem => isInteractive(i) && Boolean(i.answeredAt) && !i.delivered);
   }
 
   state(): FeedState {
@@ -205,16 +273,4 @@ export function publicItem(item: Item): PublicItem {
 function stamp(d: Date): string {
   const p = (n: number) => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
-}
-
-export function slugify(s: string): string {
-  return (
-    s
-      .normalize('NFKD')
-      .replace(/[̀-ͯ]/g, '')
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-|-$/g, '')
-      .slice(0, 48) || 'session'
-  );
 }

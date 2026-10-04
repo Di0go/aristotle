@@ -3,7 +3,7 @@
   import { feed } from './feed.svelte.ts';
   import Markdown from './Markdown.svelte';
 
-  let { item, active }: { item: PublicQuizItem; active: boolean } = $props();
+  let { item, active, readonly = false }: { item: PublicQuizItem; active: boolean; readonly?: boolean } = $props();
 
   // undefined = not picked yet, null = "I don't know".
   let picks = $state<(number | null | undefined)[]>([]);
@@ -17,12 +17,12 @@
   const current = $derived(item.questions.findIndex((_, i) => picks[i] === undefined));
 
   function pick(q: number, choice: number | null) {
-    if (answered || sending) return;
+    if (answered || sending || readonly) return;
     picks[q] = choice;
   }
 
   async function submit() {
-    if (!ready || sending || answered) return;
+    if (!ready || sending || answered || readonly) return;
     sending = true;
     error = await feed.answer({
       id: item.id,
@@ -68,7 +68,7 @@
               class:chosen
               class:right={answered && q.correct === oi}
               class:wrong={answered && chosen && q.correct !== oi}
-              disabled={answered}
+              disabled={answered || readonly}
               onclick={() => pick(qi, oi)}
             >
               <kbd>{oi + 1}</kbd>
@@ -80,7 +80,7 @@
           <button
             class="option dont-know"
             class:chosen={answered ? r?.choice === null : picks[qi] === null}
-            disabled={answered}
+            disabled={answered || readonly}
             onclick={() => pick(qi, null)}
           >
             <kbd>0</kbd> I don't know
@@ -102,7 +102,9 @@
           <div class="explanation"><Markdown source={q.explanation} /></div>
         {/if}
         {#if r.note}<p class="your-note"><span>Your note:</span> {r.note}</p>{/if}
-      {:else if !answered}
+      {:else if readonly}
+        <p class="unanswered">Not answered.</p>
+      {:else}
         {#if noteOpen[qi]}
           <textarea
             class="note"
@@ -117,7 +119,7 @@
     </div>
   {/each}
 
-  {#if !answered}
+  {#if !answered && !readonly}
     <footer class="actions">
       {#if error}<span class="error">{error}</span>{/if}
       <button class="primary" disabled={!ready || sending} onclick={submit}>

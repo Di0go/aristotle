@@ -8,11 +8,13 @@ import path from 'node:path';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { ALLOWED_NAMES, ALLOWED_PORTS, HOST, PORT, UI_DIR, URL_CLEAN } from './config.ts';
 import { PID_FILE } from './control.ts';
-import { AnswerError, Feed, publicItem } from './feed.ts';
+import { AnswerError, publicItem } from './feed.ts';
+import { Gym } from './gym.ts';
 import { createMcpServer } from './mcp.ts';
 import type { AskAnswerBody, FeedEvent, QuizAnswerBody } from '../shared/types.ts';
 
-const feed = await Feed.load();
+const gym = await Gym.load();
+const feed = gym.feed;
 
 const server = http.createServer(async (req, res) => {
   try {
@@ -38,7 +40,7 @@ async function handleMcp(req: http.IncomingMessage, res: http.ServerResponse) {
     return;
   }
   // Stateless: a fresh server per request, so a restart never strands Claude Code's connection.
-  const mcp = createMcpServer(feed);
+  const mcp = createMcpServer(gym);
   const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
   res.on('close', () => {
     void transport.close();
@@ -52,13 +54,24 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ro
   if (req.method === 'GET' && route === '/api/health') return json(res, 200, { ok: true });
   if (req.method === 'GET' && route === '/api/state') return json(res, 200, feed.state());
   if (req.method === 'GET' && route === '/api/events') return streamEvents(req, res);
+  if (req.method === 'GET' && route === '/api/topics') return json(res, 200, gym.topics.list());
+  if (req.method === 'GET' && route.startsWith('/api/topics/')) {
+    const topic = gym.topics.get(decodeURIComponent(route.slice('/api/topics/'.length)));
+    return topic ? json(res, 200, topic) : json(res, 404, { error: 'No such topic' });
+  }
+  if (req.method === 'GET' && route === '/api/sessions') return json(res, 200, await gym.listSessions());
+  if (req.method === 'GET' && route.startsWith('/api/sessions/')) {
+    const record = await gym.readSession(decodeURIComponent(route.slice('/api/sessions/'.length)));
+    if (!record?.session) return json(res, 404, { error: 'No such session' });
+    return json(res, 200, { session: record.session, items: record.items.map(publicItem), handoff: record.handoff });
+  }
   if (req.method === 'POST' && route === '/api/answer') {
     const body = (await readJson(req)) as Partial<QuizAnswerBody & AskAnswerBody> | null;
     if (!body || typeof body.id !== 'string') return json(res, 400, { error: 'Missing id' });
     try {
       const item = Array.isArray(body.picks)
-        ? await feed.answerQuiz(body.id, body.picks)
-        : await feed.answerAsk(body.id, String(body.text ?? ''));
+        ? await gym.answerQuiz(body.id, body.picks)
+        : await gym.answerAsk(body.id, String(body.text ?? ''));
       return json(res, 200, publicItem(item));
     } catch (err) {
       if (err instanceof AnswerError) return json(res, 400, { error: err.message });

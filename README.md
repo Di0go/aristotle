@@ -11,7 +11,7 @@ pnpm install
 claude            # in this folder; the gym starts by itself
 ```
 
-Open http://gym.test (or http://localhost:4747) and tell Claude what you want to learn. Read and answer in the browser; talk to Claude in the terminal.
+Open http://gym.test (or http://localhost:4747), then type `/teach` and what you want to learn, or `/teach continue`. Read and answer in the browser; talk to Claude in the terminal (questions, "go", "stop for today").
 
 The first time, Claude Code asks you to trust the folder and to enable the `gym` MCP server: accept both.
 
@@ -30,8 +30,10 @@ The first time, Claude Code asks you to trust the folder and to enable the `gym`
 Claude Code ──stdio──▶ server/bridge.ts ──HTTP /mcp──▶ server (127.0.0.1:4747) ◀──▶ browser (gym.test)
 ```
 
-- **Tools Claude uses:** `start_session`, `show` (a lesson step), `quiz` (graded multiple choice, waits for your answer), `ask` (an open question, waits for your answer), `collect_answers` (answers given after you stepped away).
-- **Your data:** `data/sessions/` holds one append-only log per session.
+- **The method** is the `/teach` skill (`.claude/skills/teach/SKILL.md`): probe the edge of what you know, plan a map of what depends on what, then teach one reasoning step at a time with a check after each. A `researcher` subagent (`.claude/agents/researcher.md`) fact-checks and scopes topics.
+- **Tools Claude uses:** `list_topics`, `get_topic`, `start_session`, `update_map` (concepts, prerequisites, statuses), `show` (a lesson step), `quiz` (graded multiple choice, waits for your answer), `ask` (you write the answer, waits), `collect_answers` (answers given after you stepped away), `end_session` (the handoff for next time).
+- **The interface:** *Now* is the live lesson with the topic's map beside it; *Topics* lists every topic with its map, each concept's history and the next step; *Log* has every session, replayable.
+- **Your data** (plain files, yours to keep): `data/topics/` one knowledge map per topic, `data/sessions/` one append-only log per session, `data/profile.md` what the tutor has learned about how you learn.
 
 ## Credits
 

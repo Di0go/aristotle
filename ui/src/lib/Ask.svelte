@@ -3,7 +3,7 @@
   import { feed } from './feed.svelte.ts';
   import Markdown from './Markdown.svelte';
 
-  let { item, active }: { item: AskItem; active: boolean } = $props();
+  let { item, active, readonly = false }: { item: AskItem; active: boolean; readonly?: boolean } = $props();
 
   let text = $state('');
   let sending = $state(false);
@@ -47,6 +47,8 @@
       <span class="label">You wrote</span>
       <Markdown source={item.response ?? ''} />
     </div>
+  {:else if readonly}
+    <p class="unanswered">Not answered.</p>
   {:else}
     <textarea
       bind:this={box}
