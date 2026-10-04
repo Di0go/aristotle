@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "gym": {
+      "command": "node",
+      "args": ["server/bridge.ts"]
+    }
+  }
+}
