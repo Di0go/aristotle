@@ -5,6 +5,7 @@ import {
   type FeedEvent,
   type FeedState,
   type PublicItem,
+  type Roadmap,
   type Session,
   type Topic,
 } from '../../../shared/types.ts';
@@ -13,10 +14,18 @@ class LiveFeed {
   session = $state<Session | null>(null);
   items = $state<PublicItem[]>([]);
   connected = $state(false);
-  /** Full topics seen so far, by slug, updated live. */
+  /** Every topic in full, by slug, updated live. */
   topics = $state<Record<string, Topic>>({});
+  /** False until the first full load, so pages can tell "loading" from "none". */
+  loaded = $state(false);
+  /** He asked to stop for today; cleared when the session ends. */
+  wrapping = $state(false);
+  /** Something was started from the interface and its session hasn't appeared yet. */
+  starting = $state<{ label: string; at: number; after: string | null } | null>(null);
   /** Bumped on every topic change, so pages can refetch summaries. */
   topicVersion = $state(0);
+  /** Every roadmap, by slug, updated live. Null until loaded. */
+  roadmaps = $state<Record<string, Roadmap> | null>(null);
 
   /** The first question still waiting for the learner, if any. Once a session has ended, nothing is. */
   pending = $derived(this.session?.endedAt ? null : (this.items.find((i) => isInteractive(i) && !i.answeredAt) ?? null));
@@ -37,9 +46,16 @@ class LiveFeed {
     this.session = state.session;
     this.items = state.items;
     this.connected = true;
-    if (state.session) await this.loadTopic(state.session.topicSlug);
+    const all = (await (await fetch('/api/map')).json()) as Topic[];
+    const roadmaps = (await (await fetch('/api/roadmaps')).json()) as Roadmap[];
+    this.topics = Object.fromEntries(all.map((t) => [t.slug, t]));
+    this.roadmaps = Object.fromEntries(roadmaps.map((r) => [r.slug, r]));
+    this.loaded = true;
     this.topicVersion++;
   }
+
+  /** Roadmaps, most recently changed first. */
+  roadmapList = $derived(Object.values(this.roadmaps ?? {}).sort((a, b) => b.updated.localeCompare(a.updated)));
 
   async loadTopic(slug: string): Promise<Topic | null> {
     const res = await fetch(`/api/topics/${encodeURIComponent(slug)}`);
@@ -53,16 +69,25 @@ class LiveFeed {
     if (event.type === 'session') {
       const changed = event.session.id !== this.session?.id;
       this.session = event.session;
+      if (event.session.endedAt) this.wrapping = false;
       if (changed) {
         this.items = [];
-        void this.loadTopic(event.session.topicSlug);
+        this.starting = null;
+        if (event.session.topicSlug && !this.topics[event.session.topicSlug]) void this.loadTopic(event.session.topicSlug);
       }
     } else if (event.type === 'topic') {
       this.topics[event.topic.slug] = event.topic;
       this.topicVersion++;
+    } else if (event.type === 'roadmap') {
+      this.roadmaps = { ...this.roadmaps, [event.roadmap.slug]: event.roadmap };
     } else {
       this.upsert(event.item);
     }
+  }
+
+  /** Marks that something was asked of Claude, so Now can say so until the session starts. */
+  begin(label: string) {
+    this.starting = { label, at: Date.now(), after: this.session?.id ?? null };
   }
 
   upsert(item: PublicItem) {

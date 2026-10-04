@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Runs the Mind Gym at login as a systemd user service, so http://gym.test (and Claude Code in its
+# Runs the Mind Gym at login as a systemd user service, so https://gym.test (and Claude Code in its
 # terminal drawer) is always there without starting anything first. No root needed.
 #
 #   bash scripts/install-service.sh
@@ -14,7 +14,7 @@ mkdir -p "$UNIT_DIR"
 
 cat > "$UNIT_DIR/mind-gym.service" <<UNIT
 [Unit]
-Description=Mind Gym (http://gym.test)
+Description=Mind Gym (https://gym.test)
 
 [Service]
 WorkingDirectory=$ROOT

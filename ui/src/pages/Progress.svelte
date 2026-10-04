@@ -63,28 +63,28 @@
 
 <div class="page progress-page">
   <header class="page-head">
-    <h1>Progress</h1>
-    <p>What you hold, what's fading, and how you've been training.</p>
+    <h1 class="page-title">Progress</h1>
+    <p class="page-lede">What you hold, what's fading, and how you've been training.</p>
   </header>
 
   {#if progress}
     <div class="tiles">
-      <div class="card tile">
+      <div class="tile">
         <span class="tile-label">Solid concepts</span>
         <span class="tile-value">{solidNow}</span>
         <span class="tile-sub" class:up={solidDelta > 0}>{solidDelta > 0 ? `+${solidDelta}` : 'No change'} in the last 7 days</span>
       </div>
-      <div class="card tile">
+      <div class="tile">
         <span class="tile-label">Fading now</span>
         <span class="tile-value">{progress.fading.length}</span>
         <span class="tile-sub">{progress.fading.length ? 'Due for practice' : 'Nothing to review'}</span>
       </div>
-      <div class="card tile">
+      <div class="tile">
         <span class="tile-label">Due in the next 7 days</span>
         <span class="tile-value">{progress.upcoming}</span>
         <span class="tile-sub">More come due as you learn</span>
       </div>
-      <div class="card tile">
+      <div class="tile">
         <span class="tile-label">Time this week</span>
         <span class="tile-value">{hours(thisWeekMinutes)}</span>
         <span class="tile-sub">Active time only</span>
@@ -102,7 +102,7 @@
         </div>
         <div class="fading-groups">
           {#each fadingByTopic as g (g.slug)}
-            <div class="card fading-group">
+            <div class="sheet fading-group">
               <h3><a href={link.topic(g.slug)}>{g.title}</a></h3>
               <ul>
                 {#each g.concepts as f (f.id)}
@@ -121,7 +121,7 @@
     <section>
       <h2 class="section-title">Solid concepts over time</h2>
       {#if progress.solid.length >= 2}
-        <div class="card chart-card">
+        <div class="sheet chart-card">
           <StepChart points={progress.solid} label="Solid concepts" />
           <TableView columns={['Day', 'Solid concepts']} rows={progress.solid.map((p) => [longDay(p.day), p.count])} />
         </div>
@@ -134,7 +134,7 @@
       <section>
         <h2 class="section-title">Answers per week</h2>
         {#if progress.answers.length >= 2}
-          <div class="card chart-card">
+          <div class="sheet chart-card">
             <StackedColumns
               label="Answers per week by result"
               series={RESULT_SERIES}
@@ -153,7 +153,7 @@
       <section>
         <h2 class="section-title">Time per week</h2>
         {#if progress.minutes.length >= 2}
-          <div class="card chart-card">
+          <div class="sheet chart-card">
             <StackedColumns
               label="Minutes per week by kind of session"
               series={KIND_SERIES}
@@ -192,3 +192,151 @@
     <p class="muted">Loading…</p>
   {/if}
 </div>
+
+<style>
+  .progress-page section {
+    margin-top: 56px;
+  }
+
+  .tiles {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    border-top: 1.5px solid var(--ink);
+    border-bottom: 1px solid var(--rule);
+  }
+
+  .tile {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 20px 22px 22px 0;
+  }
+
+  .tile + .tile {
+    padding-left: 22px;
+    border-left: 1px solid var(--rule);
+  }
+
+  .tile-label {
+    font-size: 0.81rem;
+    color: var(--graphite);
+  }
+
+  .tile-value {
+    font: 400 2rem/1.1 var(--sans);
+    font-variant-numeric: lining-nums;
+    letter-spacing: -0.02em;
+  }
+
+  .tile-sub {
+    font-size: 0.8rem;
+    color: var(--graphite);
+  }
+
+  .tile-sub.up {
+    color: var(--solid);
+  }
+
+  .fading-intro {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+  }
+
+  .fading-intro p {
+    margin: 0;
+    font-family: var(--sans);
+    font-size: 0.9rem;
+  }
+
+  .fading-groups {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 16px;
+    margin-top: 16px;
+  }
+
+  .fading-group {
+    padding: 18px 22px;
+  }
+
+  .fading-group h3 {
+    margin: 0 0 10px;
+    font-size: 0.9rem;
+  }
+
+  .fading-group h3 a,
+  .fading-group li a {
+    color: var(--ink);
+    text-decoration: none;
+  }
+
+  .fading-group ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    font-size: 0.89rem;
+  }
+
+  .fading-group li {
+    display: flex;
+    flex-direction: column;
+    padding: 4px 0;
+  }
+
+  .fading-group li a {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .fading-group .muted {
+    padding-left: 18px;
+    font-size: 0.78rem;
+  }
+
+  .chart-pair {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(420px, 100%), 1fr));
+    gap: 0 28px;
+  }
+
+  .chart-pair > section {
+    min-width: 0;
+  }
+
+  .chart-card {
+    padding: 20px 22px 14px;
+  }
+
+  .levels {
+    list-style: none;
+    max-width: 560px;
+    margin: 12px 0 0;
+    padding: 0;
+  }
+
+  .levels li {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 160px 48px;
+    align-items: center;
+    gap: 14px;
+    padding: 6px 0;
+  }
+
+  .meter {
+    display: block;
+    height: 6px;
+    background: var(--cyan-soft);
+    border-radius: 1px;
+    overflow: hidden;
+  }
+
+  .meter span {
+    display: block;
+    height: 100%;
+    background: var(--cyan);
+  }
+</style>

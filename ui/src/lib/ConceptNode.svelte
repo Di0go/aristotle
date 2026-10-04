@@ -7,8 +7,11 @@
     node,
     focused = false,
     selected = false,
+    dim = false,
+    ref = undefined,
     onclick,
-  }: { node: PlacedNode; focused?: boolean; selected?: boolean; onclick?: () => void } = $props();
+    onhover,
+  }: { node: PlacedNode; focused?: boolean; selected?: boolean; dim?: boolean; ref?: string; onclick?: () => void; onhover?: (on: boolean) => void } = $props();
 
   const c = $derived(node.concept);
   const fading = $derived(isFading(c));
@@ -35,15 +38,24 @@
   class:selected
   class:external={node.external}
   class:clickable={Boolean(onclick)}
+  class:dim
   transform="translate({node.x},{node.y})"
-  role={onclick ? 'button' : undefined}
+  data-concept={ref ?? (node.key.includes('/') ? node.key : undefined)}
+  role={onclick ? 'button' : 'img'}
+  aria-label={title}
   tabindex={onclick ? 0 : undefined}
   onclick={() => onclick?.()}
   onkeydown={onKey}
+  onpointerenter={() => onhover?.(true)}
+  onpointerleave={() => onhover?.(false)}
+  onfocus={() => onhover?.(true)}
+  onblur={() => onhover?.(false)}
 >
-  <title>{title}</title>
-  {#if focused}<rect class="halo" x="-5" y="-5" width={node.w + 10} height={node.h + 10} rx="13" />{/if}
-  <rect class="box" width={node.w} height={node.h} rx="9" />
-  {#if c.goal && !node.external}<rect class="goal-ring" x="3" y="3" width={node.w - 6} height={node.h - 6} rx="6" />{/if}
-  <text x={node.w / 2} y={node.h / 2} dominant-baseline="central" text-anchor="middle">{node.text}</text>
+  {#if focused}<rect class="halo" x="-6" y="-6" width={node.w + 12} height={node.h + 12} rx="11" />{/if}
+  <rect class="box" width={node.w} height={node.h} rx="7" />
+  {#if c.status === 'shaky'}<rect class="half" x="0.5" y="6" width={3} height={node.h - 12} rx="1.5" />{/if}
+  {#if c.goal && !node.external}<rect class="goal-ring" x="3" y="3" width={node.w - 6} height={node.h - 6} rx="5" />{/if}
+  <text x={node.w / 2} y={node.h / 2 - ((node.lines.length - 1) * 17) / 2} text-anchor="middle">
+    {#each node.lines as line, i (i)}<tspan x={node.w / 2} dy={i === 0 ? '0.35em' : '17'}>{line}</tspan>{/each}
+  </text>
 </g>

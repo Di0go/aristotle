@@ -23,36 +23,37 @@
   };
 </script>
 
-<header>
-  <a href={link.progress()}>Review</a>
-  <button class="close" onclick={onclose} aria-label="Close">×</button>
-</header>
+<button class="close bench-close" onclick={onclose} aria-label="Close">×</button>
 {#if queue}
   {#if queue.practised.length}
-    <h3 class="panel-title">Practised this session</h3>
-    <ul class="review-list">
-      {#each queue.practised as p (p.topic + p.id)}
-        <li>
-          <span class="mark {MARK[p.result]?.cls ?? 'neutral'}">{MARK[p.result]?.mark ?? '·'}</span>
-          <a href={link.topic(p.topic, p.id)}>{p.label}</a>
-        </li>
-      {/each}
-    </ul>
+    <section class="bench-section">
+      <h3 class="bench-title">Practised this session</h3>
+      <ul class="plan">
+        {#each queue.practised as p (p.topic + p.id)}
+          <li>
+            <a href={link.topic(p.topic, p.id)}><span class="mark {MARK[p.result]?.cls ?? 'neutral'}">{MARK[p.result]?.mark ?? '·'}</span><span>{p.label}</span></a>
+          </li>
+        {/each}
+      </ul>
+    </section>
   {/if}
-  <h3 class="panel-title">Still fading <span class="muted">{queue.fading.length}</span></h3>
-  {#if queue.fading.length}
-    <ul class="review-list">
-      {#each queue.fading as f (f.topic + f.id)}
-        <li>
-          <i class="dot fading"></i>
-          <a href={link.topic(f.topic, f.id)}>{f.label}</a>
-          <span class="muted">{f.topicTitle} · ~{Math.round(f.recall * 100)}%</span>
-        </li>
-      {/each}
-    </ul>
-  {:else}
-    <p class="muted">All caught up. {queue.upcoming ? `${queue.upcoming} come due in the next 7 days.` : ''}</p>
-  {/if}
+  <section class="bench-section">
+    <h3 class="bench-title">Still fading ({queue.fading.length})</h3>
+    {#if queue.fading.length}
+      <ul class="plan">
+        {#each queue.fading as f (f.topic + f.id)}
+          <li>
+            <a href={link.topic(f.topic, f.id)}>
+              <i class="dot fading"></i>
+              <span>{f.label} <span class="muted">({f.topicTitle}, ~{Math.round(f.recall * 100)}%)</span></span>
+            </a>
+          </li>
+        {/each}
+      </ul>
+    {:else}
+      <p class="muted">All caught up. {queue.upcoming ? `${queue.upcoming} come due in the next 7 days.` : ''}</p>
+    {/if}
+  </section>
 {:else}
   <p class="muted">Loading…</p>
 {/if}

@@ -2,21 +2,24 @@
   import type { BlockItem } from '../../../shared/types.ts';
   import Markdown from './Markdown.svelte';
 
-  let { item }: { item: BlockItem } = $props();
+  let { item, number = 0 }: { item: BlockItem; number?: number } = $props();
 
   const LABELS: Record<BlockItem['kind'], string> = {
+    orient: 'Before we start',
     step: 'Step',
-    plan: 'Plan',
+    plan: 'The plan',
     summary: 'Summary',
-    feedback: 'Feedback',
+    feedback: 'On your answer',
     note: 'Note',
   };
+
+  /** "2. Wired and broadcast" is shown as "Wired and broadcast": the label already carries the number. */
+  const title = $derived(item.title?.replace(/^\s*(step\s*)?\d+[.:)]\s*/i, ''));
+  const label = $derived(item.kind === 'step' && number ? `Step ${number}` : LABELS[item.kind] ?? 'Note');
 </script>
 
-<article class="card block kind-{item.kind}">
-  <header class="card-head">
-    <span class="label">{LABELS[item.kind]}</span>
-    {#if item.title}<h2>{item.title}</h2>{/if}
-  </header>
+<article class="block kind-{item.kind}">
+  <p class="kicker">{label}</p>
+  {#if title}<h2 class="block-title">{title}</h2>{/if}
   <Markdown source={item.markdown} />
 </article>

@@ -1,0 +1,347 @@
+/* The frame: icon ribbon, library pane (resizable), then the stage with its tabs; a status line along the
+   bottom. The page scrolls with the window; the panes and the tab bar stay put. */
+
+:root {
+  --drawer-space: 0px;
+  --status-h: 26px;
+  --tabs-h: 39px;
+}
+
+.app {
+  display: grid;
+  grid-template-columns: var(--ribbon-w) var(--files-w) minmax(0, 1fr);
+  min-height: 100vh;
+}
+
+.ribbon-col,
+.rail {
+  position: sticky;
+  top: 0;
+  height: calc(100vh - var(--status-h));
+}
+
+.rail {
+  min-width: 0;
+}
+
+/* Above the library pane, so the appearance pop-up that opens beside the ribbon is on top and clickable. */
+.ribbon-col {
+  z-index: 30;
+}
+
+.stage {
+  min-width: 0;
+  padding-bottom: calc(var(--status-h) + var(--drawer-space));
+  background: var(--b0);
+}
+
+.stage > .tabbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+
+.status-col {
+  position: fixed;
+  z-index: 25;
+  left: 0;
+  right: 0;
+  bottom: 0;
+}
+
+body.resizing {
+  cursor: col-resize;
+  user-select: none;
+}
+
+.mobile-bar,
+.scrim {
+  display: none;
+}
+
+/* A page: left-aligned, generous, never cramped. */
+.page {
+  max-width: 1120px;
+  padding: 44px clamp(24px, 4vw, 56px) 96px;
+}
+
+.page-head {
+  margin-bottom: 36px;
+}
+
+.crumbs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+  margin-bottom: 12px;
+  font-size: 0.82rem;
+  color: var(--faint);
+}
+
+.crumbs a {
+  color: var(--faint);
+}
+
+.crumbs a:hover {
+  color: var(--fg);
+  text-decoration: none;
+}
+
+.crumbs .sep {
+  color: var(--rule-strong);
+}
+
+.head-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 22px;
+}
+
+/* Properties, as Obsidian shows them under a title: quiet label, plain value. */
+.props {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr);
+  gap: 5px 14px;
+  margin: 16px 0 0;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--rule);
+  font-size: 0.88rem;
+}
+
+.props dt {
+  color: var(--faint);
+}
+
+.props dd {
+  margin: 0;
+  color: var(--fg-2);
+  min-width: 0;
+}
+
+@media (max-width: 960px) {
+  .app {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .ribbon-col {
+    display: none;
+  }
+
+  .rail {
+    position: fixed;
+    z-index: 40;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    height: auto;
+    width: min(300px, 86vw);
+    transform: translateX(-100%);
+    transition: transform 0.22s var(--ease);
+    box-shadow: var(--shadow);
+  }
+
+  .rail.open {
+    transform: none;
+  }
+
+  .scrim.open {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 35;
+    background: rgb(0 0 0 / 0.35);
+  }
+
+  .mobile-bar {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    height: 50px;
+    padding: 0 14px;
+    background: var(--b1);
+    border-bottom: 1px solid var(--rule);
+    font-weight: 600;
+  }
+
+  .mobile-bar button {
+    display: grid;
+    place-items: center;
+    width: 34px;
+    height: 34px;
+    padding: 0;
+    border: 1px solid var(--rule-strong);
+    border-radius: var(--radius);
+    background: var(--b0);
+    cursor: pointer;
+  }
+
+  .mobile-bar svg {
+    width: 18px;
+    height: 18px;
+    stroke: currentColor;
+    stroke-width: 1.6;
+    stroke-linecap: round;
+  }
+
+  .mobile-brand {
+    color: var(--fg);
+  }
+
+  .mobile-bar .turn {
+    margin-left: auto;
+    padding: 2px 8px;
+    font-size: 0.78rem;
+    background: var(--acc);
+    color: var(--on-acc);
+    border-radius: 999px;
+  }
+
+  .page {
+    padding: 28px 16px 80px;
+  }
+
+  .props {
+    grid-template-columns: 96px minmax(0, 1fr);
+  }
+}
+
+/* Claude Code's terminal, docked above the status line. */
+.drawer {
+  position: fixed;
+  z-index: 30;
+  left: calc(var(--ribbon-w) + var(--files-w));
+  right: 0;
+  bottom: var(--status-h);
+  display: flex;
+  flex-direction: column;
+  background: var(--b0);
+  border-top: 1px solid var(--rule-strong);
+  box-shadow: 0 -14px 30px -20px rgb(0 0 0 / 0.35);
+  transform: translateY(calc(100% + var(--status-h)));
+  visibility: hidden;
+  transition: transform 0.2s var(--ease), visibility 0s linear 0.2s;
+}
+
+@media (max-width: 960px) {
+  .drawer {
+    left: 0;
+  }
+}
+
+.drawer.open {
+  transform: none;
+  visibility: visible;
+  transition: transform 0.2s var(--ease);
+}
+
+.drawer-grip {
+  height: 10px;
+  margin-top: -5px;
+  cursor: ns-resize;
+  touch-action: none;
+}
+
+.drawer-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 2px 14px 8px;
+  font-size: 0.85rem;
+}
+
+.drawer-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+}
+
+.drawer-title .run-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--faint);
+}
+
+.drawer-title .run-dot.on {
+  background: var(--solid);
+}
+
+.drawer-state {
+  color: var(--muted);
+}
+
+.drawer-actions {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.xterm-host {
+  flex: 1;
+  min-height: 0;
+  padding: 0 0 6px 14px;
+}
+
+.xterm-host .xterm {
+  height: 100%;
+}
+
+/* The message box at the foot of a lesson. */
+.composer {
+  position: sticky;
+  bottom: calc(var(--status-h) + var(--drawer-space));
+  z-index: 5;
+  max-width: var(--measure);
+  margin: 0 auto;
+  padding: 16px 0 18px;
+  background: linear-gradient(to bottom, transparent, var(--b0) 20px);
+}
+
+.composer-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.composer textarea {
+  flex: 1;
+  min-height: 42px;
+  max-height: 160px;
+  resize: none;
+  font-size: 0.92rem;
+  background: var(--b1);
+  border-color: var(--rule);
+  border-radius: 10px;
+}
+
+.composer .primary {
+  height: 42px;
+  border-radius: 10px;
+}
+
+.composer-off {
+  margin: 0;
+  font-size: 0.84rem;
+  color: var(--faint);
+}
+
+.asking {
+  display: block;
+  width: 100%;
+  margin-bottom: 10px;
+  padding: 10px 14px;
+  border: 1px solid var(--acc-line);
+  border-radius: var(--radius);
+  background: var(--acc-soft);
+  color: var(--fg);
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+}

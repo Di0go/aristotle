@@ -1,11 +1,11 @@
 // Graph layout shared by the topic maps and the map of everything.
 
 import dagre from '@dagrejs/dagre';
-import type { Concept, Topic } from '../../../shared/types.ts';
+import type { Concept, Roadmap, RoadmapStep, Topic } from '../../../shared/types.ts';
 
-export const NODE_H = 34;
-const CHAR_W = 7.1;
-const MAX_CHARS = 26;
+const LINE_H = 17;
+const CHAR_W = 6.9;
+const MAX_CHARS = 22;
 
 export interface PlacedNode {
   /** "id" inside a topic layout; "topic/id" in the map of everything. */
@@ -17,7 +17,7 @@ export interface PlacedNode {
   y: number;
   w: number;
   h: number;
-  text: string;
+  lines: string[];
 }
 
 export interface PlacedEdge {
@@ -34,9 +34,21 @@ export interface Layout {
   height: number;
 }
 
-export function labelBox(label: string): { w: number; text: string } {
-  const text = label.length > MAX_CHARS ? `${label.slice(0, MAX_CHARS - 1)}…` : label;
-  return { w: Math.max(64, Math.round(text.length * CHAR_W + 26)), text };
+/** Wraps a label onto at most two lines, and sizes the box to fit. */
+export function labelBox(label: string): { w: number; h: number; lines: string[] } {
+  const words = label.split(/\s+/);
+  const lines: string[] = [''];
+  for (const word of words) {
+    const line = lines[lines.length - 1];
+    if (!line) lines[lines.length - 1] = word;
+    else if ((line + ' ' + word).length <= MAX_CHARS) lines[lines.length - 1] = `${line} ${word}`;
+    else lines.push(word);
+  }
+  let out = lines.slice(0, 2);
+  if (lines.length > 2) out[1] = `${out[1].slice(0, MAX_CHARS - 1)}…`;
+  out = out.map((l) => (l.length > MAX_CHARS + 4 ? `${l.slice(0, MAX_CHARS + 3)}…` : l));
+  const longest = Math.max(...out.map((l) => l.length));
+  return { w: Math.max(72, Math.round(longest * CHAR_W + 30)), h: out.length * LINE_H + 18, lines: out };
 }
 
 /** A path through dagre's points, rounded at the bends. */
@@ -60,15 +72,15 @@ export function layoutTopic(topic: Topic, direction: 'LR' | 'TB', others: Record
   const g = new dagre.graphlib.Graph();
   g.setGraph({
     rankdir: direction,
-    nodesep: direction === 'LR' ? 14 : 18,
-    ranksep: direction === 'LR' ? 44 : 36,
-    marginx: 10,
-    marginy: 10,
+    nodesep: direction === 'LR' ? 16 : 22,
+    ranksep: direction === 'LR' ? 56 : 44,
+    marginx: 12,
+    marginy: 12,
   });
   g.setDefaultEdgeLabel(() => ({}));
 
   const nodes = new Map<string, Omit<PlacedNode, 'x' | 'y'>>();
-  for (const c of topic.concepts) nodes.set(c.id, { key: c.id, concept: c, h: NODE_H, ...labelBox(c.label) });
+  for (const c of topic.concepts) nodes.set(c.id, { key: c.id, concept: c, ...labelBox(c.label) });
 
   const edges: [string, string][] = [];
   for (const c of topic.concepts) {
@@ -83,7 +95,6 @@ export function layoutTopic(topic: Topic, direction: 'LR' | 'TB', others: Record
             key: dep,
             concept: other,
             external: { topic: slug, topicTitle: others[slug].title },
-            h: NODE_H,
             ...labelBox(other.label),
           });
         }
@@ -110,79 +121,151 @@ export function layoutTopic(topic: Topic, direction: 'LR' | 'TB', others: Record
   return { nodes: placed, edges: placedEdges, width: Math.ceil(graph.width ?? 0), height: Math.ceil(graph.height ?? 0) };
 }
 
-export interface PlacedTopic {
-  topic: Topic;
+export interface PlacedBox {
+  key: string;
+  /** Set for a topic with a map; a step not started yet has only its roadmap step. */
+  topic?: Topic;
+  step?: RoadmapStep;
+  number?: number;
+  title: string;
   x: number;
   y: number;
   w: number;
   h: number;
 }
 
-const PAD = 18;
-const LABEL_H = 34;
+export interface PlacedBand {
+  key: string;
+  title: string;
+  roadmap?: Roadmap;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  /** The route through the band's boxes, in step order. */
+  route: string;
+}
+
+const PAD = 20;
+const LABEL_H = 46;
+const BOX_GAP = 44;
+const BAND_LABEL = 56;
+const BAND_GAP = 72;
+const ROW_GAP = 40;
+const ROW_WIDTH = 1700;
+const GHOST = { w: 200, h: 76 };
 
 /**
- * The map of everything: each topic laid out on its own inside a box, the boxes arranged left to
- * right so a topic comes after the topics it builds on, and links between topics drawn concept to concept.
+ * The map of everything, as the library is organised: a band per roadmap with its steps in order (wrapping
+ * onto new rows), a box per topic with its concepts inside, steps not started as empty frames, and a last band
+ * for topics on no roadmap. Links between topics are drawn concept to concept.
  */
-export function layoutAll(topics: Topic[]): { topics: PlacedTopic[]; layout: Layout } {
-  const inner = new Map(topics.map((t) => [t.slug, layoutTopic(t, 'TB', {}, false)]));
-  const outer = new dagre.graphlib.Graph();
-  outer.setGraph({ rankdir: 'LR', nodesep: 36, ranksep: 90, marginx: 24, marginy: 24 });
-  outer.setDefaultEdgeLabel(() => ({}));
-  for (const t of topics) {
-    const l = inner.get(t.slug)!;
-    outer.setNode(t.slug, { width: Math.max(l.width, 180) + PAD * 2, height: l.height + PAD + LABEL_H });
+export function layoutAtlas(roadmaps: Roadmap[], topicsBySlug: Record<string, Topic>): { bands: PlacedBand[]; boxes: PlacedBox[]; layout: Layout } {
+  const groups: { key: string; title: string; roadmap?: Roadmap; items: { topic?: Topic; step?: RoadmapStep; number?: number; title: string }[] }[] = [];
+  const used = new Set<string>();
+  for (const r of roadmaps) {
+    groups.push({
+      key: r.slug,
+      title: r.title,
+      roadmap: r,
+      items: r.steps.map((s, i) => {
+        used.add(s.topic);
+        const t = topicsBySlug[s.topic];
+        return { topic: t?.concepts.length ? t : undefined, step: s, number: i + 1, title: s.title };
+      }),
+    });
   }
-  const bySlug = new Map(topics.map((t) => [t.slug, t]));
-  const cross: { from: string; to: string }[] = [];
-  for (const t of topics) {
+  const loose = Object.values(topicsBySlug).filter((t) => !used.has(t.slug) && t.concepts.length);
+  if (loose.length) groups.push({ key: ':loose', title: 'Other topics', items: loose.map((t) => ({ topic: t, title: t.title })) });
+
+  const inner = new Map<string, Layout>();
+  const bands: PlacedBand[] = [];
+  const boxes: PlacedBox[] = [];
+  const nodes: PlacedNode[] = [];
+  const edges: PlacedEdge[] = [];
+  let y = 0;
+  let width = 0;
+
+  for (const g of groups) {
+    const bandY = y;
+    let x = PAD;
+    let rowY = bandY + BAND_LABEL;
+    let rowH = 0;
+    const placed: PlacedBox[] = [];
+    for (const item of g.items) {
+      // An empty frame is as wide as its title (set in 15px serif, about 7.4px a character).
+      let w = Math.min(440, Math.max(GHOST.w, Math.round(item.title.length * 7.6 + (item.number ? 64 : 40))));
+      let h = GHOST.h;
+      let l: Layout | undefined;
+      if (item.topic) {
+        l = layoutTopic(item.topic, 'TB', {}, false);
+        inner.set(item.topic.slug, l);
+        w = Math.max(l.width, 200) + PAD * 2;
+        h = l.height + PAD + LABEL_H;
+      }
+      if (x > PAD && x + w > ROW_WIDTH) {
+        x = PAD;
+        rowY += rowH + ROW_GAP;
+        rowH = 0;
+      }
+      const box: PlacedBox = { key: `${g.key}:${item.topic?.slug ?? item.step?.topic}`, topic: item.topic, step: item.step, number: item.number, title: item.title, x, y: rowY, w, h };
+      placed.push(box);
+      if (l && item.topic) {
+        const dx = x + PAD + (w - PAD * 2 - l.width) / 2;
+        const dy = rowY + LABEL_H;
+        for (const n of l.nodes) nodes.push({ ...n, key: `${item.topic.slug}/${n.key}`, x: n.x + dx, y: n.y + dy });
+        for (const e of l.edges) {
+          edges.push({ key: `${item.topic.slug}:${e.key}`, from: `${item.topic.slug}/${e.from}`, to: `${item.topic.slug}/${e.to}`, d: translate(e.d, dx, dy) });
+        }
+      }
+      x += w + BOX_GAP;
+      rowH = Math.max(rowH, h);
+      width = Math.max(width, x - BOX_GAP + PAD);
+    }
+    const bandH = rowY + rowH - bandY + PAD;
+    // The route: from each box's top edge to the next one's, so the order of the steps reads at a glance.
+    let route = '';
+    if (g.roadmap) {
+      for (let i = 0; i < placed.length; i++) {
+        const b = placed[i];
+        const cx = b.x + 22;
+        const cy = b.y;
+        if (i === 0) route = `M${cx},${cy}`;
+        else {
+          const prev = placed[i - 1];
+          const px = prev.x + 22;
+          const py = prev.y;
+          // Along a row the route arcs over to the next box; a new row starts its own line.
+          if (py === cy) route += ` M${px},${py} C${px},${py - 22} ${cx},${cy - 22} ${cx},${cy}`;
+        }
+      }
+    }
+    boxes.push(...placed);
+    bands.push({ key: g.key, title: g.title, roadmap: g.roadmap, x: 0, y: bandY, w: 0, h: bandH, route });
+    y = bandY + bandH + BAND_GAP;
+  }
+  for (const b of bands) b.w = width;
+
+  // Links between topics.
+  const at = new Map(nodes.map((n) => [n.key, n]));
+  for (const t of Object.values(topicsBySlug)) {
     for (const c of t.concepts) {
       for (const dep of c.deps) {
         const [slug, id] = dep.split('/');
-        if (id === undefined || !bySlug.has(slug) || !bySlug.get(slug)!.concepts.some((x) => x.id === id)) continue;
-        cross.push({ from: dep, to: `${t.slug}/${c.id}` });
-        if (slug !== t.slug) outer.setEdge(slug, t.slug);
+        if (id === undefined) continue;
+        const a = at.get(dep);
+        const b = at.get(`${t.slug}/${c.id}`);
+        if (!a || !b) continue;
+        const x1 = a.x + a.w;
+        const y1 = a.y + a.h / 2;
+        const x2 = b.x;
+        const y2 = b.y + b.h / 2;
+        const bend = Math.max(40, Math.abs(x2 - x1) / 2);
+        edges.push({ key: `x:${slug}/${id}->${t.slug}/${c.id}`, from: dep, to: `${t.slug}/${c.id}`, d: `M${x1},${y1} C${x1 + bend},${y1} ${x2 - bend},${y2} ${x2},${y2}` });
       }
     }
   }
-  dagre.layout(outer);
-
-  const placedTopics: PlacedTopic[] = [];
-  const nodes: PlacedNode[] = [];
-  const edges: PlacedEdge[] = [];
-  for (const t of topics) {
-    const box = outer.node(t.slug);
-    const x0 = box.x - box.width / 2;
-    const y0 = box.y - box.height / 2;
-    placedTopics.push({ topic: t, x: x0, y: y0, w: box.width, h: box.height });
-    const l = inner.get(t.slug)!;
-    const dx = x0 + PAD + (box.width - PAD * 2 - l.width) / 2;
-    const dy = y0 + LABEL_H;
-    for (const n of l.nodes) nodes.push({ ...n, key: `${t.slug}/${n.key}`, x: n.x + dx, y: n.y + dy });
-    for (const e of l.edges) {
-      edges.push({ key: `${t.slug}:${e.key}`, from: `${t.slug}/${e.from}`, to: `${t.slug}/${e.to}`, d: translate(e.d, dx, dy) });
-    }
-  }
-
-  const at = new Map(nodes.map((n) => [n.key, n]));
-  for (const c of cross) {
-    const a = at.get(c.from);
-    const b = at.get(c.to);
-    if (!a || !b) continue;
-    // Leave from the right side of the prerequisite and arrive at the left side of what builds on it.
-    const x1 = a.x + a.w;
-    const y1 = a.y + a.h / 2;
-    const x2 = b.x;
-    const y2 = b.y + b.h / 2;
-    const bend = Math.max(40, Math.abs(x2 - x1) / 2);
-    edges.push({ key: `x:${c.from}->${c.to}`, from: c.from, to: c.to, d: `M${x1},${y1} C${x1 + bend},${y1} ${x2 - bend},${y2} ${x2},${y2}` });
-  }
-  const graph = outer.graph();
-  return {
-    topics: placedTopics,
-    layout: { nodes, edges, width: Math.ceil(graph.width ?? 0), height: Math.ceil(graph.height ?? 0) },
-  };
+  return { bands, boxes, layout: { nodes, edges, width: Math.ceil(width), height: Math.ceil(Math.max(0, y - BAND_GAP)) } };
 }
 
 function translate(d: string, dx: number, dy: number): string {

@@ -2,19 +2,24 @@
 
 import { after, before, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { spawn, type ChildProcess } from 'node:child_process';
+import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
+import http from 'node:http';
+import https from 'node:https';
 import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import WebSocket from 'ws';
-import type { FeedState, Progress, PublicItem, ReviewQueue, SessionSummary, Topic, TopicSummary } from '../shared/types.ts';
+import { allowed } from '../server/images.ts';
+import type { FeedState, Progress, PublicItem, ReviewQueue, Roadmap, SessionSummary, Topic, TopicSummary } from '../shared/types.ts';
 
 const PORT = 4799;
+const TLS_PORT = 4798;
 const BASE = `http://localhost:${PORT}`;
 let server: ChildProcess;
 let dataDir: string;
+let tlsDir: string;
 let client: Client;
 
 async function startServer() {
@@ -23,6 +28,8 @@ async function startServer() {
       ...process.env,
       GYM_PORT: String(PORT),
       GYM_DATA_DIR: dataDir,
+      GYM_TLS_DIR: tlsDir,
+      GYM_TLS_PORT: String(TLS_PORT),
       GYM_WAIT_MS: '1500',
       GYM_CLAUDE_CMD: 'bash --norc --noprofile',
       PS1: '$ ',
@@ -40,6 +47,10 @@ async function startServer() {
 
 before(async () => {
   dataDir = await mkdtemp(path.join(tmpdir(), 'mind-gym-test-'));
+  // A certificate from the real script, marked as trusted the way setup-hostname.sh does.
+  tlsDir = await mkdtemp(path.join(tmpdir(), 'mind-gym-tls-'));
+  assert.equal(spawnSync('bash', ['scripts/tls.sh'], { env: { ...process.env, GYM_TLS_DIR: tlsDir }, stdio: 'ignore' }).status, 0);
+  await writeFile(path.join(tlsDir, 'installed'), '');
   await startServer();
   client = new Client({ name: 'test', version: '0' });
   await client.connect(new StreamableHTTPClientTransport(new URL(`${BASE}/mcp`)));
@@ -49,6 +60,7 @@ after(async () => {
   await client.close();
   server.kill();
   await rm(dataDir, { recursive: true, force: true });
+  await rm(tlsDir, { recursive: true, force: true });
 });
 
 type ToolResult = Awaited<ReturnType<Client['callTool']>>;
@@ -80,14 +92,19 @@ test('lists the tools', async () => {
     'collect_answers',
     'due_reviews',
     'end_session',
+    'find_images',
+    'get_roadmap',
     'get_topic',
+    'list_roadmaps',
     'list_topics',
     'preview_svg',
     'quiz',
     'record_practice',
+    'save_roadmap',
     'show',
     'start_session',
     'update_map',
+    'view_image',
   ]);
 });
 
@@ -392,4 +409,81 @@ test('run starts the command with the request as its first message, or types it 
   await until(() => /typed-42/.test(output()));
   ws.send(JSON.stringify({ type: 'stop' }));
   ws.close();
+});
+
+/** A request to gym.test, the way the browser makes it once nftables has forwarded it to the server. */
+function requestGym(secure: boolean, route: string, ca?: Buffer): Promise<{ status: number; location?: string; body: string }> {
+  return new Promise((resolve, reject) => {
+    const options = { host: '127.0.0.1', port: secure ? TLS_PORT : PORT, path: route, headers: { host: 'gym.test' } };
+    const req = secure ? https.get({ ...options, servername: 'gym.test', ca }) : http.get(options);
+    req.on('response', (res) => {
+      let body = '';
+      res.on('data', (chunk) => (body += chunk));
+      res.on('end', () => resolve({ status: res.statusCode!, location: res.headers.location, body }));
+    });
+    req.on('error', reject);
+  });
+}
+
+test('gym.test is served over https with its own certificate, and its pages move there from http', async () => {
+  const ca = await readFile(path.join(tlsDir, 'ca.crt'));
+  const page = await requestGym(true, '/topics', ca);
+  assert.equal(page.status, 200);
+  assert.deepEqual(JSON.parse((await requestGym(true, '/api/health', ca)).body), { ok: true });
+  await assert.rejects(requestGym(true, '/', undefined), /self-signed|unable to (get|verify)/, 'only its own authority vouches for it');
+
+  assert.deepEqual(await requestGym(false, '/topics?x=1', ca), { status: 307, location: 'https://gym.test/topics?x=1', body: '' });
+  assert.equal((await requestGym(false, '/api/health')).status, 200, 'a page still open over http keeps its feed');
+  assert.equal((await fetch(`${BASE}/`)).status, 200, 'localhost stays on http');
+
+  // ws hands servername on to tls.connect, though its types leave it out.
+  const tlsOptions: WebSocket.ClientOptions = { ca, servername: 'gym.test', headers: { host: 'gym.test' }, origin: 'https://gym.test' } as WebSocket.ClientOptions;
+  const ws = new WebSocket(`wss://127.0.0.1:${TLS_PORT}/api/terminal`, tlsOptions);
+  await new Promise((resolve, reject) => ws.on('open', resolve).on('error', reject));
+  ws.close();
+});
+
+test('a roadmap orders topics and reads its progress off their maps', async () => {
+  assert.equal(textOf(await call('list_roadmaps')), 'No roadmaps yet.');
+  const steps = [
+    { title: 'Forms first', goal: 'Read a 1-form', topic: 'differential-forms', why: 'Everything else uses them' },
+    { title: 'Stokes theorem', goal: 'Prove Stokes for a square' },
+  ];
+  const saved = textOf(await call('save_roadmap', { title: 'Geometry path', goal: 'Read Maxwell in forms', steps }));
+  assert.match(saved, /Roadmap created/);
+  assert.match(saved, /\[DRAFT/);
+  assert.match(saved, /1\. Forms first \(topic differential-forms\) \[started/);
+  assert.match(saved, /2\. Stokes theorem \(topic stokes-theorem\) \[not started\]/);
+
+  const [roadmap] = await get<Roadmap[]>('/api/roadmaps');
+  assert.equal(roadmap.slug, 'geometry-path');
+  assert.equal(roadmap.status, 'draft');
+  assert.deepEqual(roadmap.steps.map((s) => s.topic), ['differential-forms', 'stokes-theorem']);
+
+  // Revising replaces the steps and keeps the roadmap's identity.
+  const revised = textOf(
+    await call('save_roadmap', { roadmap: 'geometry-path', title: 'Geometry path', goal: 'Read Maxwell in forms', status: 'active', steps: steps.reverse() }),
+  );
+  assert.match(revised, /Roadmap updated/);
+  const after = await get<Roadmap>('/api/roadmaps/geometry-path');
+  assert.equal(after.status, 'active');
+  assert.equal(after.created, roadmap.created);
+  assert.equal(after.steps[0].topic, 'stokes-theorem');
+  assert.equal((await call('save_roadmap', { roadmap: 'nope', title: 'X', goal: 'Y', steps })).isError, true);
+
+  // A lesson on a step learns where it sits on the path.
+  const started = textOf(await call('start_session', { topic: 'Stokes theorem', goal: 'Start the step' }));
+  assert.match(started, /step 1 of 2 of the roadmap "Geometry path"/);
+  assert.match(started, /It is the first step/);
+  assert.match(textOf(await call('get_topic', { topic: 'differential-forms' })), /step 2 of 2 .*Earlier steps: stokes-theorem \(started\)/);
+  assert.match(textOf(await call('list_roadmaps')), /geometry-path: "Geometry path" \(0\/2 steps done\) \| next: Stokes theorem/);
+  assert.ok(await readFile(path.join(dataDir, 'roadmaps', 'geometry-path.json'), 'utf8'));
+});
+
+test('images: only licences that allow reuse get through', () => {
+  for (const ok of ['Public domain', 'PD-old', 'CC0', 'CC BY 4.0', 'CC BY-SA 3.0', 'CC-BY-SA-4.0']) assert.equal(allowed(ok), true, ok);
+  for (const no of ['', 'CC BY-NC 4.0', 'CC BY-NC-SA 4.0', 'CC BY-ND 2.0', 'Fair use', 'All rights reserved', 'Copyrighted free use']) {
+    assert.equal(allowed(no), false, no || '(none)');
+  }
+  assert.equal(allowed('CC BY 4.0', 'personality'), false, 'restricted');
 });

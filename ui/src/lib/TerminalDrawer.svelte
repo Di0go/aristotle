@@ -4,6 +4,7 @@
   import type { Terminal as XTerm } from '@xterm/xterm';
   import type { FitAddon } from '@xterm/addon-fit';
   import { claude } from './claude.svelte.ts';
+  import { theme as look } from './theme.svelte.ts';
 
   const HEIGHT_KEY = 'mind-gym.drawer-height';
 
@@ -34,7 +35,7 @@
   function theme() {
     const css = getComputedStyle(document.documentElement);
     const v = (name: string) => css.getPropertyValue(name).trim();
-    const dark = matchMedia('(prefers-color-scheme: dark)').matches;
+    const dark = look.dark;
     const ansi = dark
       ? {
           black: '#3a3936', red: '#f08a76', green: '#6cc58f', yellow: '#e2b34f', blue: '#6ea8f0', magenta: '#d68bd0', cyan: '#5cc4c9', white: '#d8d5cf',
@@ -57,17 +58,17 @@
     let unsubscribe = () => {};
     let disposed = false;
     const observer = new ResizeObserver(() => fit());
-    const scheme = matchMedia('(prefers-color-scheme: dark)');
-    const onScheme = () => term && (term.options.theme = theme());
 
     void (async () => {
       const [{ Terminal }, { FitAddon }] = await Promise.all([import('@xterm/xterm'), import('@xterm/addon-fit'), import('@xterm/xterm/css/xterm.css')]);
       if (disposed || !host) return;
       term = new Terminal({
-        fontFamily: "ui-monospace, 'JetBrains Mono', 'Fira Code', 'DejaVu Sans Mono', monospace",
-        fontSize: 13,
+        fontFamily: "'JetBrains Mono Variable', ui-monospace, monospace",
+        fontSize: 13.5,
         lineHeight: 1.15,
         cursorBlink: true,
+        cursorStyle: 'bar',
+        cursorWidth: 2,
         allowProposedApi: false,
         scrollback: 5000,
         theme: theme(),
@@ -82,7 +83,6 @@
         term?.write(data);
       });
       observer.observe(host);
-      scheme.addEventListener('change', onScheme);
       fit();
       term.focus();
     })();
@@ -91,9 +91,14 @@
       disposed = true;
       unsubscribe();
       observer.disconnect();
-      scheme.removeEventListener('change', onScheme);
       term?.dispose();
     };
+  });
+
+  // Follow the gym's theme switch.
+  $effect(() => {
+    void look.value;
+    requestAnimationFrame(() => term && (term.options.theme = theme()));
   });
 
   // Tell the page how much of the bottom the drawer covers, so nothing hides behind it.
@@ -141,11 +146,11 @@
     <div class="drawer-actions">
       {#if claude.connected && !claude.running}
         <button class="primary small" onclick={() => claude.start()}>Start Claude</button>
-        <button class="ghost" onclick={() => claude.start(true)} title="claude --continue">Resume last</button>
+        <button class="ghost small" onclick={() => claude.start(true)} title="claude --continue">Resume last</button>
       {:else if claude.running}
-        <button class="ghost" onclick={() => claude.stop()} title="End this Claude Code session">Stop</button>
+        <button class="ghost small" onclick={() => claude.stop()} title="End this Claude Code session">Stop</button>
       {/if}
-      <button class="ghost" onclick={() => claude.toggle(false)} aria-label="Hide the terminal" title="Hide (Ctrl+`)">Hide</button>
+      <button class="ghost small" onclick={() => claude.toggle(false)} aria-label="Hide the terminal" title="Hide (Ctrl+`)">Hide</button>
     </div>
   </header>
   <div class="xterm-host" bind:this={host}></div>

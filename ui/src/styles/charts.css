@@ -1,0 +1,186 @@
+.chart-pair {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(420px, 100%), 1fr));
+  gap: 0 24px;
+}
+
+.chart-pair > section {
+  min-width: 0;
+}
+
+.chart-card {
+  padding: 16px 18px 12px;
+}
+
+.chart {
+  position: relative;
+}
+
+.chart-plot {
+  position: relative;
+}
+
+.chart svg {
+  display: block;
+  overflow: visible;
+  outline: none;
+}
+
+.chart .grid {
+  stroke: var(--grid);
+  stroke-width: 1;
+}
+
+.chart .tick {
+  font: 11px var(--font);
+  fill: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.chart .end-label {
+  font: 600 12px var(--font);
+  fill: var(--ink);
+}
+
+.chart .ring {
+  stroke: var(--surface);
+  stroke-width: 2;
+}
+
+.chart .crosshair {
+  stroke: var(--line-strong);
+  stroke-width: 1;
+}
+
+.chart .hit {
+  fill: transparent;
+  outline: none;
+  cursor: default;
+}
+
+.chart .column.active path,
+.chart .column.active rect:not(.hit) {
+  filter: brightness(1.08);
+}
+
+.chart .hit:focus-visible {
+  stroke: var(--accent);
+  stroke-width: 1.5;
+}
+
+.chart svg:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+  border-radius: 4px;
+}
+
+.chart-legend {
+  margin: 0 0 8px;
+}
+
+.swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  margin-right: 6px;
+  vertical-align: -0.05em;
+}
+
+.tooltip {
+  position: absolute;
+  z-index: 5;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 140px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: 0 4px 16px rgb(0 0 0 / 0.12);
+  font-size: 0.82em;
+  white-space: nowrap;
+}
+
+.tooltip strong {
+  font-size: 1.15em;
+  margin-right: 6px;
+}
+
+.tooltip .key {
+  display: inline-block;
+  width: 12px;
+  height: 2px;
+  margin-right: 6px;
+  vertical-align: 0.25em;
+}
+
+.table-view {
+  margin-top: 8px;
+  font-size: 0.85em;
+}
+
+.table-view summary {
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.table-view table {
+  border-collapse: collapse;
+  margin-top: 8px;
+  font-variant-numeric: tabular-nums;
+}
+
+.table-view th,
+.table-view td {
+  padding: 4px 14px 4px 0;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+}
+
+.levels {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  max-width: 560px;
+}
+
+.levels li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 160px 48px;
+  align-items: center;
+  gap: 14px;
+}
+
+.levels li + li {
+  margin-top: 8px;
+}
+
+.levels a {
+  text-decoration: none;
+}
+
+.meter {
+  display: block;
+  height: 8px;
+  border-radius: 99px;
+  background: var(--accent-soft);
+  overflow: hidden;
+}
+
+.meter span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  border-radius: 99px;
+}
+
+@media (max-width: 640px) {
+  .chart-pair {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Map of everything */

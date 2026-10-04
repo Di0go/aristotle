@@ -25,6 +25,19 @@
   } = $props();
 
   const layout = $derived(layoutTopic(topic, direction, others));
+
+  // Focus and context: pointing at a concept lights it, what it builds on, and what builds on it.
+  let hovered = $state<string | null>(null);
+  const lit = $derived.by(() => {
+    const key = hovered ?? selected;
+    if (!key) return null;
+    const set = new Set([key]);
+    for (const e of layout.edges) {
+      if (e.from === key) set.add(e.to);
+      if (e.to === key) set.add(e.from);
+    }
+    return set;
+  });
 </script>
 
 {#if topic.concepts.length === 0}
@@ -50,6 +63,7 @@
           class="edge"
           class:cross={edge.from.includes('/')}
           class:to-selected={edge.to === selected}
+          class:dim={lit && !(lit.has(edge.from) && lit.has(edge.to) && (edge.from === (hovered ?? selected) || edge.to === (hovered ?? selected)))}
           marker-end="url(#arrow-{topic.slug})"
         />
       {/each}
@@ -58,6 +72,9 @@
           {node}
           focused={!node.external && topic.focus === node.key}
           selected={selected === node.key}
+          ref={node.external ? node.key : `${topic.slug}/${node.key}`}
+          dim={lit ? !lit.has(node.key) : false}
+          onhover={(on) => (hovered = on ? node.key : hovered === node.key ? null : hovered)}
           onclick={node.external
             ? () => (location.hash = link.topic(node.external!.topic, node.concept.id))
             : onselect

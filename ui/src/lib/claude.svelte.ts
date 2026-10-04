@@ -12,6 +12,10 @@ interface ServerMessage {
 // Strips ANSI escape sequences, for reading what is on screen.
 // eslint-disable-next-line no-control-regex
 const ANSI = /\x1b\[[0-9;?]*[ -/]*[@-~]|\x1b\][^\x07]*(?:\x07|\x1b\\)|\x1b[@-Z\\-_]/g;
+/** Claude Code's status line while it works ("✻ Pondering… (12s · esc to interrupt)"). */
+const WORKING = /esc to interrupt/i;
+/** The status word in that line, e.g. "Pondering…". */
+const STATUS_WORD = /(\p{Lu}\p{Ll}{2,}…)/gu;
 /** Claude Code asking something only the terminal can answer: a permission or a trust prompt. */
 const ASKING = /Do you want to|Would you like to|Enter to confirm|Esc to cancel/;
 
@@ -26,6 +30,15 @@ class Claude {
   activity = $state(false);
   /** Claude Code seems to be waiting on a prompt in the terminal. */
   asking = $state(false);
+  /** Claude is working (its status line says so). Cleared a moment after the status line stops. */
+  busy = $state(false);
+  /** When the current stretch of work began. */
+  busySince = $state(0);
+  /** Claude Code's own word for what it is doing ("Pondering…"). */
+  doing = $state('');
+  /** The last thing Claude said in the terminal, best effort: what to answer when it is waiting on him. */
+  lastSaid = $state('');
+  private idleTimer: ReturnType<typeof setTimeout> | undefined;
 
   private ws: WebSocket | null = null;
   private listeners = new Set<Listener>();
@@ -61,6 +74,33 @@ class Claude {
     this.recent = (this.recent + msg.data.replace(ANSI, ' ').replace(/\s+/g, ' ')).slice(-1500);
     if (ASKING.test(this.recent)) this.asking = true;
     if (!this.open) this.activity = true;
+    const chunk = msg.data.replace(ANSI, ' ').replace(/\s+/g, ' ');
+    if (WORKING.test(chunk)) {
+      if (!this.busy) this.busySince = Date.now();
+      this.busy = true;
+      const words = [...chunk.matchAll(STATUS_WORD)];
+      if (words.length) this.doing = words[words.length - 1][1];
+      clearTimeout(this.idleTimer);
+      this.idleTimer = setTimeout(() => {
+        this.busy = false;
+        this.doing = '';
+        this.lastSaid = this.readLastSaid();
+      }, 2500);
+    }
+  }
+
+  /** Claude Code prints its replies after a "⏺" marker; the text runs until its input box. */
+  private readLastSaid(): string {
+    const text = this.screen.replace(ANSI, ' ').replace(/[ \t]+/g, ' ');
+    const at = text.lastIndexOf('⏺');
+    if (at === -1) return '';
+    const said = text
+      .slice(at + 1, at + 600)
+      .split(/[╭│─>]{2,}|\n\s*\n|\? for shortcuts/)[0]
+      .replace(/\s+/g, ' ')
+      .trim();
+    // Tool calls look like "gym - show (MCP)(…)"; only plain sentences are worth showing.
+    return /^[\w-]+ - \w+ \(MCP\)|^\w+\(/.test(said) || said.length < 3 ? '' : said.slice(0, 280);
   }
 
   /** Receives everything shown so far (as a replay), then live output. */

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { setContext } from 'svelte';
   import { feed } from '../lib/feed.svelte.ts';
   import { link } from '../lib/router.svelte.ts';
   import { duration, formatDay, formatTime } from '../lib/format.ts';
@@ -23,26 +24,24 @@
 
   const items = $derived(live ? feed.items : (record?.items ?? []));
   const lastAt = $derived(items.at(-1)?.at ?? record?.session.startedAt ?? '');
+
+  setContext('topic-slug', () => record?.session.topicSlug ?? feed.session?.topicSlug);
 </script>
 
-<div class="page session-page">
+<div class="lesson-main session-page">
   {#if record}
-    <header class="page-head">
-      <a class="eyebrow" href={link.log()}>Log</a>
-      <h1>{record.session.goal}</h1>
-      <p>
-        <a href={link.topic(record.session.topicSlug)}>{record.session.topic}</a> ·
-        {formatDay(record.session.startedAt)}, {formatTime(record.session.startedAt)} ·
-        {duration(record.session.startedAt, lastAt)}
-      </p>
+    <header class="lesson-head">
+      <nav class="crumbs"><a href={link.log()}>Log</a><span class="sep">/</span><span>{formatDay(record.session.startedAt)}, {formatTime(record.session.startedAt)}, {duration(record.session.startedAt, lastAt)}</span></nav>
+      <h1 class="page-title">
+        {#if record.session.topicSlug}<a class="title-link" href={link.topic(record.session.topicSlug)}>{record.session.topic}</a>{:else}{record.session.topic}{/if}
+      </h1>
+      <p class="page-lede">{record.session.goal}</p>
       {#if live}<p><a href={link.now()}>This is the current session: open it in Now</a></p>{/if}
     </header>
-    <div class="session-feed">
-      <FeedList {items} readonly={!live} pendingId={live ? (feed.pending?.id ?? null) : null} />
-    </div>
+    <FeedList {items} readonly={!live} pendingId={live ? (feed.pending?.id ?? null) : null} />
   {:else if missing}
-    <div class="empty">
-      <h1>No such session</h1>
+    <div class="empty-state">
+      <h2>No such session</h2>
       <p><a href={link.log()}>Back to the log</a></p>
     </div>
   {:else}

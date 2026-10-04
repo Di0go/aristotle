@@ -8,6 +8,7 @@ import { SESSIONS_DIR } from './config.ts';
 import { Feed, readSession, sessionFiles, summarizeSession } from './feed.ts';
 import type { Outcome } from './reviews.ts';
 import { slugify } from './slug.ts';
+import { Roadmaps } from './roadmaps.ts';
 import { Topics, type ConceptInput } from './topics.ts';
 import type {
   AskItem,
@@ -31,19 +32,22 @@ export interface PracticeResult {
 export class Gym {
   readonly feed: Feed;
   readonly topics: Topics;
+  readonly roadmaps: Roadmaps;
   readonly backup = new Backup();
   private summaries = new Map<string, { mtime: number; summary: SessionSummary | null }>();
 
-  constructor(feed: Feed, topics: Topics) {
+  constructor(feed: Feed, topics: Topics, roadmaps: Roadmaps) {
     this.feed = feed;
     this.topics = topics;
+    this.roadmaps = roadmaps;
     topics.events.on('topic', (topic) => feed.events.emit('event', { type: 'topic', topic }));
+    roadmaps.events.on('roadmap', (roadmap) => feed.events.emit('event', { type: 'roadmap', roadmap }));
     feed.events.on('event', () => this.backup.schedule());
     this.backup.schedule(30_000);
   }
 
   static async load(): Promise<Gym> {
-    return new Gym(await Feed.load(), await Topics.load());
+    return new Gym(await Feed.load(), await Topics.load(), await Roadmaps.load());
   }
 
   /** The current session's topic, if it has one on the map. */

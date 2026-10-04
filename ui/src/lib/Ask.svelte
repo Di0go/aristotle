@@ -13,9 +13,9 @@
   const answered = $derived(Boolean(item.answeredAt));
 
   const LABELS: Record<AskItem['kind'], string> = {
-    problem: 'Problem: solve it yourself',
+    problem: 'Problem: work it out yourself',
     explain: 'Explain it in your own words',
-    recall: 'From memory',
+    recall: 'From memory, without looking back',
     open: 'Your answer',
   };
 
@@ -38,13 +38,13 @@
   }
 </script>
 
-<section class="card ask kind-{item.kind}" class:active class:answered>
-  <header class="card-head"><span class="label">{LABELS[item.kind]}</span></header>
-  <Markdown source={item.prompt} />
+<section class="sheet ask kind-{item.kind}" class:active class:answered>
+  <p class="kicker">{LABELS[item.kind]}</p>
+  <div class="question-text"><Markdown source={item.prompt} /></div>
 
   {#if answered}
     <div class="your-answer">
-      <span class="label">You wrote</span>
+      <p class="kicker">You wrote</p>
       <Markdown source={item.response ?? ''} />
     </div>
   {:else if readonly}
@@ -59,11 +59,12 @@
     ></textarea>
     {#if text.includes('$') || text.includes('\\(')}
       <div class="preview">
-        <span class="label">Preview</span>
+        <p class="kicker">Preview</p>
         <Markdown source={text} />
       </div>
     {/if}
-    <footer class="actions">
+    <footer class="sheet-foot">
+      <span class="muted hint">Struggling is the point: write what you think, even if unsure.</span>
       {#if error}<span class="error">{error}</span>{/if}
       <button class="primary" disabled={!text.trim() || sending} onclick={submit}>
         Send <kbd>Ctrl</kbd><kbd>Enter</kbd>

@@ -81,17 +81,21 @@ export class Backup {
   }
 }
 
-/** "differential-forms, how-the-internet-works (2 sessions)" from `git status --porcelain` output. */
+/** "differential-forms, how-the-internet-works, 2 sessions, roadmap fighting-mind" from `git status --porcelain` output. */
 function describe(porcelain: string): string {
   const topics = new Set<string>();
+  const roadmaps = new Set<string>();
   let sessions = 0;
   for (const line of porcelain.split('\n')) {
     const file = line.slice(3).trim();
     const topic = /data\/topics\/([^/]+)\.json$/.exec(file);
     if (topic) topics.add(topic[1]);
+    const roadmap = /data\/roadmaps\/([^/]+)\.json$/.exec(file);
+    if (roadmap) roadmaps.add(roadmap[1]);
     if (/data\/sessions\//.test(file)) sessions++;
   }
   const parts = [...topics];
   if (sessions) parts.push(`${sessions} session${sessions === 1 ? '' : 's'}`);
+  for (const r of roadmaps) parts.push(`roadmap ${r}`);
   return parts.length ? parts.join(', ') : 'backup';
 }

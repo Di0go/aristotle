@@ -1,6 +1,6 @@
 // Types shared by the server and the interface.
 
-export type BlockKind = 'step' | 'plan' | 'summary' | 'feedback' | 'note';
+export type BlockKind = 'orient' | 'step' | 'plan' | 'summary' | 'feedback' | 'note';
 export type AskKind = 'problem' | 'explain' | 'recall' | 'open';
 
 export interface QuizQuestion {
@@ -166,6 +166,39 @@ export interface Topic {
   training?: { level: number; updated: string };
 }
 
+// Roadmaps: an ordered path of topics, planned with him before any of them is taught.
+
+export interface RoadmapStep {
+  /** The topic this step becomes: the slug of its title. */
+  topic: string;
+  title: string;
+  /** What he should be able to do once the step is done. */
+  goal: string;
+  /** Why it comes here, and what it builds on. */
+  why?: string;
+}
+
+export interface Roadmap {
+  slug: string;
+  title: string;
+  /** What the whole path is for. */
+  goal: string;
+  /** draft: still being planned with him; active: approved, being followed. */
+  status: 'draft' | 'active';
+  created: string;
+  updated: string;
+  steps: RoadmapStep[];
+}
+
+/** not-started: no topic yet; started: a topic with a map; done: every goal concept on its map is solid. */
+export type StepState = 'not-started' | 'started' | 'done';
+
+export function stepState(topic: Pick<Topic, 'concepts'> | undefined): StepState {
+  if (!topic) return 'not-started';
+  const goals = topic.concepts.filter((c) => c.goal);
+  return goals.length > 0 && goals.every((c) => c.status === 'solid') ? 'done' : 'started';
+}
+
 export interface MapChange {
   id: string;
   label: string;
@@ -252,7 +285,8 @@ export interface FeedState {
 export type FeedEvent =
   | { type: 'session'; session: Session }
   | { type: 'item'; item: PublicItem }
-  | { type: 'topic'; topic: Topic };
+  | { type: 'topic'; topic: Topic }
+  | { type: 'roadmap'; roadmap: Roadmap };
 
 export interface QuizAnswerBody {
   id: string;

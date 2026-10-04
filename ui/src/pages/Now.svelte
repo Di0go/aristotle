@@ -1,36 +1,38 @@
 <script lang="ts">
+  import { setContext } from 'svelte';
   import { tick } from 'svelte';
   import { feed } from '../lib/feed.svelte.ts';
-  import { claude } from '../lib/claude.svelte.ts';
   import { link } from '../lib/router.svelte.ts';
+  import { countsOf, placeOf } from '../lib/library.ts';
   import FeedList from '../lib/FeedList.svelte';
-  import MapGraph from '../lib/MapGraph.svelte';
-  import StatusBar from '../lib/StatusBar.svelte';
   import ReviewPanel from '../lib/ReviewPanel.svelte';
+  import LessonBench from '../lib/LessonBench.svelte';
   import Composer from '../lib/Composer.svelte';
-  import StartPanel from '../lib/StartPanel.svelte';
-  import { isFading, type ConceptStatus } from '../../../shared/types.ts';
+  import Home from '../lib/Home.svelte';
+  import Grip from '../lib/Grip.svelte';
+  import LessonActivity from '../lib/LessonActivity.svelte';
+  import { actions } from '../lib/actions.ts';
+  import { claude } from '../lib/claude.svelte.ts';
 
-  let mapOpen = $state(false);
-  /** Set when something was started from the interface, until the new session appears. */
-  let startedFrom = $state<string | null>(null);
-  const waiting = $derived(startedFrom !== null && (feed.session?.id ?? '') === startedFrom);
-  const idle = $derived(!feed.session || Boolean(feed.session.endedAt));
+  let benchOpen = $state(false);
+  let stopHint = $state(false);
   let count = 0;
 
+  const live = $derived(Boolean(feed.session && !feed.session.endedAt));
   const topic = $derived(feed.currentTopic);
   const reviewing = $derived(feed.session?.kind === 'review');
-  const hasPanel = $derived(Boolean(topic) || reviewing);
-  const fading = $derived(topic?.concepts.filter((c) => isFading(c)).length ?? 0);
-  const KIND_LABEL = { learn: '', review: 'Review', train: 'Training' } as const;
-  const counts = $derived.by(() => {
-    const c: Record<ConceptStatus, number> = { unknown: 0, shaky: 0, solid: 0 };
-    for (const x of topic?.concepts ?? []) c[x.status]++;
-    return c;
-  });
-  const focus = $derived(topic?.concepts.find((c) => c.id === topic.focus) ?? null);
+  const place = $derived(topic ? placeOf(topic.slug, feed.roadmapList) : null);
+  const counts = $derived(countsOf(topic ?? undefined));
+  const KIND = { learn: 'Lesson', review: 'Review', train: 'Training set' } as const;
 
-  // Follow the lesson as it grows, unless the learner has scrolled back up to reread.
+  // When Claude starts working at the end of the lesson, keep its activity card in view if he is near the bottom.
+  $effect(() => {
+    if (!claude.busy && !feed.wrapping) return;
+    const nearBottom = window.innerHeight + window.scrollY >= document.body.scrollHeight - 500;
+    if (nearBottom && !feed.pending) void tick().then(() => window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }));
+  });
+
+  // Follow the lesson as it grows, unless he has scrolled back up to reread.
   $effect(() => {
     const n = feed.items.length;
     if (n <= count) {
@@ -47,69 +49,89 @@
       else window.scrollTo({ top: document.body.scrollHeight, behavior: first ? 'instant' : 'smooth' });
     });
   });
+
+  setContext('topic-slug', () => feed.session?.topicSlug);
 </script>
 
-<div class="now" class:has-map={hasPanel}>
-  <section class="feed-col">
-    {#if feed.session}
-      <header class="session-head">
-        <div>
-          {#if reviewing}
-            <a class="eyebrow" href={link.progress()}>Review</a>
+{#if live && feed.session}
+  <div class="lesson" class:with-bench={topic || reviewing}>
+    <div class="lesson-main">
+      <header class="lesson-head">
+        <nav class="crumbs" aria-label="Where this is">
+          {#if place}
+            <a href={link.roadmap(place.roadmap.slug)}>{place.roadmap.title}</a>
+            <span class="sep">/</span>
+            <a href={link.topic(feed.session.topicSlug)}>{place.index + 1} · {feed.session.topic}</a>
+          {:else if !reviewing}
+            <a href={link.topic(feed.session.topicSlug)}>{feed.session.topic}</a>
           {:else}
-            <a class="eyebrow" href={link.topic(feed.session.topicSlug)}>
-              {KIND_LABEL[feed.session.kind ?? 'learn'] ? `${KIND_LABEL[feed.session.kind ?? 'learn']} · ` : ''}{feed.session.topic}
-            </a>
+            <span>Review</span>
           {/if}
-          <h1>{feed.session.goal}</h1>
+        </nav>
+        <div class="title-row">
+          <h1 class="page-title">{reviewing ? 'Review' : feed.session.topic}</h1>
+          <button
+            class="ghost small stop"
+            onclick={() => (actions.stopForToday() ? null : (stopHint = true))}
+            disabled={feed.wrapping}
+            title="Claude updates your map and writes where to pick up next time"
+          >{feed.wrapping ? 'Wrapping up…' : 'Stop for today'}</button>
         </div>
-        {#if hasPanel}
-          <button class="map-toggle" onclick={() => (mapOpen = !mapOpen)} aria-expanded={mapOpen}>{reviewing ? 'Queue' : 'Map'}</button>
+        {#if stopHint && !claude.running}<p class="stop-hint muted">Claude isn't running in the gym. If you're talking to it in your own terminal, tell it there to stop for today.</p>{/if}
+        <dl class="props">
+          <dt>session</dt><dd>{KIND[feed.session.kind ?? 'learn']}: {feed.session.goal}</dd>
+          {#if place}<dt>roadmap</dt><dd><a href={link.roadmap(place.roadmap.slug)}>{place.roadmap.title}</a>, step {place.index + 1} of {place.roadmap.steps.length}</dd>{/if}
+          {#if topic && counts.total}<dt>progress</dt><dd>{counts.solid} of {counts.total} concepts solid</dd>{/if}
+        </dl>
+        {#if topic || reviewing}
+          <button class="ghost small bench-toggle" onclick={() => (benchOpen = true)}>{reviewing ? 'The queue' : 'Outline and graph'}</button>
         {/if}
       </header>
-    {/if}
 
-    {#if feed.items.length === 0 && feed.session && !idle}
-      <div class="empty">
-        <h1>Session started</h1>
-        <p>Claude is getting ready.</p>
-      </div>
-    {:else if feed.items.length}
-      <FeedList items={feed.items} pendingId={feed.pending?.id ?? null} />
-      {#if feed.session?.endedAt}
-        <p class="hint">Session ended.</p>
-      {/if}
-    {/if}
-
-    {#if idle}
-      {#if waiting}
-        <div class="starting card">
-          <i class="run-dot busy"></i>
-          <span>Claude is getting ready. The lesson will appear here.</span>
-          {#if claude.asking}<button class="link" onclick={() => claude.toggle(true)}>Claude is asking something: open the terminal</button>{/if}
+      {#if feed.items.length === 0}
+        <div class="lesson-wait">
+          <span class="spinner" aria-hidden="true"></span>
+          <p>Claude is getting the lesson ready. It usually starts with the big picture, then finds out what you already know.</p>
         </div>
       {:else}
-        <StartPanel onstarted={() => (startedFrom = feed.session?.id ?? '')} />
+        <FeedList items={feed.items} pendingId={feed.pending?.id ?? null} />
       {/if}
-    {/if}
-    <Composer />
-  </section>
+      <LessonActivity />
+      <Composer />
+    </div>
 
-  {#if reviewing}
-    <aside class="map-panel card" class:open={mapOpen}>
-      <ReviewPanel onclose={() => (mapOpen = false)} />
-    </aside>
-  {:else if topic}
-    <aside class="map-panel card" class:open={mapOpen}>
-      <header>
-        <a href={link.topic(topic.slug)}>{topic.title}</a>
-        <button class="close" onclick={() => (mapOpen = false)} aria-label="Close map">×</button>
-      </header>
-      <StatusBar {counts} {fading} legend />
-      <MapGraph {topic} others={feed.topics} direction="TB" fit onselect={(id) => (location.hash = link.topic(topic.slug, id))} />
-      {#if focus}
-        <p class="focus-line"><span class="label">Now</span> {focus.label}</p>
-      {/if}
-    </aside>
-  {/if}
-</div>
+    {#if reviewing || topic}
+      <aside class="bench" class:open={benchOpen} aria-label={reviewing ? 'Review queue' : 'Where this lesson sits'}>
+        {#if reviewing}
+          <div class="bench-inner"><ReviewPanel onclose={() => (benchOpen = false)} /></div>
+        {:else if topic}
+          <LessonBench {topic} onclose={() => (benchOpen = false)} />
+        {/if}
+        <Grip name="--side-w" side="left" min={220} max={480} initial={280} label="Resize the sidebar" />
+      </aside>
+    {/if}
+    <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+    <div class="bench-scrim" class:open={benchOpen} onclick={() => (benchOpen = false)}></div>
+  </div>
+{:else}
+  <Home />
+{/if}
+
+<style>
+  .title-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+  }
+
+  .stop {
+    flex: none;
+    margin-top: 6px;
+  }
+
+  .stop-hint {
+    margin: 8px 0 0;
+    font-size: 0.82rem;
+  }
+</style>

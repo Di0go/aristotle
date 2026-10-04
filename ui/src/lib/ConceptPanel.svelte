@@ -43,10 +43,10 @@
   }
 </script>
 
-<section class="card concept-panel">
+<section class="sheet concept-panel">
   <header>
-    <span class="chip {fading ? 'fading' : concept.status}">{word}</span>
-    {#if concept.goal}<span class="chip goal">Goal</span>{/if}
+    <span class="tag {fading ? 'solid' : concept.status === 'unknown' ? '' : concept.status}">{word}</span>
+    {#if concept.goal}<span class="tag cyan">Goal</span>{/if}
     <button class="close" onclick={onclose} aria-label="Close">×</button>
   </header>
   <h2>{concept.label}</h2>
@@ -112,3 +112,124 @@
     </li>
   </ul>
 </section>
+
+<style>
+  .concept-panel {
+    padding: 22px 26px 24px;
+  }
+
+  header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  header .close {
+    margin-left: auto;
+  }
+
+  h2 {
+    margin: 10px 0 6px;
+    font-size: 1.15rem;
+    line-height: 1.2;
+  }
+
+  p {
+    margin: 0 0 10px;
+    font: 0.9rem/1.65 var(--sans);
+    color: var(--ink-2);
+  }
+
+  .concept-note {
+    padding: 10px 14px;
+    border-left: 3px solid var(--shaky);
+    background: var(--shaky-soft);
+    border-radius: 0 var(--radius) var(--radius) 0;
+    font-size: 0.95rem;
+    color: var(--ink);
+  }
+
+  .review-line {
+    font: 0.83rem var(--sans);
+    color: var(--graphite);
+  }
+
+  h3 {
+    margin: 20px 0 8px;
+    font: 500 0.8rem var(--sans);
+    color: var(--graphite);
+  }
+
+  .links,
+  .history {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .links li {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 3px 0;
+    font-size: 0.91rem;
+  }
+
+  .links :global(.link-button),
+  .links a {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .history li {
+    font-size: 0.85rem;
+  }
+
+  .history li + li {
+    margin-top: 2px;
+  }
+
+  .history a {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    padding: 4px 0;
+    color: var(--ink-2);
+    text-decoration: none;
+  }
+
+  .history a:hover {
+    color: var(--ink);
+  }
+
+  .history .when {
+    margin-left: auto;
+    font: 0.72rem var(--sans);
+    color: var(--graphite);
+  }
+
+  .history li.muted {
+    padding-top: 8px;
+    font-size: 0.78rem;
+  }
+
+  .mark {
+    display: inline-block;
+    width: 1em;
+    font-weight: 600;
+    color: var(--graphite);
+  }
+
+  .mark.right {
+    color: var(--solid);
+  }
+
+  .mark.wrong {
+    color: var(--wrong);
+  }
+
+  .mark.partial {
+    color: var(--shaky);
+  }
+</style>

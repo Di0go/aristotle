@@ -1,13 +1,15 @@
 // The Mind Gym server: the interface, its live feed, and the MCP endpoint Claude Code connects to.
-// Listens on 127.0.0.1 only.
+// Listens on 127.0.0.1 only: HTTP, and HTTPS for gym.test when scripts/tls.sh has made its certificate.
 
 import http from 'node:http';
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import https from 'node:https';
+import type { Duplex } from 'node:stream';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { WebSocketServer } from 'ws';
-import { ALLOWED_NAMES, ALLOWED_PORTS, HOST, PORT, UI_DIR, URL_CLEAN } from './config.ts';
+import { ALLOWED_NAMES, ALLOWED_PORTS, HOST, HOSTNAME, PORT, TLS_DIR, TLS_PORT, TLS_TRUSTED, UI_DIR, URL_CLEAN } from './config.ts';
 import { PID_FILE } from './control.ts';
 import { AnswerError, publicItem } from './feed.ts';
 import { Gym } from './gym.ts';
@@ -20,7 +22,7 @@ const feed = gym.feed;
 const terminal = new Terminal();
 const sockets = new WebSocketServer({ noServer: true });
 
-const server = http.createServer(async (req, res) => {
+async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
   try {
     // Only answer requests addressed to this machine by name, and only from our own pages:
     // stops other websites in the browser from reaching the server (DNS rebinding, CSRF).
@@ -28,6 +30,12 @@ const server = http.createServer(async (req, res) => {
       return send(res, 403, 'Forbidden');
     }
     const url = new URL(req.url ?? '/', 'http://localhost');
+    // Once the browsers trust the certificate, pages on http://gym.test move to https. Not /api/: a page
+    // still open over http keeps its live feed and terminal, which a redirect to another origin would break.
+    if (TLS_TRUSTED && !('encrypted' in req.socket) && req.headers.host === HOSTNAME && !url.pathname.startsWith('/api/') && url.pathname !== '/mcp') {
+      res.writeHead(307, { Location: `https://${HOSTNAME}${req.url ?? '/'}` }).end();
+      return;
+    }
     if (url.pathname === '/mcp') return await handleMcp(req, res);
     if (url.pathname.startsWith('/api/')) return await handleApi(req, res, url.pathname);
     return await serveStatic(res, url.pathname);
@@ -36,11 +44,11 @@ const server = http.createServer(async (req, res) => {
     if (!res.headersSent) send(res, 500, 'Server error');
     else res.end();
   }
-});
+}
 
 // The terminal runs Claude Code, so it is only ever reachable from the gym's own pages: a browser always
 // sends an Origin on a WebSocket, and other sites (or a rebound DNS name) fail the Host and Origin checks.
-server.on('upgrade', (req, socket, head) => {
+function upgrade(req: http.IncomingMessage, socket: Duplex, head: Buffer) {
   const url = new URL(req.url ?? '/', 'http://localhost');
   if (url.pathname !== '/api/terminal' || !localHost(req.headers.host) || !req.headers.origin || !localOrigin(req.headers.origin)) {
     socket.write('HTTP/1.1 403 Forbidden\r\n\r\n');
@@ -48,7 +56,14 @@ server.on('upgrade', (req, socket, head) => {
     return;
   }
   sockets.handleUpgrade(req, socket, head, (ws) => terminal.attach(ws));
-});
+}
+
+const server = http.createServer(handle).on('upgrade', upgrade);
+const tls = existsSync(path.join(TLS_DIR, 'server.crt'))
+  ? https
+      .createServer({ key: readFileSync(path.join(TLS_DIR, 'server.key')), cert: readFileSync(path.join(TLS_DIR, 'server.crt')) }, handle)
+      .on('upgrade', upgrade)
+  : undefined;
 
 async function handleMcp(req: http.IncomingMessage, res: http.ServerResponse) {
   if (req.method !== 'POST') {
@@ -72,6 +87,11 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ro
   if (req.method === 'GET' && route === '/api/events') return streamEvents(req, res);
   if (req.method === 'GET' && route === '/api/topics') return json(res, 200, gym.topics.list());
   if (req.method === 'GET' && route === '/api/map') return json(res, 200, gym.topics.all());
+  if (req.method === 'GET' && route === '/api/roadmaps') return json(res, 200, gym.roadmaps.all());
+  if (req.method === 'GET' && route.startsWith('/api/roadmaps/')) {
+    const roadmap = gym.roadmaps.get(decodeURIComponent(route.slice('/api/roadmaps/'.length)));
+    return roadmap ? json(res, 200, roadmap) : json(res, 404, { error: 'No such roadmap' });
+  }
   if (req.method === 'GET' && route.startsWith('/api/topics/')) {
     const topic = gym.topics.get(decodeURIComponent(route.slice('/api/topics/'.length)));
     return topic ? json(res, 200, topic) : json(res, 404, { error: 'No such topic' });
@@ -188,25 +208,30 @@ function send(res: http.ServerResponse, status: number, message: string) {
   res.writeHead(status, { 'Content-Type': 'text/plain; charset=utf-8' }).end(message);
 }
 
-server.on('error', (err: NodeJS.ErrnoException) => {
+const portInUse = (port: number) => (err: NodeJS.ErrnoException) => {
   if (err.code === 'EADDRINUSE') {
-    console.error(`Port ${PORT} is already in use: the Mind Gym is probably already running.`);
+    console.error(`Port ${port} is already in use: the Mind Gym is probably already running.`);
     process.exit(1);
   }
   throw err;
-});
+};
+server.on('error', portInUse(PORT));
+tls?.on('error', portInUse(TLS_PORT));
 
 server.listen(PORT, HOST, () => {
   mkdirSync(path.dirname(PID_FILE), { recursive: true });
   writeFileSync(PID_FILE, String(process.pid));
   console.log(`${new Date().toISOString()} Mind Gym running at ${URL_CLEAN} (http://localhost:${PORT})`);
 });
+tls?.listen(TLS_PORT, HOST);
 
 function shutdown() {
   rmSync(PID_FILE, { force: true });
   terminal.stop();
-  server.close();
-  server.closeAllConnections();
+  for (const s of [server, tls]) {
+    s?.close();
+    s?.closeAllConnections();
+  }
   process.exit(0);
 }
 process.on('SIGTERM', shutdown);

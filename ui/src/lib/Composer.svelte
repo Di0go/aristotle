@@ -45,10 +45,10 @@
     </div>
   {:else if claude.connected}
     <p class="composer-off">
-      Talking to Claude in your own terminal? Carry on there. Or run it here:
-      <button class="link" onclick={() => { claude.start(); claude.toggle(true); }}>start Claude</button>
-      ·
-      <button class="link" onclick={() => { claude.start(true); claude.toggle(true); }}>resume the last session</button>
+      Claude isn't running here. If you're talking to it in your own terminal, carry on there. Otherwise
+      <button class="link" onclick={() => { claude.start(true); claude.toggle(true); }}>resume the last conversation</button>
+      or
+      <button class="link" onclick={() => { claude.start(); claude.toggle(true); }}>start a new one</button>.
     </p>
   {/if}
 </div>

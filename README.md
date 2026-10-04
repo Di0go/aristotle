@@ -11,7 +11,7 @@ pnpm install
 bash scripts/install-service.sh   # once: runs the gym at login (a systemd user service, no root)
 ```
 
-Open http://gym.test and type what you want to learn into **What do you want to learn?** on *Now*, or pick *Continue*, *Review* or *Train*. The gym starts Claude Code inside itself (on your own login) with that request; the same buttons are on *Topics*, each topic's page and *Progress*. Talk to Claude in the box at the bottom of *Now*, or open the terminal drawer with **Claude** in the top bar (`Ctrl+``). Prefer your own terminal? Run `claude` in this folder: the gym starts by itself if it isn't running.
+Open https://gym.test and type what you want to learn into **What do you want to learn?** on *Now*, or pick *Continue*, *Review* or *Train*. The gym starts Claude Code inside itself (on your own login) with that request; the same buttons are on *Topics*, each topic's page and *Progress*. Talk to Claude in the box at the bottom of *Now*, or open the terminal drawer with **Claude** in the top bar (`Ctrl+``). Prefer your own terminal? Run `claude` in this folder: the gym starts by itself if it isn't running.
 
 The buttons run these skills, which you can also type yourself:
 
@@ -20,12 +20,15 @@ The buttons run these skills, which you can also type yourself:
 | `/teach <anything>` | A lesson: finds the edge of what you know, plans a map, teaches one step at a time. `/teach continue` picks up where you left off |
 | `/review` | Practises what's fading (solid once, now due), across all your topics, by recalling and applying it |
 | `/train <topic>` | Problems just above what you hold solidly, solved without help; the difficulty rises as you solve them cleanly |
+| `/roadmap <field or goal>` | Plans a path of topics with you (which ones, in what order, why), shown on *Roadmaps* as a draft until you approve it. Each step then starts as a lesson from its page |
 
 There is no schedule: the gym shows what's fading, and you train when you like.
 
+The sidebar is your library: each roadmap with its steps in order, each step's concepts underneath, and topics on no roadmap below. During a lesson, the panel beside it shows where the lesson sits on its roadmap, what the topic is for, what is being worked on now, and the plan. Lessons open with an orientation (the question, a picture of the territory, the words you'll meet) and use figures, animations and step-through sequences wherever the subject has moving parts.
+
 The first time, Claude Code asks you to trust the folder and to enable the `gym` MCP server: accept both.
 
-`http://gym.test` needs a one-off system setup, in the same style as `bancada.test` and `playground.test`: a hosts entry on 127.0.0.82 and an nftables rule that forwards its port 80 to 4747. Run `pkexec bash scripts/setup-hostname.sh` (it explains how to undo it).
+`https://gym.test` needs a one-off system setup, in the same style as `bancada.test` and `playground.test`: a hosts entry on 127.0.0.82, an nftables rule that forwards its ports 80 and 443 to 4747 and 4748, and a certificate authority of its own that can only sign `gym.test`. Run `bash scripts/tls.sh` to make the certificate, then `pkexec bash scripts/setup-hostname.sh` (it explains how to undo it), then `pnpm gym restart`. From then on `http://gym.test` sends pages to https.
 
 | Command | What it does |
 |---|---|

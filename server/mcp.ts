@@ -12,8 +12,10 @@ import type {
 import * as z from 'zod';
 import { KEEPALIVE_MS, URL_CLEAN, WAIT_MS } from './config.ts';
 import type { Gym } from './gym.ts';
+import { describeRoadmap } from './roadmaps.ts';
+import { findImages, viewImage } from './images.ts';
 import { describeTopic } from './topics.ts';
-import type { AskItem, FadingConcept, MapChange, QuizItem, QuizQuestion, TopicSummary } from '../shared/types.ts';
+import { stepState, type AskItem, type FadingConcept, type MapChange, type QuizItem, type QuizQuestion, type TopicSummary } from '../shared/types.ts';
 
 type Extra = RequestHandlerExtra<ServerRequest, ServerNotification>;
 
@@ -22,7 +24,18 @@ const error = (t: string): CallToolResult => ({ ...text(t), isError: true });
 
 const MATH_AND_DIAGRAMS =
   'Markdown is rendered with LaTeX maths ($...$ inline, $$...$$ on its own lines; write a literal dollar as \\$), ' +
-  '```mermaid code blocks as diagrams, and inline <svg> elements.';
+  '```mermaid code blocks as diagrams, and inline <svg> elements (which may animate with SMIL <animate>; the gym adds play and replay buttons). ' +
+  'Hover cards: {{term|short definition}} marks a term with a definition he can hover; [[concept-id]], [[other-topic/concept-id]] or [[concept-id|text]] links a concept on the map and shows its preview. ' +
+  'Also: ==highlighted text==; callouts as Obsidian writes them (> [!idea] Title, then > lines; kinds: idea, key, why, context, example, you, careful, term, note); ' +
+  '<figure> with <figcaption> around a drawing; ![alt](https://… "caption") for an image with a caption (only images you have checked exist, e.g. Wikimedia Commons); ' +
+  'and ```sequence code blocks: Markdown frames split by lines of ---, which he steps through with Next and Back. ' +
+  'The visual kit (prefer it to hand-drawn SVG; each is a fenced block of JSON, drawn and animated by the gym): ' +
+  '```balance (two forces on one value: {title, left:{label,detail}, right:{label,detail}, unit, min, max, neutral, neutralLabel, states:[{label, left:0-1, right:0-1, value, note}]}), ' +
+  '```timeline (things over time, log scale by default: {title, scale:"log"|"linear", from:"0.5s", to:"2h", marks:["1s","1min"], lanes:[{label, start, end, peak?, note?}]}), ' +
+  '```flow (a pathway: {title, direction:"LR"|"TB", nodes:[{id,label,sub?}], edges:[{from,to,label?,kind:"a"|"b"|"slow"}], steps:[{caption, on:[node ids]}]}), ' +
+  '```plate (a real image with numbered markers: {title, src, alt, credit, license, source, markers:[{x:%, y:%, label, detail?}]}; take images from find_images, which checks the licence, and place markers with view_image). ' +
+  'Hand-built interactive figures (explorables): ```explorable {"id":"heart-rate","age":24,"start":"resting"|"asleep"|"called"|"round"|"transplant"} (brake and accelerator sliders driving a beating heart and its trace; shows the brake is fast and the accelerator slow) and ' +
+  '```explorable {"id":"stress-hormones","minutes":10,"second":false} (heart rate, adrenaline and cortisol over two hours after a stressor, with a second-round option).';
 
 const STATUSES =
   'Statuses: "unknown" = he has not shown he holds it; "shaky" = partly (needed help, inconsistent, or holds a misconception: say which in `note`); ' +
@@ -74,7 +87,77 @@ export function createMcpServer(gym: Gym): McpServer {
         (s) =>
           `- ${s.startedAt.slice(0, 16).replace('T', ' ')}: ${s.goal} (${s.steps} steps, quizzes ${s.quizRight}/${s.quizTotal}, ${s.asks} written)`,
       );
-      return text(`${describeTopic(t)}\n\nRecent sessions:\n${recent.join('\n') || '(none)'}`);
+      return text(`${describeTopic(t)}\n\nRecent sessions:\n${recent.join('\n') || '(none)'}${roadmapContext(gym, t.slug)}`);
+    },
+  );
+
+  mcp.registerTool(
+    'list_roadmaps',
+    {
+      title: 'List roadmaps',
+      description: 'List his roadmaps: ordered paths of topics planned with him, with how far along each one is.',
+    },
+    async () => {
+      const roadmaps = gym.roadmaps.all();
+      if (roadmaps.length === 0) return text('No roadmaps yet.');
+      return text(
+        roadmaps
+          .map((r) => {
+            const done = r.steps.filter((s) => stepState(gym.topics.get(s.topic)) === 'done').length;
+            const next = r.steps.find((s) => stepState(gym.topics.get(s.topic)) !== 'done');
+            return `- ${r.slug}: "${r.title}"${r.status === 'draft' ? ' [draft]' : ''} (${done}/${r.steps.length} steps done)${next ? ` | next: ${next.title}` : ''}`;
+          })
+          .join('\n'),
+      );
+    },
+  );
+
+  mcp.registerTool(
+    'get_roadmap',
+    {
+      title: 'Read a roadmap',
+      description: "Read a roadmap: its goal, and every step in order with its goal, why it comes there, and the state of the step's topic.",
+      inputSchema: { roadmap: z.string().min(1).describe('Roadmap slug or title') },
+    },
+    async ({ roadmap }) => {
+      const r = gym.roadmaps.get(roadmap);
+      if (!r) return error(`No roadmap "${roadmap}". Roadmaps: ${gym.roadmaps.all().map((x) => x.slug).join(', ') || 'none'}.`);
+      return text(describeRoadmap(r, (slug) => gym.topics.get(slug)));
+    },
+  );
+
+  mcp.registerTool(
+    'save_roadmap',
+    {
+      title: 'Save a roadmap',
+      description:
+        'Create a roadmap, or replace the steps of an existing one (pass its slug as `roadmap`): reordering, adding and dropping steps all go through here. ' +
+        'The gym shows it on the Roadmaps page straight away, so he can read it there while you plan it together. ' +
+        'Save it as "draft" while planning and as "active" only once he has approved it. ' +
+        'Each step becomes a topic named after its title, so keep a step\'s title stable once it has been started, ' +
+        'and pass `topic` to point a step at a topic that already exists under another name.',
+      inputSchema: {
+        roadmap: z.string().optional().describe('Slug of the roadmap to replace; omit to create one'),
+        title: z.string().min(1).describe('e.g. "The fighting mind"'),
+        goal: z.string().min(1).describe('What the whole path is for, in a sentence or two'),
+        status: z.enum(['draft', 'active']).default('draft'),
+        steps: z
+          .array(
+            z.object({
+              title: z.string().min(1).describe('The topic\'s title, e.g. "Performance under pressure"'),
+              goal: z.string().min(1).describe('What he will be able to do or explain once this step is done'),
+              why: z.string().optional().describe('Why it comes here: what it builds on and what it unlocks'),
+              topic: z.string().optional().describe('Slug of an existing topic this step is; defaults to the slug of the title'),
+            }),
+          )
+          .min(1)
+          .max(20),
+      },
+    },
+    async ({ roadmap, title, goal, status, steps }) => {
+      if (roadmap && !gym.roadmaps.get(roadmap)) return error(`No roadmap "${roadmap}" to replace; omit \`roadmap\` to create one.`);
+      const { roadmap: r, created } = await gym.roadmaps.save({ title, goal, status, steps }, roadmap);
+      return text(`Roadmap ${created ? 'created' : 'updated'} (${URL_CLEAN}/#/roadmaps/${r.slug}):\n${describeRoadmap(r, (slug) => gym.topics.get(slug))}`);
     },
   );
 
@@ -103,9 +186,10 @@ export function createMcpServer(gym: Gym): McpServer {
           `Review session ${session.id} started. ${fading.length} concepts are fading:\n${fading.map(formatFading).join('\n') || '(none)'}`,
         );
       }
-      if (created) return text(`New topic "${t.title}" (${t.slug}) created; ${kind} session ${session.id} started. The map is empty.`);
+      const onRoadmap = roadmapContext(gym, t.slug);
+      if (created) return text(`New topic "${t.title}" (${t.slug}) created; ${kind} session ${session.id} started. The map is empty.${onRoadmap}`);
       const s = formatSummary(gym.topics.list().find((x) => x.slug === t.slug)!);
-      return text(`${kind} session ${session.id} started on an existing topic:\n${s}\nCall get_topic for the full map.`);
+      return text(`${kind} session ${session.id} started on an existing topic:\n${s}\nCall get_topic for the full map.${onRoadmap}`);
     },
   );
 
@@ -220,9 +304,12 @@ export function createMcpServer(gym: Gym): McpServer {
         markdown: z.string().min(1).describe('The content, in Markdown'),
         title: z.string().optional().describe('A short heading'),
         kind: z
-          .enum(['step', 'plan', 'summary', 'feedback', 'note'])
+          .enum(['orient', 'step', 'plan', 'summary', 'feedback', 'note'])
           .default('step')
-          .describe('step: one teaching step; plan: the lesson plan; summary: a recap; feedback: a critique of an answer; note: anything else'),
+          .describe(
+            'orient: the orientation that opens a topic (the big question, where it sits, a picture of the territory, key terms); ' +
+              'step: one teaching step; plan: the lesson plan; summary: a recap; feedback: a critique of an answer; note: anything else',
+          ),
         concept: conceptParam.describe('Id of the map concept this step teaches; the map highlights it'),
       },
     },
@@ -355,6 +442,58 @@ export function createMcpServer(gym: Gym): McpServer {
   );
 
   mcp.registerTool(
+    'find_images',
+    {
+      title: 'Find a real image',
+      description:
+        'Search Wikimedia Commons for real images (anatomical plates, photos, diagrams) and return only files whose licence allows reuse: ' +
+        'public domain, CC0, CC BY, CC BY-SA. Non-commercial, no-derivatives, restricted or unlicensed files are left out. ' +
+        "Each result has its src (a 1200px rendition), size, licence and the credit line to show. Gray's Anatomy (1918) plates are public domain and good for anatomy: " +
+        'search e.g. "Gray\'s Anatomy vagus nerve". Then call view_image on your choice before placing markers on a ```plate.',
+      inputSchema: {
+        query: z.string().min(2).describe('What to look for, e.g. "Gray\'s Anatomy adrenal gland" or "sinoatrial node diagram"'),
+        limit: z.number().int().min(1).max(12).default(6),
+      },
+    },
+    async ({ query, limit }) => {
+      try {
+        const { images, rejected } = await findImages(query, limit);
+        if (images.length === 0) return text(`No reusable images found for "${query}"${rejected ? ` (${rejected} skipped for their licence)` : ''}. Try other words.`);
+        return text(
+          images
+            .map((im, i) => `${i + 1}. ${im.title} (${im.width}x${im.height})\n   src: ${im.src}\n   page: ${im.page}\n   licence: ${im.license}${im.licenseUrl ? ` (${im.licenseUrl})` : ''}\n   credit: ${im.credit}`)
+            .join('\n') + (rejected ? `\n(${rejected} more skipped for their licence.)` : ''),
+        );
+      } catch (err) {
+        return error(`Could not search Wikimedia Commons: ${(err as Error).message}`);
+      }
+    },
+  );
+
+  mcp.registerTool(
+    'view_image',
+    {
+      title: 'Look at an image',
+      description:
+        'Look at an image from find_images, with a grid of 10% lines drawn over it (labelled 10 to 90 along the top and left edges). ' +
+        'Use it to check the image really shows what you need, and to read off x/y percentages for the markers of a ```plate (x from the left, y from the top).',
+      inputSchema: {
+        src: z.string().url().describe('The src from find_images'),
+        width: z.number().int().optional().describe('The width find_images reported, to keep the proportions'),
+        height: z.number().int().optional().describe('The height find_images reported'),
+      },
+    },
+    async ({ src, width, height }) => {
+      try {
+        const png = await viewImage(src, width ?? 0, height ?? 0);
+        return { content: [{ type: 'image', data: png.toString('base64'), mimeType: 'image/png' }] };
+      } catch (err) {
+        return error(`Could not show the image: ${(err as Error).message}`);
+      }
+    },
+  );
+
+  mcp.registerTool(
     'end_session',
     {
       title: 'End the session',
@@ -382,8 +521,8 @@ export function createMcpServer(gym: Gym): McpServer {
 }
 
 const THEME = {
-  light: { background: '#ffffff', ink: '#1f1e1c' },
-  dark: { background: '#1d1c1a', ink: '#ebe8e2' },
+  light: { background: '#f6f5ef', ink: '#1d211e' },
+  dark: { background: '#121513', ink: '#d5dbd3' },
 };
 
 /** SVG to PNG with rsvg-convert, on the gym's card colours, so currentColor renders as it would in the gym. */
@@ -475,6 +614,21 @@ function formatSummary(t: TopicSummary): string {
   const fading = t.fading ? `, ${t.fading} fading` : '';
   const level = t.trainingLevel ? `; training level ${t.trainingLevel}/10` : '';
   return `- ${t.slug}: "${t.title}" (${solid} solid${fading}, ${shaky} shaky, ${unknown} unknown; ${t.sessions} sessions; last ${t.updated.slice(0, 10)}${level})${next}`;
+}
+
+/** Where a topic sits on his roadmaps, so a lesson can build on the steps before it. */
+function roadmapContext(gym: Gym, slug: string): string {
+  const places = gym.roadmaps.containing(slug);
+  if (places.length === 0) return '';
+  return places
+    .map(({ roadmap, index }) => {
+      const before = roadmap.steps.slice(0, index);
+      const earlier = before.length
+        ? ` Earlier steps: ${before.map((s) => `${s.topic} (${stepState(gym.topics.get(s.topic)).replace('-', ' ')})`).join(', ')}; reuse their concepts as "topic/id" prerequisites instead of reteaching them.`
+        : ' It is the first step.';
+      return `\n\nThis topic is step ${index + 1} of ${roadmap.steps.length} of the roadmap "${roadmap.title}" (${roadmap.slug}). Step goal: ${roadmap.steps[index].goal}.${earlier} Call get_roadmap for the whole path.`;
+    })
+    .join('');
 }
 
 function formatFading(f: FadingConcept): string {

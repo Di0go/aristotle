@@ -49,15 +49,15 @@
 
 <svelte:window onkeydown={onKey} />
 
-<section class="card quiz" class:active class:answered>
+<section class="sheet quiz" class:active class:answered>
   {#each item.questions as q, qi (qi)}
     {@const r = item.responses?.[qi]}
     <div class="question">
-      <header class="card-head">
-        <span class="label">Quiz{item.questions.length > 1 ? ` ${qi + 1}/${item.questions.length}` : ''}</span>
-        {#if q.strand}<span class="strand">{q.strand}</span>{/if}
+      <header class="question-head">
+        <span class="kicker">{item.questions.length > 1 ? `Check · question ${qi + 1} of ${item.questions.length}` : 'Check'}</span>
+        {#if q.strand}<span class="tag">{q.strand}</span>{/if}
       </header>
-      <Markdown source={q.question} />
+      <div class="question-text"><Markdown source={q.question} /></div>
 
       <ol class="options">
         {#each q.options as option, oi (oi)}
@@ -71,8 +71,9 @@
               disabled={answered || readonly}
               onclick={() => pick(qi, oi)}
             >
-              <kbd>{oi + 1}</kbd>
-              <Markdown source={option} inline />
+              <span class="cb" aria-hidden="true"></span>
+              <span class="option-text"><Markdown source={option} inline /></span>
+              {#if answered && q.correct === oi}<span class="verdict-mark" aria-label="right answer">✓</span>{:else if answered && chosen}<span class="verdict-mark" aria-label="your answer, wrong">✗</span>{:else}<kbd class="key">{oi + 1}</kbd>{/if}
             </button>
           </li>
         {/each}
@@ -83,44 +84,34 @@
             disabled={answered || readonly}
             onclick={() => pick(qi, null)}
           >
-            <kbd>0</kbd> I don't know
+            <span class="cb" aria-hidden="true"></span>
+            <span class="option-text">I don't know</span>
+            <kbd class="key">0</kbd>
           </button>
         </li>
       </ol>
 
       {#if answered && r}
-        <div class="verdict" class:is-right={r.correct}>
-          {#if r.correct}
-            Right.
-          {:else if r.choice === null}
-            Fair enough. Here's the answer.
-          {:else}
-            Not quite.
-          {/if}
+        <div class="explanation" class:is-right={r.correct}>
+          <p class="verdict">
+            {#if r.correct}Right.{:else if r.choice === null}Here's the answer.{:else}Not quite.{/if}
+          </p>
+          {#if q.explanation}<Markdown source={q.explanation} />{/if}
+          {#if r.note}<p class="your-note"><span>Your note</span> {r.note}</p>{/if}
         </div>
-        {#if q.explanation}
-          <div class="explanation"><Markdown source={q.explanation} /></div>
-        {/if}
-        {#if r.note}<p class="your-note"><span>Your note:</span> {r.note}</p>{/if}
       {:else if readonly}
         <p class="unanswered">Not answered.</p>
+      {:else if noteOpen[qi]}
+        <textarea class="note" rows="2" placeholder="Your reasoning, or what you're unsure about (optional)" bind:value={notes[qi]}></textarea>
       {:else}
-        {#if noteOpen[qi]}
-          <textarea
-            class="note"
-            rows="2"
-            placeholder="Your reasoning, or what you're unsure about (optional)"
-            bind:value={notes[qi]}
-          ></textarea>
-        {:else}
-          <button class="link" onclick={() => (noteOpen[qi] = true)}>Add a note</button>
-        {/if}
+        <button class="link add-note" onclick={() => (noteOpen[qi] = true)}>Add a note on your reasoning</button>
       {/if}
     </div>
   {/each}
 
   {#if !answered && !readonly}
-    <footer class="actions">
+    <footer class="sheet-foot">
+      <span class="muted hint">Pick with the number keys, <kbd>0</kbd> if you don't know.</span>
       {#if error}<span class="error">{error}</span>{/if}
       <button class="primary" disabled={!ready || sending} onclick={submit}>
         Check {#if active}<kbd>Enter</kbd>{/if}
