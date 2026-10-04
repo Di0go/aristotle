@@ -2,7 +2,7 @@
    sidebar with where you are. Plus Now between sessions (home). */
 
 .kicker {
-  margin: 0 0 6px;
+  margin: 0 0 10px;
   font-size: 0.78rem;
   font-weight: 500;
   color: var(--faint);
@@ -36,12 +36,12 @@
 
 .lesson-main {
   min-width: 0;
-  padding: 44px clamp(24px, 5vw, 72px) 0;
+  padding: 56px clamp(24px, 6vw, 96px) 0;
 }
 
 .lesson-head {
   max-width: var(--measure);
-  margin: 0 auto 48px;
+  margin: 0 auto 72px;
 }
 
 .bench-toggle {
@@ -125,7 +125,7 @@
 }
 
 .entry {
-  margin-bottom: 52px;
+  margin-bottom: 96px;
   animation: settle 0.4s var(--ease) both;
 }
 
@@ -137,12 +137,12 @@
 }
 
 .entry-map {
-  margin: -36px 0 40px;
+  margin: -64px 0 64px;
 }
 
 .block-title {
-  margin: 0 0 14px;
-  font-size: 1.45rem;
+  margin: 0 0 22px;
+  font-size: 1.7rem;
   font-weight: 650;
   line-height: 1.3;
   letter-spacing: -0.015em;
@@ -151,7 +151,7 @@
 .kind-orient,
 .kind-plan,
 .kind-summary {
-  padding: 22px 24px;
+  padding: 32px 36px;
   background: var(--b1);
   border-radius: var(--radius-lg);
 }
@@ -218,23 +218,23 @@
 
 /* Checks: a quiz or a written answer, as a simple card. */
 .quiz,
-.ask {
-  padding: 20px 22px;
-  border: 1px solid var(--rule);
-  border-radius: var(--radius-lg);
-  background: var(--b0);
+.ask,
+.quiz.sheet,
+.ask.sheet {
+  padding: 0 0 0 26px;
+  border: 0;
+  border-left: 2px solid var(--rule);
+  border-radius: 0;
+  background: none;
 }
 
 .entry.pending .quiz,
 .entry.pending .ask {
-  border-color: var(--acc-line);
-  box-shadow: 0 0 0 3px var(--acc-soft);
+  border-left-color: var(--acc);
 }
 
 .question + .question {
-  margin-top: 28px;
-  padding-top: 24px;
-  border-top: 1px solid var(--rule);
+  margin-top: 64px;
 }
 
 .question-head {
@@ -249,19 +249,19 @@
 
 .question-text .md {
   font-weight: 600;
-  font-size: 1.02rem;
+  font-size: 1.2rem;
   line-height: 1.55;
 }
 
 .question-text {
-  margin-top: 4px;
+  margin-top: 6px;
 }
 
 .options {
   list-style: none;
   display: grid;
-  gap: 6px;
-  margin: 16px 0 0;
+  gap: 4px;
+  margin: 22px 0 0;
   padding: 0;
 }
 
@@ -270,12 +270,14 @@
   align-items: center;
   gap: 12px;
   width: 100%;
-  padding: 10px 12px;
-  font: 400 0.95rem/1.45 var(--sans);
+  padding: 11px 14px;
+  margin-left: -14px;
+  width: calc(100% + 14px);
+  font: 400 1.04rem/1.5 var(--sans);
   text-align: left;
   color: var(--fg);
   background: transparent;
-  border: 1px solid var(--rule);
+  border: 0;
   border-radius: 8px;
   cursor: pointer;
   transition: border-color 0.12s, background-color 0.12s;
@@ -306,7 +308,6 @@
 }
 
 .option.chosen {
-  border-color: var(--acc);
   background: var(--acc-soft);
 }
 
@@ -317,7 +318,6 @@
 }
 
 .option.right {
-  border-color: color-mix(in srgb, var(--solid) 60%, transparent);
   background: var(--solid-soft);
 }
 
@@ -328,7 +328,6 @@
 }
 
 .option.wrong {
-  border-color: color-mix(in srgb, var(--wrong) 60%, transparent);
   background: var(--wrong-soft);
 }
 
@@ -344,7 +343,6 @@
 
 .option.dont-know {
   color: var(--muted);
-  border-style: dashed;
 }
 
 .verdict-mark {
@@ -362,14 +360,18 @@
 }
 
 .explanation {
-  margin-top: 16px;
-  padding: 14px 16px;
-  border-radius: 8px;
-  background: var(--b1);
+  margin-top: 22px;
+  padding: 2px 0 2px 18px;
+  border-left: 2px solid var(--wrong);
+}
+
+.explanation.is-right {
+  border-left-color: var(--solid);
 }
 
 .explanation .md {
-  font-size: 0.95rem;
+  font-size: 1.02rem;
+  color: var(--fg-2);
 }
 
 .verdict {
@@ -409,9 +411,9 @@ textarea.note {
 }
 
 .ask textarea {
-  margin-top: 14px;
-  min-height: 150px;
-  font-size: 0.97rem;
+  margin-top: 20px;
+  min-height: 160px;
+  font-size: 1.04rem;
   line-height: 1.65;
   background: var(--b1);
   border-color: var(--rule);
@@ -419,10 +421,10 @@ textarea.note {
 
 .preview,
 .your-answer {
-  margin-top: 16px;
-  padding: 14px 16px;
+  margin-top: 22px;
+  padding: 16px 20px;
   background: var(--b1);
-  border-radius: 8px;
+  border-radius: 10px;
 }
 
 .your-answer .md {

@@ -2,8 +2,8 @@
    and the hover terms and concept links. */
 
 .md {
-  font-size: 1rem;
-  line-height: 1.72;
+  font-size: 1.075rem;
+  line-height: 1.8;
   color: var(--fg);
   overflow-wrap: break-word;
 }
@@ -17,18 +17,18 @@
 }
 
 .md p {
-  margin: 0 0 1em;
+  margin: 0 0 1.3em;
   text-wrap: pretty;
 }
 
 .md ul,
 .md ol {
-  margin: 0 0 1em;
+  margin: 0 0 1.3em;
   padding-left: 1.4em;
 }
 
 .md li {
-  margin: 0.3em 0;
+  margin: 0.45em 0;
 }
 
 .md li::marker {
@@ -157,7 +157,7 @@
 .md figure,
 .md .diagram {
   position: relative;
-  margin: 1.8em 0;
+  margin: 2.4em 0;
   text-align: center;
 }
 
@@ -214,8 +214,8 @@
 
 /* Callouts, written as Obsidian does: > [!idea] Title */
 .md .callout {
-  margin: 0 0 1.3em;
-  padding: 12px 16px;
+  margin: 1.6em 0;
+  padding: 16px 20px;
   border-radius: 8px;
   background: var(--acc-soft);
   color: var(--fg);
@@ -371,8 +371,8 @@
 }
 
 .kit {
-  margin: 1.8em 0;
-  padding: 18px 18px 14px;
+  margin: 2.4em 0;
+  padding: 22px 22px 18px;
   border: 1px solid var(--rule);
   border-radius: var(--radius-lg);
   text-align: center;

@@ -2,15 +2,11 @@
   import { getContext, mount, unmount } from 'svelte';
   import { feed } from './feed.svelte.ts';
   import { link } from './router.svelte.ts';
+  import { EXPLORABLES, explorable } from './explorables/index.ts';
   import { renderMarkdown, renderInline } from './markdown.ts';
   // Figures load on first use, so a lesson without them never downloads them.
   type Loader = () => Promise<{ default: unknown }>;
   const Sequence: Loader = () => import('./Sequence.svelte');
-  /** Hand-built interactive figures, placed with ```explorable {"id": "...", ...options}. */
-  const EXPLORABLES: Record<string, Loader> = {
-    'heart-rate': () => import('./explorables/HeartRate.svelte'),
-    'stress-hormones': () => import('./explorables/StressHormones.svelte'),
-  };
   /** The visual kit: a fenced block in one of these languages becomes that component, filled from its JSON. */
   const KIT: Record<string, Loader> = {
     balance: () => import('./kit/Balance.svelte'),
@@ -77,13 +73,13 @@
       const pre = code.parentElement!;
       const spec = json(pre, code, 'explorable');
       if (!spec) continue;
-      const load = EXPLORABLES[spec.id ?? ''];
-      if (!load) {
+      const found = explorable(spec.id ?? '');
+      if (!found) {
         pre.classList.add('diagram-error');
-        pre.title = `No explorable called "${spec.id}". Available: ${Object.keys(EXPLORABLES).join(', ')}`;
+        pre.title = `No explorable called "${spec.id}". Available: ${EXPLORABLES.map((e) => e.id).join(', ')}`;
         continue;
       }
-      place(pre, load, { spec });
+      place(pre, found.load, { spec });
     }
     for (const [lang, load] of Object.entries(KIT)) {
       for (const code of el?.querySelectorAll<HTMLElement>(`pre > code.language-${lang}`) ?? []) {

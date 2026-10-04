@@ -1,4 +1,5 @@
 <script lang="ts">
+  import ExploreSection from '../lib/ExploreSection.svelte';
   import { setContext } from 'svelte';
   import { tick } from 'svelte';
   import { feed } from '../lib/feed.svelte.ts';
@@ -87,6 +88,8 @@
           <button class="ghost small bench-toggle" onclick={() => (benchOpen = true)}>{reviewing ? 'The queue' : 'Outline and graph'}</button>
         {/if}
       </header>
+
+      <ExploreSection topic={feed.session.topicSlug} />
 
       {#if feed.items.length === 0}
         <div class="lesson-wait">

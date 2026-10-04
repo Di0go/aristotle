@@ -1,4 +1,5 @@
 <script lang="ts">
+  import ExploreSection from '../lib/ExploreSection.svelte';
   // The class for one topic, open to read: every step, figure and answer from all its sessions, in order.
   // Nothing starts by going here. Claude starts only when he interacts: writes in the box at the foot, or
   // presses Continue. If a lesson on this topic is running right now, this is that live lesson.
@@ -79,10 +80,11 @@
           <dt>class</dt><dd>{started ? `${sessions?.length ?? '…'} ${sessions?.length === 1 ? 'session' : 'sessions'} so far. Reading it starts nothing.` : 'Not started yet.'}</dd>
           {#if topic?.goal || step?.goal}<dt>goal</dt><dd>{topic?.goal ?? step?.goal}</dd>{/if}
           {#if counts.total}<dt>progress</dt><dd>{counts.solid} of {counts.total} concepts solid</dd>{/if}
-          {#if topic?.handoff}<dt>next time</dt><dd>{topic.handoff.next}</dd>{/if}
         </dl>
         {#if topic}<button class="ghost small bench-toggle" onclick={() => (benchOpen = true)}>Outline and graph</button>{/if}
       </header>
+
+      <ExploreSection topic={slug} />
 
       {#if !started}
         <div class="not-begun">
@@ -103,6 +105,7 @@
 
       <div class="composer resume">
         <p class="resume-h">{started ? 'Pick up the class' : 'Begin the class'}</p>
+        {#if topic?.handoff}<p class="resume-next"><span class="muted">Next time:</span> {topic.handoff.next}</p>{/if}
         <div class="composer-row">
           <textarea
             bind:value={text}
@@ -157,10 +160,31 @@
     font-weight: 400;
   }
 
+  /* On a class you are reading, the box waits at the end instead of following you down the page. */
+  .resume {
+    position: static;
+    margin-top: 24px;
+    padding: 28px 0 64px;
+    background: none;
+    border-top: 1px solid var(--rule);
+  }
+
   .resume-h {
     margin: 0 0 8px;
     font-size: 0.82rem;
     font-weight: 600;
+    color: var(--fg-2);
+  }
+
+  .resume-next {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    overflow: hidden;
+    margin: 0 0 10px;
+    font-size: 0.86rem;
+    line-height: 1.55;
     color: var(--fg-2);
   }
 

@@ -17,21 +17,41 @@
     {#if moved.length}
       <p>
         {#each moved as c, i (c.id)}
-          {#if i}{', '}{/if}<a href={link.topic(item.topic, c.id)}><i class="dot {c.to}"></i>{c.label}</a>
+          {#if i}{', '}{/if}<a href={link.topic(item.topic, c.id)} data-concept="{item.topic}/{c.id}"><i class="dot {c.to}"></i>{c.label}</a>
           <span class="to {c.to}">{c.from ? `${WORD[c.from]} → ` : ''}{WORD[c.to!]}</span>
         {/each}
       </p>
     {/if}
-    {#if added.length}
-      <p>
-        <span class="muted">On the map:</span>
-        {#each added as c, i (c.id)}
-          {#if i}{', '}{/if}<a href={link.topic(item.topic, c.id)}>{c.label}</a>
-        {/each}
-      </p>
+    {#if added.length === 1}
+      <p><span class="muted">On the map:</span> <a href={link.topic(item.topic, added[0].id)}>{added[0].label}</a></p>
+    {:else if added.length}
+      <details>
+        <summary>{added.length} concepts added to the map</summary>
+        <p>
+          {#each added as c, i (c.id)}
+            {#if i}{', '}{/if}<a href={link.topic(item.topic, c.id)} data-concept="{item.topic}/{c.id}">{c.label}</a>
+          {/each}
+        </p>
+      </details>
     {/if}
     {#if removed.length}
       <p class="muted">Removed: {removed.map((c) => c.label).join(', ')}</p>
     {/if}
   </div>
 </div>
+
+<style>
+  details summary {
+    cursor: pointer;
+    color: var(--faint);
+  }
+
+  details summary:hover {
+    color: var(--fg-2);
+  }
+
+  details p {
+    margin-top: 4px;
+    line-height: 1.7;
+  }
+</style>
