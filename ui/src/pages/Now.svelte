@@ -94,7 +94,7 @@
         <button class="close" onclick={() => (mapOpen = false)} aria-label="Close map">×</button>
       </header>
       <StatusBar {counts} {fading} legend />
-      <MapGraph {topic} direction="TB" fit onselect={(id) => (location.hash = link.topic(topic.slug, id))} />
+      <MapGraph {topic} others={feed.topics} direction="TB" fit onselect={(id) => (location.hash = link.topic(topic.slug, id))} />
       {#if focus}
         <p class="focus-line"><span class="label">Now</span> {focus.label}</p>
       {/if}

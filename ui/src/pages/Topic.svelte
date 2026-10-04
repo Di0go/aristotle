@@ -37,6 +37,12 @@
     void feed.loadTopic(slug).then((t) => (missing = !t));
   });
 
+  // Load the topics this one borrows prerequisites from, so the map can show them.
+  $effect(() => {
+    const borrowed = new Set((topic?.concepts ?? []).flatMap((c) => c.deps.filter((d) => d.includes('/')).map((d) => d.split('/')[0])));
+    for (const other of borrowed) if (!feed.topics[other]) void feed.loadTopic(other);
+  });
+
   $effect(() => {
     void feed.topicVersion;
     void fetch('/api/sessions')
@@ -78,11 +84,11 @@
 
     <div class="map-area" class:with-panel={chosen}>
       <section class="card map-card">
-        <MapGraph {topic} direction="TB" selected={selected} onselect={(id) => select(id === selected ? null : id)} />
+        <MapGraph {topic} others={feed.topics} direction="TB" selected={selected} onselect={(id) => select(id === selected ? null : id)} />
         <p class="map-help muted">
           Each arrow runs from a concept to what builds on it. Green is solid, a dotted green outline is solid
           but fading (due for review), amber is shaky, dashed is not yet, and an inner ring marks a goal.
-          Click a concept for its history.
+          Concepts from other topics have a grey double outline. Click a concept for its history.
         </p>
       </section>
       {#if chosen}

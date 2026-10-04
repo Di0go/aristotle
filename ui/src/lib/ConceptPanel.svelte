@@ -1,5 +1,6 @@
 <script lang="ts">
   import { isFading, type Concept, type Evidence, type Topic } from '../../../shared/types.ts';
+  import { feed } from './feed.svelte.ts';
   import { formatDay, formatTime, onDay } from './format.ts';
   import { link } from './router.svelte.ts';
 
@@ -70,7 +71,12 @@
           {#if dep}
             <button class="link-button" onclick={() => onselect(id)}><i class="dot {isFading(dep) ? 'fading' : dep.status}"></i>{dep.label}</button>
           {:else if id.includes('/')}
-            <a href={link.topic(id.split('/')[0], id.split('/')[1])}>{id.replace('/', ' / ')}</a>
+            {@const [slug, cid] = id.split('/')}
+            {@const ext = feed.topics[slug]?.concepts.find((c) => c.id === cid)}
+            <a href={link.topic(slug, cid)}>
+              {#if ext}<i class="dot {isFading(ext) ? 'fading' : ext.status}"></i>{ext.label}{:else}{cid}{/if}
+            </a>
+            <span class="muted">in {feed.topics[slug]?.title ?? slug}</span>
           {:else}
             <span class="muted">{id}</span>
           {/if}

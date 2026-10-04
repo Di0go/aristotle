@@ -542,6 +542,16 @@ nav a.current {
   stroke-width: 1.4;
 }
 
+.map .edge.cross {
+  stroke: var(--accent);
+  stroke-opacity: 0.55;
+}
+
+.map .arrow.cross {
+  fill: var(--accent);
+  fill-opacity: 0.7;
+}
+
 .map .edge.to-selected {
   stroke: var(--accent);
   stroke-opacity: 0.9;
@@ -577,6 +587,19 @@ nav a.current {
   fill: var(--surface);
   stroke-dasharray: 2 3;
   stroke-width: 2;
+}
+
+.map .node.external .box {
+  fill: var(--bg);
+  stroke: var(--line-strong);
+  stroke-width: 3;
+  paint-order: stroke;
+  stroke-dasharray: none;
+}
+
+.map .node.external text {
+  fill: var(--muted);
+  font-style: italic;
 }
 
 .map .node .goal-ring {
@@ -1225,7 +1248,13 @@ textarea.note {
   }
 
   nav a {
-    padding: 5px 9px;
+    padding: 5px 8px;
+    font-size: 0.92em;
+  }
+
+  /* The dot on "Now" already says a question is waiting. */
+  .pill.your-turn {
+    display: none;
   }
 
   .page,
@@ -1374,8 +1403,12 @@ textarea.note {
 
 .chart-pair {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(420px, 100%), 1fr));
   gap: 0 24px;
+}
+
+.chart-pair > section {
+  min-width: 0;
 }
 
 .chart-card {
@@ -1549,6 +1582,129 @@ textarea.note {
 
 @media (max-width: 640px) {
   .chart-pair {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Map of everything */
+
+.atlas {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 61px);
+  padding: 20px 24px 24px;
+}
+
+.atlas-head {
+  display: flex;
+  align-items: flex-end;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.atlas-head h1 {
+  margin: 0;
+  font-size: 1.6em;
+  letter-spacing: -0.02em;
+}
+
+.atlas-head p {
+  margin: 2px 0 0;
+}
+
+.atlas-controls {
+  margin-left: auto;
+  display: flex;
+  gap: 6px;
+}
+
+.atlas-controls button {
+  min-width: 36px;
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  cursor: pointer;
+  font-size: 0.95em;
+}
+
+.atlas-controls button:hover {
+  border-color: var(--accent);
+}
+
+.atlas-stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  padding: 0;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+.atlas-svg {
+  display: block;
+  cursor: grab;
+  touch-action: none;
+  outline: none;
+}
+
+.atlas-svg.dragging {
+  cursor: grabbing;
+}
+
+.atlas-svg:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.topic-box rect {
+  fill: var(--surface);
+  stroke: var(--line);
+  stroke-width: 1;
+}
+
+.topic-title {
+  font: 650 14px var(--font);
+  fill: var(--ink);
+}
+
+.topic-box a:hover .topic-title {
+  fill: var(--accent);
+}
+
+.topic-count {
+  font: 12px var(--font);
+  fill: var(--muted);
+}
+
+.atlas-legend {
+  position: absolute;
+  left: 14px;
+  bottom: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  border: 1px solid var(--line);
+  font-size: 0.8em;
+  color: var(--muted);
+}
+
+.cross-key {
+  display: inline-block;
+  width: 18px;
+  height: 2px;
+  margin-right: 7px;
+  vertical-align: 0.25em;
+  background: var(--accent);
+  opacity: 0.7;
+}
+
+@media (max-width: 640px) {
+  .atlas {
+    padding: 14px 12px 12px;
   }
 }

@@ -3,6 +3,7 @@
   import { link, router } from './lib/router.svelte.ts';
   import Now from './pages/Now.svelte';
   import Progress from './pages/Progress.svelte';
+  import KnowledgeMap from './pages/KnowledgeMap.svelte';
   import Topics from './pages/Topics.svelte';
   import Topic from './pages/Topic.svelte';
   import Log from './pages/Log.svelte';
@@ -23,6 +24,7 @@
       Now{#if feed.pending && section !== 'now'}<i class="badge" aria-label="waiting for you"></i>{/if}
     </a>
     <a href={link.progress()} class:current={section === 'progress'}>Progress</a>
+    <a href={link.map()} class:current={section === 'map'}>Map</a>
     <a href={link.topics()} class:current={section === 'topics'}>Topics</a>
     <a href={link.log()} class:current={section === 'log'}>Log</a>
   </nav>
@@ -40,6 +42,8 @@
     <Now />
   {:else if route.page === 'progress'}
     <Progress />
+  {:else if route.page === 'map'}
+    <KnowledgeMap />
   {:else if route.page === 'topics'}
     <Topics />
   {:else if route.page === 'topic'}

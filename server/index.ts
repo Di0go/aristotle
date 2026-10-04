@@ -55,6 +55,7 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ro
   if (req.method === 'GET' && route === '/api/state') return json(res, 200, feed.state());
   if (req.method === 'GET' && route === '/api/events') return streamEvents(req, res);
   if (req.method === 'GET' && route === '/api/topics') return json(res, 200, gym.topics.list());
+  if (req.method === 'GET' && route === '/api/map') return json(res, 200, gym.topics.all());
   if (req.method === 'GET' && route.startsWith('/api/topics/')) {
     const topic = gym.topics.get(decodeURIComponent(route.slice('/api/topics/'.length)));
     return topic ? json(res, 200, topic) : json(res, 404, { error: 'No such topic' });
