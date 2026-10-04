@@ -4,10 +4,11 @@
 import { spawn, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, openSync, readFileSync } from 'node:fs';
 import path from 'node:path';
-import { PORT, ROOT, UI_DIR } from './config.ts';
+import { PORT, ROOT, UI_DIR, URL_CLEAN } from './config.ts';
 
 const STATE_DIR = path.join(ROOT, '.gym');
-export const PID_FILE = path.join(STATE_DIR, 'server.pid');
+// One pid file per port, so test servers on other ports never touch the real one's.
+export const PID_FILE = path.join(STATE_DIR, `server-${PORT}.pid`);
 export const LOG_FILE = path.join(STATE_DIR, 'server.log');
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -60,12 +61,12 @@ export async function stop(): Promise<void> {
 if (import.meta.main) {
   const command = process.argv[2] ?? 'status';
   const say = (m: string) => console.error(m);
-  if (command === 'start') say((await start()) ? `Running at http://localhost:${PORT}` : `Failed to start; see ${LOG_FILE}`);
+  if (command === 'start') say((await start()) ? `Running at ${URL_CLEAN} (http://localhost:${PORT})` : `Failed to start; see ${LOG_FILE}`);
   else if (command === 'stop') {
     await stop();
     say('Stopped');
   } else if (command === 'restart') {
     await stop();
-    say((await start()) ? `Restarted at http://localhost:${PORT}` : `Failed to start; see ${LOG_FILE}`);
-  } else say((await isRunning()) ? `Running at http://localhost:${PORT}` : 'Not running');
+    say((await start()) ? `Restarted at ${URL_CLEAN} (http://localhost:${PORT})` : `Failed to start; see ${LOG_FILE}`);
+  } else say((await isRunning()) ? `Running at ${URL_CLEAN} (http://localhost:${PORT})` : 'Not running');
 }

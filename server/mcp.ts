@@ -9,7 +9,7 @@ import type {
   ServerRequest,
 } from '@modelcontextprotocol/sdk/types.js';
 import * as z from 'zod';
-import { KEEPALIVE_MS, PORT, WAIT_MS } from './config.ts';
+import { KEEPALIVE_MS, URL_CLEAN, WAIT_MS } from './config.ts';
 import type { Feed } from './feed.ts';
 import type { AskItem, QuizItem, QuizQuestion } from '../shared/types.ts';
 
@@ -26,7 +26,7 @@ export function createMcpServer(feed: Feed): McpServer {
     { name: 'mind-gym', version: '0.1.0' },
     {
       instructions:
-        `The Mind Gym is the learner's interface at http://localhost:${PORT}. They read and answer there, not in the terminal: ` +
+        `The Mind Gym is the learner's interface at ${URL_CLEAN}. They read and answer there, not in the terminal: ` +
         'put all teaching content in `show`, all graded questions in `quiz`, and all open questions in `ask`. ' +
         'Keep your terminal replies to a line or two.',
     },

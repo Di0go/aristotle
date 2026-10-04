@@ -11,9 +11,11 @@ pnpm install
 claude            # in this folder; the gym starts by itself
 ```
 
-Open http://localhost:4747 and tell Claude what you want to learn. Read and answer in the browser; talk to Claude in the terminal.
+Open http://gym.test (or http://localhost:4747) and tell Claude what you want to learn. Read and answer in the browser; talk to Claude in the terminal.
 
 The first time, Claude Code asks you to trust the folder and to enable the `gym` MCP server: accept both.
+
+`http://gym.test` needs a one-off system setup, in the same style as `bancada.test` and `playground.test`: a hosts entry on 127.0.0.82 and an nftables rule that forwards its port 80 to 4747. Run `pkexec bash scripts/setup-hostname.sh` (it explains how to undo it).
 
 | Command | What it does |
 |---|---|
@@ -25,7 +27,7 @@ The first time, Claude Code asks you to trust the folder and to enable the `gym`
 ## How it works
 
 ```
-Claude Code ──stdio──▶ server/bridge.ts ──HTTP /mcp──▶ server (localhost:4747) ◀──▶ browser
+Claude Code ──stdio──▶ server/bridge.ts ──HTTP /mcp──▶ server (127.0.0.1:4747) ◀──▶ browser (gym.test)
 ```
 
 - **Tools Claude uses:** `start_session`, `show` (a lesson step), `quiz` (graded multiple choice, waits for your answer), `ask` (an open question, waits for your answer), `collect_answers` (answers given after you stepped away).

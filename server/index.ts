@@ -6,7 +6,7 @@ import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
-import { ALLOWED_PORTS, HOST, PORT, UI_DIR } from './config.ts';
+import { ALLOWED_NAMES, ALLOWED_PORTS, HOST, PORT, UI_DIR, URL_CLEAN } from './config.ts';
 import { PID_FILE } from './control.ts';
 import { AnswerError, Feed, publicItem } from './feed.ts';
 import { createMcpServer } from './mcp.ts';
@@ -120,8 +120,8 @@ async function serveStatic(res: http.ServerResponse, pathname: string) {
 
 function localHost(host: string | undefined): boolean {
   if (!host) return false;
-  const [name, port] = host.split(':');
-  return (name === 'localhost' || name === '127.0.0.1') && ALLOWED_PORTS.includes(Number(port));
+  const [name, port = '80'] = host.split(':');
+  return ALLOWED_NAMES.includes(name) && ALLOWED_PORTS.includes(Number(port));
 }
 
 function localOrigin(origin: string): boolean {
@@ -166,7 +166,7 @@ server.on('error', (err: NodeJS.ErrnoException) => {
 server.listen(PORT, HOST, () => {
   mkdirSync(path.dirname(PID_FILE), { recursive: true });
   writeFileSync(PID_FILE, String(process.pid));
-  console.log(`${new Date().toISOString()} Mind Gym running at http://localhost:${PORT}`);
+  console.log(`${new Date().toISOString()} Mind Gym running at ${URL_CLEAN} (http://localhost:${PORT})`);
 });
 
 function shutdown() {

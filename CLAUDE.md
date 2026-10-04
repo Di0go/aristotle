@@ -1,6 +1,6 @@
 # Mind Gym
 
-Diogo's personal mind gym. Claude Code is the tutor; the Mind Gym app (http://localhost:4747) is where he reads, answers and sees what he has learned. Built for one person, on his Claude subscription: no API keys, no accounts, no onboarding, no mascots, no marketing.
+Diogo's personal mind gym. Claude Code is the tutor; the Mind Gym app (http://gym.test, also http://localhost:4747) is where he reads, answers and sees what he has learned. Built for one person, on his Claude subscription: no API keys, no accounts, no onboarding, no mascots, no marketing.
 
 The idea: Eero Alvar's "Bodybuilding for the Mind". Struggle is the training signal, and AI is the equipment that loads the mind at the edge of what it can do. Credits in `README.md`.
 

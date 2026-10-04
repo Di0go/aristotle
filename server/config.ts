@@ -7,8 +7,13 @@ export const UI_DIR = path.join(ROOT, 'dist', 'ui');
 
 export const HOST = '127.0.0.1';
 export const PORT = Number(process.env.GYM_PORT ?? 4747);
-/** Ports allowed in Host/Origin headers: the server itself and the Vite dev server. */
-export const ALLOWED_PORTS = [PORT, 5173];
+/** The clean name: /etc/hosts maps it to 127.0.0.82, and nftables forwards its port 80 here (scripts/setup-hostname.sh). */
+export const HOSTNAME = process.env.GYM_HOSTNAME ?? 'gym.test';
+export const URL_CLEAN = `http://${HOSTNAME}`;
+
+/** Names and ports allowed in Host/Origin headers: this server, the Vite dev server, and the forwarded name. */
+export const ALLOWED_NAMES = ['localhost', '127.0.0.1', HOSTNAME];
+export const ALLOWED_PORTS = [PORT, 5173, 80];
 
 /** How long quiz and ask wait for an answer before handing control back to Claude. */
 export const WAIT_MS = Number(process.env.GYM_WAIT_MS ?? 15 * 60_000);
