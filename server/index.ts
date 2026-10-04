@@ -158,7 +158,9 @@ async function serveStatic(res: http.ServerResponse, pathname: string) {
   try {
     body = await readFile(file);
   } catch {
-    // Unknown paths get the app (single-page routing).
+    // A missing build file is a real 404 (a tab from before a rebuild asking for an old chunk): answering it with
+    // the app would hand a script import an HTML page. Every other unknown path gets the app (single-page routing).
+    if (rel.startsWith(`${path.sep}assets${path.sep}`) || rel.startsWith('/assets/')) return send(res, 404, 'Not found');
     file = path.join(UI_DIR, 'index.html');
     try {
       body = await readFile(file);

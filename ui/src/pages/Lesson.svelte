@@ -1,5 +1,5 @@
 <script lang="ts">
-  import ExploreSection from '../lib/ExploreSection.svelte';
+  import { placeFigures } from '../lib/explorables/index.ts';
   // The class for one topic, open to read: every step, figure and answer from all its sessions, in order.
   // Nothing starts by going here. Claude starts only when he interacts: writes in the box at the foot, or
   // presses Continue. If a lesson on this topic is running right now, this is that live lesson.
@@ -45,6 +45,9 @@
     })();
   });
 
+  /** Each figure placed once, after the first step (in any session) on a concept it explains. */
+  const figures = $derived(placeFigures(slug, (sessions ?? []).flatMap((s) => s.items as { id: string; type: string }[])));
+
   /** Interacting is what starts the class: his words go to Claude as the first thing it hears. */
   function begin(said = '') {
     if (started) actions.continueTopic(slug, said);
@@ -84,8 +87,6 @@
         {#if topic}<button class="ghost small bench-toggle" onclick={() => (benchOpen = true)}>Outline and graph</button>{/if}
       </header>
 
-      <ExploreSection topic={slug} />
-
       {#if !started}
         <div class="not-begun">
           {#if step?.why}<p>{step.why}</p>{/if}
@@ -99,7 +100,7 @@
             <span>Session {i + 1}</span>
             <span class="muted">{formatDay(s.session.startedAt)}, {formatTime(s.session.startedAt)}{s.session.kind === 'train' ? ' · training' : s.session.kind === 'review' ? ' · review' : ''}</span>
           </div>
-          <FeedList items={s.items} readonly />
+          <FeedList items={s.items} readonly figures={figures} />
         {/each}
       {/if}
 

@@ -68,6 +68,7 @@
     background: var(--b1);
     border-bottom: 1px solid var(--rule);
     overflow-x: auto;
+    overflow-y: visible;
     scrollbar-width: none;
   }
 

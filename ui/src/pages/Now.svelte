@@ -1,5 +1,5 @@
 <script lang="ts">
-  import ExploreSection from '../lib/ExploreSection.svelte';
+  import { placeFigures } from '../lib/explorables/index.ts';
   import { setContext } from 'svelte';
   import { tick } from 'svelte';
   import { feed } from '../lib/feed.svelte.ts';
@@ -89,15 +89,13 @@
         {/if}
       </header>
 
-      <ExploreSection topic={feed.session.topicSlug} />
-
       {#if feed.items.length === 0}
         <div class="lesson-wait">
           <span class="spinner" aria-hidden="true"></span>
           <p>Claude is getting the lesson ready. It usually starts with the big picture, then finds out what you already know.</p>
         </div>
       {:else}
-        <FeedList items={feed.items} pendingId={feed.pending?.id ?? null} />
+        <FeedList items={feed.items} pendingId={feed.pending?.id ?? null} figures={placeFigures(feed.session.topicSlug, feed.items)} />
       {/if}
       <LessonActivity />
       <Composer />

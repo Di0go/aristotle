@@ -36,7 +36,7 @@
 
 .lesson-main {
   min-width: 0;
-  padding: 56px clamp(24px, 6vw, 96px) 0;
+  padding: 56px clamp(20px, 3.5vw, 64px) 0;
 }
 
 .lesson-head {
@@ -134,6 +134,14 @@
     opacity: 0;
     transform: translateY(4px);
   }
+}
+
+.entry-figure {
+  margin-top: -48px;
+}
+
+.entry-figure .kit {
+  margin-top: 0;
 }
 
 .entry-map {

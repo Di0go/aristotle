@@ -6,12 +6,21 @@
   import Quiz from './Quiz.svelte';
   import Ask from './Ask.svelte';
   import MapUpdate from './MapUpdate.svelte';
+  import type { Component } from 'svelte';
+  import type { Explorable } from './explorables/index.ts';
 
   let {
     items,
     pendingId = null,
     readonly = false,
-  }: { items: PublicItem[]; pendingId?: string | null; readonly?: boolean } = $props();
+    figures = {},
+  }: {
+    items: PublicItem[];
+    pendingId?: string | null;
+    readonly?: boolean;
+    /** Interactive figures to place after an item (by item id), where the step they explain is. */
+    figures?: Record<string, Explorable[]>;
+  } = $props();
 
   const numbers = $derived.by(() => {
     let step = 0;
@@ -32,5 +41,16 @@
         <MapUpdate {item} />
       {/if}
     </li>
+    {#each figures[item.id] ?? [] as fig (fig.id)}
+      <li class="entry entry-figure">
+        <p class="kicker">Try it</p>
+        {#await fig.load()}
+          <div class="figure-loading"></div>
+        {:then m}
+          {@const Figure = m.default as Component<{ spec: Record<string, unknown> }>}
+          <Figure spec={{}} />
+        {/await}
+      </li>
+    {/each}
   {/each}
 </ol>

@@ -60,7 +60,8 @@
   <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
   <div class="scrim" class:open={railOpen} onclick={() => (railOpen = false)}></div>
 
-  <div class="stage">
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div class="stage" onpointerenter={() => document.documentElement.classList.add('show-scroll')} onpointerleave={() => document.documentElement.classList.remove('show-scroll')}>
     <header class="mobile-bar">
       <button onclick={() => (railOpen = true)} aria-label="Open the library">
         <svg viewBox="0 0 18 18" aria-hidden="true"><path d="M3 5h12M3 9h12M3 13h12" /></svg>
@@ -78,6 +79,8 @@
           {#key 'slug' in r ? r.slug : 'id' in r ? r.id : r.page}
             <m.default {...pageProps} />
           {/key}
+        {:catch}
+          <div class="page"><div class="empty-state"><h2>The gym was updated</h2><p>This page needs the new version. <button class="link" onclick={() => location.reload()}>Reload</button></p></div></div>
         {/await}
       {/if}
     </main>

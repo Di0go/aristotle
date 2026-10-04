@@ -136,7 +136,7 @@
       </ul>
     {/if}
   </div>
-  <Grip name="--files-w" side="right" min={200} max={460} initial={260} label="Resize the library pane" />
+  <Grip name="--files-w" side="right" min={200} max={460} initial={290} label="Resize the library pane" />
 </div>
 
 <style>
@@ -237,7 +237,7 @@
 
   .row {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     gap: 1px;
     min-height: 27px;
     border-radius: 5px;
@@ -248,9 +248,9 @@
     display: flex;
     flex: 1;
     min-width: 0;
-    align-items: center;
+    align-items: baseline;
     gap: 8px;
-    padding: 3px 6px;
+    padding: 4px 6px;
     color: var(--fg-2);
     text-decoration: none;
     border-radius: 5px;
@@ -288,23 +288,25 @@
 
   a.row.concept {
     min-height: 25px;
-    padding: 2px 6px;
+    padding: 3px 6px;
     font-size: 0.83rem;
+    align-items: baseline;
   }
 
   a.row.concept.focus .name {
     color: var(--acc);
   }
 
+  /* Long names wrap onto a second line rather than being cut off at the pane's edge. */
   .name {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    min-width: 0;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
   }
 
   .count {
     flex: none;
-    padding-right: 8px;
+    padding: 5px 8px 0 4px;
     font-size: 0.74rem;
     color: var(--faint);
     font-variant-numeric: tabular-nums;
@@ -314,7 +316,7 @@
     flex: none;
     width: 7px;
     height: 7px;
-    margin-right: 10px;
+    margin: 10px 10px 0 4px;
     border-radius: 50%;
     background: var(--acc);
   }
@@ -323,7 +325,7 @@
   .chev-space {
     flex: none;
     width: 18px;
-    height: 22px;
+    height: 27px;
   }
 
   .chev {

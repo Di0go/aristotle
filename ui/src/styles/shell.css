@@ -41,6 +41,18 @@
   z-index: 20;
 }
 
+/* Text scrolling up fades out under the tab bar instead of being cut at its edge. */
+.stage > .tabbar::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  height: 22px;
+  background: linear-gradient(var(--b0), transparent);
+  pointer-events: none;
+}
+
 .status-col {
   position: fixed;
   z-index: 25;

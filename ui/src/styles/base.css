@@ -99,9 +99,9 @@
   --radius-lg: 10px;
   --lift: var(--shadow);
   --ribbon-w: 44px;
-  --files-w: 260px;
+  --files-w: 290px;
   --side-w: 280px;
-  --measure: 48rem;
+  --measure: 58rem;
   --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
 }
 
@@ -467,4 +467,25 @@ textarea:focus,
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+/* Scrollbars stay hidden until the pointer is over their pane. The page's own scrollbar belongs to <html>,
+   so it follows the pointer over the stage (App sets .show-scroll); inner panes follow :hover. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+
+*:hover {
+  scrollbar-color: var(--rule-strong) transparent;
+}
+
+html,
+html:hover {
+  scrollbar-color: transparent transparent;
+}
+
+html.show-scroll,
+html.show-scroll:hover {
+  scrollbar-color: var(--rule-strong) transparent;
 }
