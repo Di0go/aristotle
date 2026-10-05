@@ -232,4 +232,4 @@ Start at [docs/README.md](docs/README.md) and [CONTRIBUTING.md](CONTRIBUTING.md)
 
 ## License
 
-Not chosen yet. Until a licence is added, all rights are reserved.
+[MIT](LICENSE). The images in the demo lessons keep their own licences (see Credits).

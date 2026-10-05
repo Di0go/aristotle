@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "description": "A personal tutor: Claude Code teaches, this app is where you learn.",
+  "license": "MIT",
   "engines": {
     "node": ">=24"
   },
