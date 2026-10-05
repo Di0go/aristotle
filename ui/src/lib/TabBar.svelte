@@ -222,9 +222,12 @@
     opacity: 1;
   }
 
-  .x:hover {
-    background: var(--b2);
-    color: var(--fg);
+  /* Red on hover: closing is the one thing this button does. */
+  .x:hover,
+  .x:focus-visible {
+    background: color-mix(in srgb, var(--wrong) 14%, transparent);
+    color: var(--wrong);
+    outline: none;
   }
 
   @media (max-width: 960px) {

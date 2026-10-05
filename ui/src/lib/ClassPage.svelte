@@ -24,8 +24,8 @@
   let stopHint = $state(false);
   /** Items on this page last time we looked; plain, so reading it doesn't make the scroll effect depend on it. */
   let count = 0;
-  /** Whether he was on the last page, so a new step can take him along. */
-  let wasLast = false;
+  /** How many pages the class had last time we looked, to tell a new step arriving from him moving between steps. */
+  let seen = 0;
 
   const pages = $derived(classes.pages(slug));
   const index = $derived(pages ? pages.findIndex((p) => p.number === number) : -1);
@@ -48,11 +48,15 @@
 
   setContext('topic-slug', () => slug);
 
-  // On the last page of a live class, a new step takes him to it.
+  // When the live class gains a page while he is on what was its last one, take him to the new one. Moving to an
+  // earlier step himself changes no count, so it never pulls him back.
   $effect(() => {
     if (!pages) return;
-    if (wasLast && !last && feed.liveSlug === slug) location.hash = link.step(slug, pages.at(-1)!.number);
-    wasLast = last;
+    const before = seen;
+    seen = pages.length;
+    if (before && pages.length > before && feed.liveSlug === slug && pages[before - 1]?.number === number) {
+      location.hash = link.step(slug, pages.at(-1)!.number);
+    }
   });
 
   // On the live page, follow it as it grows, unless he has scrolled back up to reread.
