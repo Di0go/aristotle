@@ -1,4 +1,5 @@
-// The connection to Claude Code running inside Aristotle (server/terminal.ts).
+// The connection to Claude Code running inside Aristotle (server/terminal.ts). Opening Aristotle starts it, so
+// it is there, idle, before he asks for anything.
 
 type Listener = (data: string, replay: boolean) => void;
 
@@ -44,6 +45,8 @@ class Claude {
   private recent = '';
   private retry: ReturnType<typeof setTimeout> | undefined;
   private idleTimer: ReturnType<typeof setTimeout> | undefined;
+  /** Claude Code is started once per page load, not again after he stops it or it exits. */
+  private autoStarted = false;
 
   connect() {
     if (this.ws) return;
@@ -63,6 +66,8 @@ class Claude {
     if (msg.type === 'state') {
       this.running = Boolean(msg.running);
       if (!this.running) this.asking = false;
+      if (!this.running && !this.autoStarted) this.post({ type: 'start', auto: true });
+      this.autoStarted = true;
       return;
     }
     if (msg.type !== 'output' || msg.data === undefined) return;

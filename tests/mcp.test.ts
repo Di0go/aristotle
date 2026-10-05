@@ -72,6 +72,7 @@ async function startServer() {
       ARISTOTLE_CLAUDE_CMD: 'bash --norc --noprofile',
       // cat in Claude Code's place for glosses: the gloss is the request it was sent.
       ARISTOTLE_GLOSS_CMD: 'cat',
+      ARISTOTLE_GLOSS_IMAGES: 'off',
       PS1: '$ ',
     },
     stdio: 'inherit',
@@ -240,6 +241,8 @@ test('a session builds a map, records evidence and leaves a handoff', async () =
   const right = pending.questions[0].options.indexOf('-1');
   const res = await answer({ id: pending.id, picks: [{ choice: right, note: 'in my head' }, { choice: null }] });
   assert.equal(res.status, 200);
+  // The quiz call was waiting: Claude heard it, nobody has to tell it.
+  assert.equal(res.headers.get('X-Aristotle-Heard'), 'yes');
 
   const quizText = textOf(await quiz);
   assert.match(quizText, /1\/2 right/);
@@ -309,7 +312,9 @@ test('an answer given after the wait ends is collected later', async () => {
   assert.match(textOf(result), /No answer yet/);
 
   const open = await waitForPending('ask');
-  await answer({ id: open.id, text: 'An antisymmetric bilinear map at each point.' });
+  const late = await answer({ id: open.id, text: 'An antisymmetric bilinear map at each point.' });
+  // Nothing was waiting any more: the interface has to tell Claude to collect it.
+  assert.equal(late.headers.get('X-Aristotle-Heard'), 'no');
 
   assert.match(textOf(await call('collect_answers')), /antisymmetric bilinear/);
   assert.equal(textOf(await call('collect_answers')), 'No new answers.');
@@ -709,4 +714,11 @@ test('a selected phrase is glossed once, shown to the tutor on its topic, and ca
   assert.equal((await fetch(`${BASE}/api/glosses/vagal-brake`, { method: 'DELETE' })).status, 200);
   assert.deepEqual(await get<Gloss[]>('/api/glosses'), []);
   assert.equal((await fetch(`${BASE}/api/glosses/vagal-brake`, { method: 'DELETE' })).status, 404);
+});
+
+test('a step without hover cards reminds Claude to write them', async () => {
+  await call('start_session', { topic: 'Hover cards', goal: 'Terms' });
+  assert.match(textOf(await call('show', { markdown: 'Plain words only.', kind: 'step' })), /no hover cards/);
+  assert.equal(textOf(await call('show', { markdown: 'A {{form|a field of covectors}}.', kind: 'step' })), 'Shown.');
+  assert.equal(textOf(await call('show', { markdown: 'Builds on [[covector]].', kind: 'step' })), 'Shown.');
 });

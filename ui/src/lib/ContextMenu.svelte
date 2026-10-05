@@ -27,7 +27,8 @@
       const text = sel?.toString().replace(/\s+/g, ' ').trim() ?? '';
       if (e.shiftKey || !text || !sel?.rangeCount || (e.target as Element | null)?.closest?.(NATIVE)) return;
       e.preventDefault();
-      void show(e.clientX, e.clientY, text, sel.getRangeAt(0));
+      // A copy: the selection's own range moves with whatever he clicks next.
+      void show(e.clientX, e.clientY, text, sel.getRangeAt(0).cloneRange());
     };
     const away = (e: Event) => {
       if (!(e.target as Element | null)?.closest?.('.context-menu')) close();
@@ -82,12 +83,11 @@
 
   /** Asks for the gloss, with the sentence around it and the topic being read, and pins its card under the selection. */
   function gloss(text: string, range: Range) {
-    const r = range.getBoundingClientRect();
     const node = range.commonAncestorContainer;
     const host = (node instanceof Element ? node : node.parentElement)?.closest(BLOCK);
     const route = router.route;
     const topic = route.page === 'topic' || route.page === 'lesson' ? route.slug : (feed.liveSlug ?? undefined);
-    void glossing.ask(text, { left: r.left, top: r.top, bottom: r.bottom, width: r.width }, host?.textContent ?? undefined, topic);
+    void glossing.ask(text, range, host?.textContent ?? undefined, topic);
   }
 
   function choose(item: Item) {

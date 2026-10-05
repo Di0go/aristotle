@@ -124,7 +124,7 @@ He has to trust the teacher completely. One confidently delivered error poisons 
 
 ## Continuing
 
-`get_topic`, then start from the handoff's next step. First, a quick retrieval check on one or two concepts marked solid in earlier sessions that the next step depends on (FADING ones first): recalling them strengthens them, and confirms the map is still true. Record the results with `record_practice` (`kind: "recall"`), which moves their review schedule and marks a failed one shaky; repair any that fail before building on them. The longer the gap since the last session, the more you check.
+`get_topic`, then call `collect_answers` **before** `start_session`: he may have answered questions left open last time (Aristotle keeps them answerable, and sends you here when he does). Judge those answers as you would have in the moment, and don't re-ask what he has answered, even if the handoff says to. Then start from the handoff's next step. First, a quick retrieval check on one or two concepts marked solid in earlier sessions that the next step depends on (FADING ones first): recalling them strengthens them, and confirms the map is still true. Record the results with `record_practice` (`kind: "recall"`), which moves their review schedule and marks a failed one shaky; repair any that fail before building on them. The longer the gap since the last session, the more you check.
 
 Solid concepts come due for review over time ("fading"). Reviewing them is the `review` skill's job and training on a topic is the `train` skill's; when he finishes a lesson and things are fading, you can mention `/review` in one line.
 

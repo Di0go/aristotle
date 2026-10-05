@@ -6,7 +6,7 @@
   import { onMount } from 'svelte';
   import { feed } from './feed.svelte.ts';
   import { formatDay, onDay } from './format.ts';
-  import { glossing } from './gloss.svelte.ts';
+  import { glossing, type Anchor } from './gloss.svelte.ts';
   import { splitRef } from './library.ts';
   import { renderInline, renderMarkdown } from './markdown.ts';
   import { isFading, type Concept, type Gloss, type Topic } from '../../../shared/types.ts';
@@ -17,6 +17,7 @@
     | { kind: 'concept'; topic: Topic; concept: Concept }
     | { kind: 'missing'; ref: string };
   type Rect = { left: number; top: number; bottom: number; width: number };
+  type Pos = { x: number; y: number; above: boolean };
 
   const WIDTH = 320;
   const SELECTOR = '.term[data-def], .gloss[data-gloss], [data-concept]';
@@ -24,8 +25,39 @@
 
   let card = $state<Card | null>(null);
   let pos = $state({ x: 0, y: 0, above: false });
-  /** The pinned gloss card's place, under (or over) the selection it is for. */
-  const pinPos = $derived(glossing.pinned ? placeAt(glossing.pinned.rect) : null);
+  /** Bumped on scroll and resize, so the pinned card follows the words it hangs from. */
+  let layout = $state(0);
+  /** Where the pointer is, to put a hover card under the line it points at when a term wraps onto two. */
+  let pointerY: number | undefined;
+  /** The pinned card's last good place, kept while its anchor is between the selection and the marked phrase. */
+  let lastPin: Pos | null = null;
+  /** The pinned gloss card's place, under (or over) the words it is for. */
+  const pinPos = $derived.by(() => {
+    void layout;
+    const pin = glossing.pinned;
+    if (!pin) return (lastPin = null);
+    const r = lineRect(pin.anchor);
+    if (r) lastPin = placeAt(r);
+    return lastPin;
+  });
+
+  // Once the gloss exists, the phrase is marked in the page (Markdown.svelte): hang the card from that mark, the
+  // one where the selection was, so it stays with the word through any reflow.
+  $effect(() => {
+    const pin = glossing.pinned;
+    void feed.glosses;
+    if (pin?.state !== 'done' || pin.anchor instanceof HTMLElement) return;
+    const at = lastPin;
+    requestAnimationFrame(() => {
+      const marks = [...document.querySelectorAll<HTMLElement>(`.gloss[data-gloss="${CSS.escape(pin.gloss.id)}"]`)];
+      if (!marks.length || !at) return;
+      const distance = (el: HTMLElement) => {
+        const r = el.getBoundingClientRect();
+        return Math.abs(r.left + r.width / 2 - (at.x + WIDTH / 2)) + Math.abs((at.above ? r.top - 8 : r.bottom + 8) - at.y);
+      };
+      glossing.reanchor(marks.reduce((a, b) => (distance(b) < distance(a) ? b : a)));
+    });
+  });
   /** The element the card is for. */
   let target: HTMLElement | null = null;
   let showTimer: ReturnType<typeof setTimeout> | undefined;
@@ -35,6 +67,7 @@
   // like pointing, for the keyboard.
   onMount(() => {
     const over = (e: Event) => {
+      pointerY = e instanceof PointerEvent ? e.clientY : undefined;
       const el = (e.target as Element | null)?.closest?.(SELECTOR) as HTMLElement | null;
       if (el) show(el);
       else if (!(e.target as Element | null)?.closest?.('.hovercard')) hide();
@@ -57,7 +90,7 @@
     const leave = () => hide();
     const away = () => {
       hide(false);
-      glossing.close();
+      layout++;
     };
     document.addEventListener('pointerover', over);
     document.addEventListener('pointerout', out);
@@ -66,7 +99,9 @@
     document.addEventListener('keydown', key);
     document.addEventListener('pointerdown', down);
     addEventListener('scroll', away, { passive: true, capture: true });
+    addEventListener('resize', away);
     return () => {
+      removeEventListener('resize', away);
       document.removeEventListener('pointerover', over);
       document.removeEventListener('pointerout', out);
       document.removeEventListener('focusin', over);
@@ -94,11 +129,19 @@
   }
 
   function place(el: HTMLElement) {
-    pos = placeAt(el.getBoundingClientRect());
+    pos = placeAt(lineRect(el, pointerY) ?? el.getBoundingClientRect());
+  }
+
+  /** The line of a (possibly wrapped) element or range nearest y, or its first line; null once it is gone from the page. */
+  function lineRect(anchor: Anchor, y?: number): DOMRect | null {
+    const lines = [...anchor.getClientRects()].filter((r) => r.width > 0 && r.height > 0);
+    if (!lines.length) return null;
+    if (y === undefined) return lines[0];
+    return lines.reduce((a, b) => (Math.abs(b.top + b.height / 2 - y) < Math.abs(a.top + a.height / 2 - y) ? b : a));
   }
 
   /** Centred under the rectangle and kept inside the window; above it when there is no room below. */
-  function placeAt(r: Rect) {
+  function placeAt(r: Rect): Pos {
     const x = Math.min(Math.max(12, r.left + r.width / 2 - WIDTH / 2), innerWidth - WIDTH - 12);
     const above = r.bottom + 220 > innerHeight && r.top > 240;
     return { x, y: above ? r.top - 8 : r.bottom + 8, above };
@@ -153,6 +196,12 @@
 
 {#snippet glossBody(gloss: Gloss)}
   <p class="hc-title">{gloss.text}</p>
+  {#if gloss.image}
+    <figure class="hc-image">
+      <img src={gloss.image.src} alt={gloss.image.alt} loading="lazy" />
+      <figcaption><a href={gloss.image.page} target="_blank" rel="noreferrer">{gloss.image.credit}</a></figcaption>
+    </figure>
+  {/if}
   <div class="hc-body hc-gloss">{@html renderMarkdown(gloss.gloss)}</div>
   <p class="hc-meta hc-foot">
     <span>Glossed by Claude {onDay(gloss.at)}</span>
@@ -308,6 +357,29 @@
 
   .hc-gloss :global(p:last-child) {
     margin-bottom: 0;
+  }
+
+  .hc-image {
+    margin: 8px 0 6px;
+  }
+
+  .hc-image img {
+    display: block;
+    width: 100%;
+    max-height: 180px;
+    object-fit: contain;
+    border-radius: var(--radius);
+    background: var(--b1);
+  }
+
+  .hc-image figcaption {
+    margin-top: 3px;
+    font-size: 0.7rem;
+    line-height: 1.3;
+  }
+
+  .hc-image figcaption a {
+    color: var(--faint);
   }
 
   .hc-foot {

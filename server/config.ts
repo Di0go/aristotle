@@ -63,6 +63,8 @@ export const CLAUDE_CMD = process.env.ARISTOTLE_CLAUDE_CMD ?? 'claude';
 
 /** The model that writes glosses (server/glosses.ts): an alias Claude Code knows, on his own login. */
 export const GLOSS_MODEL = process.env.ARISTOTLE_GLOSS_MODEL ?? 'sonnet';
+/** Whether a gloss may carry a picture from Wikimedia Commons, when one would help (off in the tests: no network). */
+export const GLOSS_IMAGES = process.env.ARISTOTLE_GLOSS_IMAGES !== 'off';
 /** A command that reads a gloss request on stdin and prints the gloss, in place of Claude Code; tests swap one in. */
 export const GLOSS_CMD = process.env.ARISTOTLE_GLOSS_CMD;
 

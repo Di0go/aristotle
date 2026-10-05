@@ -8,6 +8,16 @@ import { link } from './router.svelte.ts';
 import type { Roadmap } from '../../../shared/types.ts';
 
 export const actions = {
+  /**
+   * Sends his answer to a quiz or an ask; an error message, or null. When no tool call was waiting for it (the
+   * session ended, or the wait ran out), Claude is told to collect it and carry on, once nothing else is open.
+   */
+  async answer(body: unknown): Promise<string | null> {
+    const result = await feed.answer(body);
+    if ('error' in result) return result.error;
+    if (!result.heard && !feed.items.some((i) => (i.type === 'quiz' || i.type === 'ask') && !i.answeredAt)) pickUp();
+    return null;
+  },
   /** Ask Claude to wrap up: the map, then the handoff. Typed in even while it works (Claude Code queues it). */
   stopForToday(): boolean {
     if (!claude.running) return false;
@@ -79,6 +89,23 @@ export const actions = {
     );
   },
 };
+
+/**
+ * Claude picks up answers it wasn't waiting for: told to collect them if its session is still going here, or
+ * asked to continue (which collects them first) when the session has ended or Claude Code isn't running.
+ */
+function pickUp() {
+  const session = feed.session;
+  if (!session) return;
+  if (!session.endedAt && claude.running) {
+    claude.say("I've answered. Please collect my answers with collect_answers and carry on.");
+    return;
+  }
+  const said = 'I answered the questions left open last time.';
+  if (session.kind === 'review') actions.review();
+  else if (session.kind === 'train') actions.train(session.topicSlug);
+  else actions.continueTopic(session.topicSlug, said);
+}
 
 /**
  * Lessons, reviews and training open a session, so they move to Now. Planning a roadmap or a mission is a

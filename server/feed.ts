@@ -195,6 +195,11 @@ export class Feed {
     return item;
   }
 
+  /** Whether a tool call is waiting for this question's answer right now. */
+  awaited(id: string): boolean {
+    return (this.waiters.get(id)?.size ?? 0) > 0;
+  }
+
   /** Records his picks, one per question, and wakes the waiting tool call. */
   async answerQuiz(id: string, picks: { choice: number | null; note?: string }[]): Promise<QuizItem> {
     const item = findInteractive(this.items, id);

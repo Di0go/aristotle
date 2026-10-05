@@ -376,7 +376,19 @@ export interface Gloss {
   context?: string;
   /** The topic he was reading, by slug. */
   topic?: string;
+  /** A picture from Wikimedia Commons, when the phrase names something seen better than described. */
+  image?: GlossImage;
   at: string;
+}
+
+export interface GlossImage {
+  /** A hotlinkable rendition. */
+  src: string;
+  /** The file's page on Commons. */
+  page: string;
+  /** Author and licence, shown under it. */
+  credit: string;
+  alt: string;
 }
 
 /** POST /api/glosses: a phrase to explain, with where it was found. */

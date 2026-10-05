@@ -49,7 +49,7 @@ Quiz items keep the right answers and explanations; the interface only receives 
 
 ## Glosses
 
-`glosses.json` is an array of `Gloss`: a phrase he selected and asked to have explained (from the context menu), the explanation Claude Code wrote, the passage and topic it came from, and when. One per phrase: its `id` is the phrase as a slug, so asking again, in any case, returns the same gloss. Forgetting one removes it from the file. The whole file is rewritten atomically on every change ([`glosses.ts`](../server/glosses.ts)); `get_topic` lists a topic's glosses for the tutor, as gaps he noticed himself.
+`glosses.json` is an array of `Gloss`: a phrase he selected and asked to have explained (from the context menu), the explanation Claude Code wrote, the passage and topic it came from, an optional `image` (a Wikimedia Commons rendition with its page and credit), and when. One per phrase: its `id` is the phrase as a slug, so asking again, in any case, returns the same gloss. Forgetting one removes it from the file. The whole file is rewritten atomically on every change ([`glosses.ts`](../server/glosses.ts)); `get_topic` lists a topic's glosses for the tutor, as gaps he noticed himself.
 
 ## Backup
 

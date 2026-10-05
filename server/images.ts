@@ -23,6 +23,8 @@ export interface FoundImage {
   artist: string;
   /** The credit line to show under the image. */
   credit: string;
+  /** What the file's page says it shows, in plain text (short). */
+  description?: string;
 }
 
 /** The parts of a Commons search result read here. */
@@ -93,6 +95,7 @@ export async function findImages(query: string, limit = 8): Promise<{ images: Fo
       licenseUrl: strip(m.LicenseUrl?.value) || undefined,
       artist,
       credit: `${artist}, ${license}, via Wikimedia Commons`,
+      ...(strip(m.ImageDescription?.value) ? { description: strip(m.ImageDescription?.value).slice(0, 240) } : {}),
     });
     if (images.length >= limit) break;
   }

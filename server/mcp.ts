@@ -488,6 +488,12 @@ export function createMcpServer(gym: Gym): McpServer {
       if (!gym.feed.session) return noSession();
       await gym.feed.add({ type: 'block', kind, markdown, ...(title ? { title } : {}), ...(concept ? { concept } : {}) });
       if (concept) await gym.focus(concept);
+      // Hover cards only exist where Claude writes them, so a step without any gets a reminder.
+      if (kind === 'step' && !/\{\{[^}|]+\|[^}]+\}\}|\[\[[^\]]+\]\]/.test(markdown)) {
+        return text(
+          'Shown. It has no hover cards: in the next steps, mark each new technical term {{term|short definition}} and link concepts on the map as [[concept-id]].',
+        );
+      }
       return text('Shown.');
     },
   );

@@ -128,9 +128,12 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ro
     const body = (await readJson(req)) as Partial<QuizAnswerBody & AskAnswerBody> | null;
     if (!body || typeof body.id !== 'string') return json(res, 400, { error: 'Missing id' });
     try {
+      // Whether Claude hears this answer now (a quiz or ask call is waiting), or has to be told to collect it.
+      const heard = feed.awaited(body.id);
       const item = Array.isArray(body.picks)
         ? await gym.answerQuiz(body.id, body.picks)
         : await gym.answerAsk(body.id, String(body.text ?? ''));
+      res.setHeader('X-Aristotle-Heard', heard ? 'yes' : 'no');
       return json(res, 200, publicItem(item));
     } catch (err) {
       if (err instanceof AnswerError) return json(res, 400, { error: err.message });

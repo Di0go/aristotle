@@ -1,5 +1,6 @@
 <script lang="ts">
   // A graded multiple-choice check: options, "I don't know", a note per question, and right or wrong once answered.
+  import { actions } from './actions.ts';
   import { feed } from './feed.svelte.ts';
   import Markdown from './Markdown.svelte';
   import type { PublicQuizItem } from '../../../shared/types.ts';
@@ -34,7 +35,7 @@
   async function submit() {
     if (!ready || sending || answered || readonly) return;
     sending = true;
-    error = await feed.answer({
+    error = await actions.answer({
       id: item.id,
       picks: item.questions.map((_, i) => ({ choice: picks[i] ?? null, note: notes[i] || undefined })),
     });

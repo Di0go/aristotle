@@ -1,5 +1,6 @@
 <script lang="ts">
   // An open question in a lesson: the prompt, a text box with a live maths preview, and the answer once sent.
+  import { actions } from './actions.ts';
   import { feed } from './feed.svelte.ts';
   import Markdown from './Markdown.svelte';
   import type { AskItem } from '../../../shared/types.ts';
@@ -30,7 +31,7 @@
   async function submit() {
     if (!text.trim() || sending || answered) return;
     sending = true;
-    error = await feed.answer({ id: item.id, text });
+    error = await actions.answer({ id: item.id, text });
     sending = false;
   }
 

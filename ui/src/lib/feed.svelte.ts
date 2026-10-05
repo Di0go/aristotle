@@ -68,17 +68,20 @@ class LiveFeed {
     return topic;
   }
 
-  /** Sends his answer to a quiz or an ask. Returns an error message, or null. */
-  async answer(body: unknown): Promise<string | null> {
+  /**
+   * Sends his answer to a quiz or an ask. Returns an error message, or whether Claude heard it at once (a tool
+   * call was waiting for it) rather than having to be told to collect it.
+   */
+  async answer(body: unknown): Promise<{ error: string } | { heard: boolean }> {
     const res = await fetch('/api/answer', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
     const data = await res.json();
-    if (!res.ok) return (data as { error?: string }).error ?? 'Could not send the answer';
+    if (!res.ok) return { error: (data as { error?: string }).error ?? 'Could not send the answer' };
     this.upsert(data as PublicItem);
-    return null;
+    return { heard: res.headers.get('X-Aristotle-Heard') === 'yes' };
   }
 
   /** Sends his debrief, or drops or restores a mission. Returns an error message, or null. */

@@ -29,8 +29,8 @@ A plain Node HTTP server, run directly as TypeScript (Node's type stripping: onl
 
 - **MCP** is stateless: a fresh `McpServer` per request on the Streamable HTTP transport, so restarting the server never strands Claude Code.
 - **The interface** is the built `dist/ui`, served with long caching for hashed assets.
-- **The terminal**: [`terminal.ts`](../server/terminal.ts) runs `claude` in a pseudo-terminal (node-pty) in the app's folder and streams it over a WebSocket to the drawer.
-- **Glosses**: [`glosses.ts`](../server/glosses.ts) explains a phrase he selected by running `claude -p` on his own login, headless and locked down: no tools, no MCP servers, no settings or hooks, no saved session, in a neutral folder. The request (phrase, topic, passage) goes on stdin; what it prints is the gloss. Sonnet by default (`ARISTOTLE_GLOSS_MODEL`); about five seconds.
+- **The terminal**: [`terminal.ts`](../server/terminal.ts) runs `claude` in a pseudo-terminal (node-pty) in the app's folder and streams it over a WebSocket to the drawer. The interface starts it when Aristotle opens; messages sent before it has drawn its screen and gone quiet are held and typed in then.
+- **Glosses**: [`glosses.ts`](../server/glosses.ts) explains a phrase he selected by running `claude -p` on his own login, headless and locked down: no tools, no MCP servers, no settings or hooks, no saved session, in a neutral folder. The request (phrase, topic, passage) goes on stdin; what it prints is the gloss. Sonnet by default (`ARISTOTLE_GLOSS_MODEL`); about five seconds. It is also handed up to five licence-checked pictures from Wikimedia Commons ([`images.ts`](../server/images.ts)), by title and description, and names one on a last `IMAGE: n` line only when the phrase is visual and a candidate clearly shows it (`ARISTOTLE_GLOSS_IMAGES=off` turns this off).
 - **Backup**: [`backup.ts`](../server/backup.ts) commits `data/` (its own Git repository) after quiet periods and pushes if it has a remote.
 
 ### Security model
@@ -219,7 +219,7 @@ Only for the interface (and the tests); Claude Code uses MCP.
 | [`claude.svelte.ts`](../ui/src/lib/claude.svelte.ts) | The connection to Claude Code running inside Aristotle (server/terminal.ts). |
 | [`feed.svelte.ts`](../ui/src/lib/feed.svelte.ts) | Live copy of the server's state, kept current over Server-Sent Events. |
 | [`format.ts`](../ui/src/lib/format.ts) | Dates, times, durations and plurals, written the way the interface shows them. |
-| [`gloss.svelte.ts`](../ui/src/lib/gloss.svelte.ts) | Glossing a phrase he selected: asks the server (which asks Claude Code), and keeps a card pinned at the selection while the answer is on its way, then with the answer. |
+| [`gloss.svelte.ts`](../ui/src/lib/gloss.svelte.ts) | Glossing a phrase he selected: asks the server (which asks Claude Code), and keeps a card pinned to the selection while the answer is on its way, then with the answer. |
 | [`layout.ts`](../ui/src/lib/layout.ts) | Graph layout shared by the topic maps and the map of everything. |
 | [`library.ts`](../ui/src/lib/library.ts) | The hierarchy everything hangs on: roadmaps hold steps, a step is a topic, a topic holds concepts. |
 | [`markdown.ts`](../ui/src/lib/markdown.ts) | Markdown with LaTeX maths, sanitised. |
