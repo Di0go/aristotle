@@ -4,6 +4,7 @@ import {
   isInteractive,
   type FeedEvent,
   type FeedState,
+  type Gloss,
   type Mission,
   type PublicItem,
   type Roadmap,
@@ -30,6 +31,9 @@ class LiveFeed {
   roadmaps = $state<Record<string, Roadmap> | null>(null);
   /** Every Praxis mission, by id, updated live. Null until loaded. */
   missions = $state<Record<string, Mission> | null>(null);
+
+  /** Every phrase he has had explained, updated live. */
+  glosses = $state<Gloss[]>([]);
 
   /** The first question still waiting for the learner, if any. Once a session has ended, nothing is. */
   pending = $derived(this.session?.endedAt ? null : (this.items.find((i) => isInteractive(i) && !i.answeredAt) ?? null));
@@ -105,6 +109,7 @@ class LiveFeed {
     const topics = await getJson<Topic[]>('/api/map');
     const roadmaps = await getJson<Roadmap[]>('/api/roadmaps');
     const missions = await getJson<Mission[]>('/api/missions');
+    this.glosses = await getJson<Gloss[]>('/api/glosses');
     this.topics = Object.fromEntries(topics.map((t) => [t.slug, t]));
     this.roadmaps = Object.fromEntries(roadmaps.map((r) => [r.slug, r]));
     this.missions = Object.fromEntries(missions.map((m) => [m.id, m]));
@@ -129,6 +134,8 @@ class LiveFeed {
       this.roadmaps = { ...this.roadmaps, [event.roadmap.slug]: event.roadmap };
     } else if (event.type === 'mission') {
       this.missions = { ...this.missions, [event.mission.id]: event.mission };
+    } else if (event.type === 'glosses') {
+      this.glosses = event.glosses;
     } else {
       this.upsert(event.item);
     }

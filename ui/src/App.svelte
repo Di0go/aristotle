@@ -7,6 +7,7 @@
   import { searchBox } from './lib/search.svelte.ts';
   import './lib/tabs.svelte.ts';
   import './lib/theme.svelte.ts';
+  import ContextMenu from './lib/ContextMenu.svelte';
   import HoverCard from './lib/HoverCard.svelte';
   import Lightbox from './lib/Lightbox.svelte';
   import Logo from './lib/Logo.svelte';
@@ -110,6 +111,7 @@
 </div>
 
 <HoverCard />
+<ContextMenu />
 <Search />
 <Lightbox />
 

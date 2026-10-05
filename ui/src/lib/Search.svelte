@@ -26,8 +26,14 @@
   let asked = 0;
 
   // On opening, select what was typed last time, so typing replaces it.
+  // Text sent from elsewhere (the context menu) replaces it instead.
   $effect(() => {
-    if (searchBox.open) queueMicrotask(() => input?.select());
+    if (!searchBox.open) return;
+    if (searchBox.seed) {
+      q = searchBox.seed;
+      searchBox.seed = null;
+    }
+    queueMicrotask(() => input?.select());
   });
 
   // Search as he types, once he pauses for 120 ms.

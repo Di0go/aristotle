@@ -6,6 +6,7 @@
   import { splitRef } from './library.ts';
   import { renderInline, renderMarkdown } from './markdown.ts';
   import { link } from './router.svelte.ts';
+  import type { Gloss } from '../../../shared/types.ts';
 
   // Figures load on first use, so a lesson without them never downloads them.
   type Loader = () => Promise<{ default: unknown }>;
@@ -17,6 +18,9 @@
     flow: () => import('./kit/Flow.svelte'),
     plate: () => import('./kit/Plate.svelte'),
   };
+
+  /** Where glossed phrases are never marked: code, maths, drawings, links, other terms and live figures. */
+  const SKIP = 'pre, code, .katex, svg, a, button, .term, .figure-live, .figure-loading, .kit, .diagram, script, style';
 
   let { source, inline = false }: { source: string; inline?: boolean } = $props();
 
@@ -44,6 +48,22 @@
     }
   });
 
+  // Glossed phrases: wherever one appears in plain text, it becomes a hover term with its gloss. Code, maths,
+  // drawings, links, other terms and live figures are left alone. Glosses forgotten since go back to plain text.
+  $effect(() => {
+    void html;
+    const glosses = feed.glosses;
+    if (!el) return;
+    const ids = new Set(glosses.map((g) => g.id));
+    for (const span of el.querySelectorAll<HTMLElement>('span.gloss')) {
+      if (ids.has(span.dataset.gloss ?? '')) continue;
+      const parent = span.parentElement;
+      span.replaceWith(...span.childNodes);
+      parent?.normalize();
+    }
+    if (glosses.length) markGlosses(el, glosses);
+  });
+
   // Step-through sequences, explorables and the visual kit's figures become live components. Each replaces its
   // code block with a placeholder at once, and mounts there when its code arrives (unless the HTML has moved on).
   $effect(() => {
@@ -56,7 +76,7 @@
       pre.replaceWith(host);
       void load().then((m) => {
         if (gone) return;
-        host.className = '';
+        host.className = 'figure-live';
         // Picked by name at run time, so the component's props can't be typed here.
         mounted.push(mount(m.default as any, { target: host, props }));
       });
@@ -204,6 +224,41 @@
       }
     })();
   });
+
+  /** Wraps each whole-word occurrence of a glossed phrase in el's plain text, longest phrases first. */
+  function markGlosses(root: HTMLElement, glosses: Gloss[]) {
+    const byText = new Map(glosses.map((g) => [g.text.toLowerCase(), g.id]));
+    const phrases = [...byText.keys()]
+      .sort((a, b) => b.length - a.length)
+      .map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/ /g, '\\s+'));
+    const pattern = new RegExp(`(?<![\\p{L}\\p{N}])(?:${phrases.join('|')})(?![\\p{L}\\p{N}])`, 'giu');
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+      acceptNode: (node) =>
+        node.parentElement?.closest(SKIP) || !node.nodeValue?.trim() ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT,
+    });
+    const nodes: Text[] = [];
+    while (walker.nextNode()) nodes.push(walker.currentNode as Text);
+    for (const node of nodes) {
+      const value = node.nodeValue ?? '';
+      const parts: (string | HTMLElement)[] = [];
+      let last = 0;
+      for (const m of value.matchAll(pattern)) {
+        const id = byText.get(m[0].replace(/\s+/g, ' ').toLowerCase());
+        if (!id) continue;
+        parts.push(value.slice(last, m.index));
+        const span = document.createElement('span');
+        span.className = 'term gloss';
+        span.tabIndex = 0;
+        span.dataset.gloss = id;
+        span.textContent = m[0];
+        parts.push(span);
+        last = m.index + m[0].length;
+      }
+      if (last === 0) continue;
+      parts.push(value.slice(last));
+      node.replaceWith(...parts.filter((p) => p !== ''));
+    }
+  }
 
   /** a blended toward b by t (0-1), for hex colours: Mermaid needs plain colours, not color-mix(). */
   function mix(a: string, b: string, t: number): string {

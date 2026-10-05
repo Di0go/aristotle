@@ -27,12 +27,13 @@ import {
 } from './config.ts';
 import { PID_FILE } from './control.ts';
 import { AnswerError, publicItem } from './feed.ts';
+import { GlossError } from './glosses.ts';
 import { Gym } from './gym.ts';
 import { createMcpServer } from './mcp.ts';
 import { MissionError } from './missions.ts';
 import { Search } from './search.ts';
 import { Terminal } from './terminal.ts';
-import type { AskAnswerBody, FeedEvent, QuizAnswerBody } from '../shared/types.ts';
+import type { AskAnswerBody, FeedEvent, GlossBody, QuizAnswerBody } from '../shared/types.ts';
 
 const gym = await Gym.load();
 const feed = gym.feed;
@@ -166,6 +167,29 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ro
       if (err instanceof MissionError) return json(res, 400, { error: err.message });
       throw err;
     }
+  }
+
+  // Glosses: explaining a phrase runs Claude Code, so the request waits a few seconds for the answer.
+  if (req.method === 'GET' && route === '/api/glosses') return json(res, 200, gym.glosses.all());
+  if (req.method === 'POST' && route === '/api/glosses') {
+    const body = (await readJson(req)) as Partial<GlossBody> | null;
+    if (typeof body?.text !== 'string') return json(res, 400, { error: 'Missing text' });
+    const str = (v: unknown) => (typeof v === 'string' ? v : undefined);
+    const topic = str(body.topic);
+    try {
+      const gloss = await gym.glosses.explain(
+        { text: body.text, context: str(body.context), topic },
+        topic && gym.topics.get(topic)?.title,
+      );
+      return json(res, 200, gloss);
+    } catch (err) {
+      if (err instanceof GlossError) return json(res, 400, { error: err.message });
+      throw err;
+    }
+  }
+  if (req.method === 'DELETE' && route.startsWith('/api/glosses/')) {
+    const removed = await gym.glosses.remove(tail('/api/glosses/'));
+    return removed ? json(res, 200, { ok: true }) : json(res, 404, { error: 'No such gloss' });
   }
 
   // History, progress and search

@@ -491,3 +491,8 @@
 .kit-plate .plate img {
   cursor: zoom-in;
 }
+
+/* Glossed phrases: a hover term like {{term|…}}, dotted to tell his own glosses from the lesson's terms. */
+.md .term.gloss {
+  border-bottom-style: dotted;
+}

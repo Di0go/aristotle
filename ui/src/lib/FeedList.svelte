@@ -3,6 +3,7 @@
   // order; map changes are quiet one-line notes between them.
   import Ask from './Ask.svelte';
   import Block from './Block.svelte';
+  import { feed } from './feed.svelte.ts';
   import MapUpdate from './MapUpdate.svelte';
   import Quiz from './Quiz.svelte';
   import type { Component } from 'svelte';
@@ -25,6 +26,12 @@
     firstStep?: number;
   } = $props();
 
+  /**
+   * The latest session's items, live. A question of it still waiting for him can be answered even where the rest is
+   * read back (a class, a past session), and shows his answer as soon as it is sent.
+   */
+  const live = $derived(new Map(feed.items.map((x) => [x.id, x])));
+
   /** Each item's step number, counted across the items (0 for anything that is not a teaching step). */
   const numbers = $derived.by(() => {
     let step = firstStep - 1;
@@ -37,10 +44,14 @@
     <li id="item-{item.id}" class="entry entry-{item.type}" class:pending={pendingId === item.id}>
       {#if item.type === 'block'}
         <Block {item} number={numbers[i]} />
-      {:else if item.type === 'quiz'}
-        <Quiz {item} active={pendingId === item.id} {readonly} />
-      {:else if item.type === 'ask'}
-        <Ask {item} active={pendingId === item.id} {readonly} />
+      {:else if item.type === 'quiz' || item.type === 'ask'}
+        {@const current = (live.get(item.id) ?? item) as typeof item}
+        {@const locked = readonly && (Boolean(current.answeredAt) || !live.has(item.id))}
+        {#if current.type === 'quiz'}
+          <Quiz item={current} active={pendingId === item.id} readonly={locked} />
+        {:else}
+          <Ask item={current} active={pendingId === item.id} readonly={locked} />
+        {/if}
       {:else}
         <MapUpdate {item} />
       {/if}

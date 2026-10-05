@@ -120,6 +120,8 @@ Every setting is an environment variable with a default. `.env` is not read: set
 | `ARISTOTLE_VITE_PORT` | The Vite dev server's port (vite.config.ts), which proxies to this server in dev. | [`config.ts`](../server/config.ts) |
 | `ARISTOTLE_BACKUP` | Commit data/ after quiet periods (server/backup.ts). | [`config.ts`](../server/config.ts) |
 | `ARISTOTLE_CLAUDE_CMD` | The command the terminal drawer runs (server/terminal.ts); tests swap in a shell. | [`config.ts`](../server/config.ts) |
+| `ARISTOTLE_GLOSS_MODEL` | The model that writes glosses (server/glosses.ts): an alias Claude Code knows, on his own login. | [`config.ts`](../server/config.ts) |
+| `ARISTOTLE_GLOSS_CMD` | A command that reads a gloss request on stdin and prints the gloss, in place of Claude Code; tests swap one in. | [`config.ts`](../server/config.ts) |
 | `ARISTOTLE_WAIT_MS` | How long quiz and ask wait for an answer before handing control back to Claude. | [`config.ts`](../server/config.ts) |
 | `ARISTOTLE_RELEASE_DIR` | Where the release copy lives: a Git worktree of this repository that the live service runs. | [`release.ts`](../scripts/release.ts) |
 <!-- /generated -->

@@ -113,7 +113,9 @@ export type FeedEvent =
   | { type: 'item'; item: PublicItem }
   | { type: 'topic'; topic: Topic }
   | { type: 'roadmap'; roadmap: Roadmap }
-  | { type: 'mission'; mission: Mission };
+  | { type: 'mission'; mission: Mission }
+  /** Every gloss, after one is added or removed. */
+  | { type: 'glosses'; glosses: Gloss[] };
 
 // Knowledge maps
 
@@ -355,4 +357,31 @@ export interface SearchHit {
   concept?: string;
   /** Mission id. */
   id?: string;
+}
+
+// Glosses
+
+/**
+ * A phrase he selected in a lesson because he didn't know it, with a short explanation Claude wrote for it.
+ * Wherever the phrase appears afterwards, it carries a hover card with the explanation.
+ */
+export interface Gloss {
+  /** The phrase as a slug: one gloss per phrase. */
+  id: string;
+  /** The phrase, as he selected it. */
+  text: string;
+  /** The explanation, Markdown (inline maths allowed). */
+  gloss: string;
+  /** The sentence or paragraph he selected it in. */
+  context?: string;
+  /** The topic he was reading, by slug. */
+  topic?: string;
+  at: string;
+}
+
+/** POST /api/glosses: a phrase to explain, with where it was found. */
+export interface GlossBody {
+  text: string;
+  context?: string;
+  topic?: string;
 }

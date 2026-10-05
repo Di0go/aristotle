@@ -1,23 +1,31 @@
 <script lang="ts">
-  // One hover card for the whole app. Point at (or focus) a term with a definition, or anything carrying
-  // data-concept="topic/id" (links in lessons, the library tree, the outline, the graph), and a small card
-  // shows what it is: the definition, or the concept's summary, state, prerequisites and review date.
+  // One hover card for the whole app. Point at (or focus) a term with a definition, a glossed phrase, or anything
+  // carrying data-concept="topic/id" (links in lessons, the library tree, the outline, the graph), and a small card
+  // shows what it is: the definition or gloss, or the concept's summary, state, prerequisites and review date.
+  // A gloss just asked for from the context menu gets a card pinned under the selection until he closes it.
   import { onMount } from 'svelte';
   import { feed } from './feed.svelte.ts';
   import { formatDay, onDay } from './format.ts';
+  import { glossing } from './gloss.svelte.ts';
   import { splitRef } from './library.ts';
-  import { renderInline } from './markdown.ts';
-  import { isFading, type Concept, type Topic } from '../../../shared/types.ts';
+  import { renderInline, renderMarkdown } from './markdown.ts';
+  import { isFading, type Concept, type Gloss, type Topic } from '../../../shared/types.ts';
 
   type Card =
-    { kind: 'term'; title: string; html: string } | { kind: 'concept'; topic: Topic; concept: Concept } | { kind: 'missing'; ref: string };
+    | { kind: 'term'; title: string; html: string }
+    | { kind: 'gloss'; gloss: Gloss }
+    | { kind: 'concept'; topic: Topic; concept: Concept }
+    | { kind: 'missing'; ref: string };
+  type Rect = { left: number; top: number; bottom: number; width: number };
 
   const WIDTH = 320;
-  const SELECTOR = '.term[data-def], [data-concept]';
+  const SELECTOR = '.term[data-def], .gloss[data-gloss], [data-concept]';
   const STATE = { solid: 'Solid', shaky: 'Shaky', unknown: 'Not yet' } as const;
 
   let card = $state<Card | null>(null);
   let pos = $state({ x: 0, y: 0, above: false });
+  /** The pinned gloss card's place, under (or over) the selection it is for. */
+  const pinPos = $derived(glossing.pinned ? placeAt(glossing.pinned.rect) : null);
   /** The element the card is for. */
   let target: HTMLElement | null = null;
   let showTimer: ReturnType<typeof setTimeout> | undefined;
@@ -38,15 +46,25 @@
       if ((e.target as Element | null)?.closest?.(SELECTOR)) hide();
     };
     const key = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') hide(false);
+      if (e.key !== 'Escape') return;
+      hide(false);
+      glossing.close();
+    };
+    // The pinned card stays through hovering and reading; a click anywhere else puts it away.
+    const down = (e: PointerEvent) => {
+      if (glossing.pinned && !(e.target as Element | null)?.closest?.('.hovercard.pinned, .context-menu')) glossing.close();
     };
     const leave = () => hide();
-    const away = () => hide(false);
+    const away = () => {
+      hide(false);
+      glossing.close();
+    };
     document.addEventListener('pointerover', over);
     document.addEventListener('pointerout', out);
     document.addEventListener('focusin', over);
     document.addEventListener('focusout', leave);
     document.addEventListener('keydown', key);
+    document.addEventListener('pointerdown', down);
     addEventListener('scroll', away, { passive: true, capture: true });
     return () => {
       document.removeEventListener('pointerover', over);
@@ -54,11 +72,16 @@
       document.removeEventListener('focusin', over);
       document.removeEventListener('focusout', leave);
       document.removeEventListener('keydown', key);
+      document.removeEventListener('pointerdown', down);
       removeEventListener('scroll', away, { capture: true });
     };
   });
 
   function build(el: HTMLElement): Card | null {
+    if (el.matches('.gloss[data-gloss]')) {
+      const gloss = feed.glosses.find((g) => g.id === el.dataset.gloss);
+      return gloss ? { kind: 'gloss', gloss } : null;
+    }
     if (el.matches('.term[data-def]')) {
       return { kind: 'term', title: el.textContent ?? '', html: renderInline(el.dataset.def ?? '') };
     }
@@ -70,12 +93,15 @@
     return { kind: 'concept', topic, concept };
   }
 
-  /** Centred under the element and kept inside the window; above it when there is no room below. */
   function place(el: HTMLElement) {
-    const r = el.getBoundingClientRect();
+    pos = placeAt(el.getBoundingClientRect());
+  }
+
+  /** Centred under the rectangle and kept inside the window; above it when there is no room below. */
+  function placeAt(r: Rect) {
     const x = Math.min(Math.max(12, r.left + r.width / 2 - WIDTH / 2), innerWidth - WIDTH - 12);
     const above = r.bottom + 220 > innerHeight && r.top > 240;
-    pos = { x, y: above ? r.top - 8 : r.bottom + 8, above };
+    return { x, y: above ? r.top - 8 : r.bottom + 8, above };
   }
 
   /**
@@ -125,7 +151,45 @@
   }
 </script>
 
-{#if card}
+{#snippet glossBody(gloss: Gloss)}
+  <p class="hc-title">{gloss.text}</p>
+  <div class="hc-body hc-gloss">{@html renderMarkdown(gloss.gloss)}</div>
+  <p class="hc-meta hc-foot">
+    <span>Glossed by Claude {onDay(gloss.at)}</span>
+    <button
+      class="link"
+      onclick={() => {
+        void glossing.remove(gloss.id);
+        hide(false);
+      }}
+      title="Forget this gloss: the phrase goes back to plain text">Forget</button
+    >
+  </p>
+{/snippet}
+
+{#if glossing.pinned && pinPos}
+  {@const pin = glossing.pinned}
+  <div
+    class="hovercard pinned"
+    class:above={pinPos.above}
+    style:left="{pinPos.x}px"
+    style:top="{pinPos.y}px"
+    style:width="{WIDTH}px"
+    role="dialog"
+    aria-label="Gloss of {pin.text}"
+  >
+    {#if pin.state === 'done'}
+      {@render glossBody(pin.gloss)}
+    {:else}
+      <p class="hc-title">{pin.text}</p>
+      {#if pin.state === 'loading'}
+        <p class="hc-body hc-wait"><span class="dot" aria-hidden="true"></span>Claude is writing a gloss…</p>
+      {:else}
+        <p class="hc-body hc-error">{pin.error}</p>
+      {/if}
+    {/if}
+  </div>
+{:else if card}
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div
     class="hovercard"
@@ -140,6 +204,8 @@
     {#if card.kind === 'term'}
       <p class="hc-title">{card.title}</p>
       <p class="hc-body">{@html card.html}</p>
+    {:else if card.kind === 'gloss'}
+      {@render glossBody(card.gloss)}
     {:else if card.kind === 'concept'}
       {@const c = card.concept}
       {@const fading = isFading(c)}
@@ -234,5 +300,53 @@
     margin: 8px 0 0;
     font-size: 0.78rem;
     color: var(--faint);
+  }
+
+  .hc-gloss :global(p) {
+    margin: 0 0 6px;
+  }
+
+  .hc-gloss :global(p:last-child) {
+    margin-bottom: 0;
+  }
+
+  .hc-foot {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+  }
+
+  .hc-foot .link {
+    font-size: inherit;
+    color: var(--faint);
+  }
+
+  .hc-foot .link:hover {
+    color: var(--fg-2);
+  }
+
+  .hc-wait {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--muted);
+  }
+
+  .dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--acc);
+    animation: breathe 1.1s ease-in-out infinite alternate;
+  }
+
+  @keyframes breathe {
+    from {
+      opacity: 0.25;
+    }
+  }
+
+  .hc-error {
+    color: var(--wrong);
   }
 </style>

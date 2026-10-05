@@ -21,6 +21,7 @@ export const SESSIONS_DIR = path.join(DATA_DIR, 'sessions');
 export const TOPICS_DIR = path.join(DATA_DIR, 'topics');
 export const ROADMAPS_DIR = path.join(DATA_DIR, 'roadmaps');
 export const MISSIONS_DIR = path.join(DATA_DIR, 'missions');
+export const GLOSSES_FILE = path.join(DATA_DIR, 'glosses.json');
 
 /** Where this install keeps what isn't learning: certificate, settings, pid files, log. Never in git. */
 export const STATE_DIR = process.env.ARISTOTLE_STATE_DIR ?? path.join(ROOT, DEV ? '.dev/state' : '.aristotle');
@@ -59,6 +60,11 @@ export const ALLOWED_PORTS = [PORT, VITE_PORT, 80, 443];
 export const BACKUP = !DEV && process.env.ARISTOTLE_BACKUP !== 'off';
 /** The command the terminal drawer runs (server/terminal.ts); tests swap in a shell. */
 export const CLAUDE_CMD = process.env.ARISTOTLE_CLAUDE_CMD ?? 'claude';
+
+/** The model that writes glosses (server/glosses.ts): an alias Claude Code knows, on his own login. */
+export const GLOSS_MODEL = process.env.ARISTOTLE_GLOSS_MODEL ?? 'sonnet';
+/** A command that reads a gloss request on stdin and prints the gloss, in place of Claude Code; tests swap one in. */
+export const GLOSS_CMD = process.env.ARISTOTLE_GLOSS_CMD;
 
 /** How long quiz and ask wait for an answer before handing control back to Claude. */
 export const WAIT_MS = Number(process.env.ARISTOTLE_WAIT_MS ?? 15 * 60_000);

@@ -25,6 +25,7 @@ import type {
   Roadmap,
   SearchHit,
   SessionSummary,
+  Gloss,
   Topic,
   TopicSummary,
 } from '../shared/types.ts';
@@ -69,6 +70,8 @@ async function startServer() {
       ARISTOTLE_WAIT_MS: '1500',
       // A plain shell in Claude Code's place, so the terminal tests can type into it.
       ARISTOTLE_CLAUDE_CMD: 'bash --norc --noprofile',
+      // cat in Claude Code's place for glosses: the gloss is the request it was sent.
+      ARISTOTLE_GLOSS_CMD: 'cat',
       PS1: '$ ',
     },
     stdio: 'inherit',
@@ -674,4 +677,36 @@ test('search finds roadmaps, concepts, missions and what was said in sessions', 
   assert.ok(said.some((h) => h.kind === 'session' && h.title === 'Covectors' && /eats a vector/.test(h.snippet ?? '')));
   assert.ok((await search('every point covector')).some((h) => h.kind === 'session'));
   assert.deepEqual(await search('zzzz-nothing'), []);
+});
+
+test('a selected phrase is glossed once, shown to the tutor on its topic, and can be forgotten', async () => {
+  const gloss = (body: unknown) =>
+    fetch(`${BASE}/api/glosses`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  await call('start_session', { topic: 'Glossed topic', goal: 'Read a lesson' });
+  const res = await gloss({ text: '  “Vagal\n brake”, ', context: 'At rest the vagal brake slows the heart.', topic: 'glossed-topic' });
+  assert.equal(res.status, 200);
+  const first = (await res.json()) as Gloss;
+  assert.equal(first.id, 'vagal-brake');
+  assert.equal(first.text, 'Vagal brake');
+  assert.equal(first.topic, 'glossed-topic');
+  // The request Claude Code got: the phrase, the topic's title and the passage.
+  assert.match(first.gloss, /Phrase: "Vagal brake"/);
+  assert.match(first.gloss, /Topic: Glossed topic/);
+  assert.match(first.gloss, /slows the heart/);
+
+  // The same phrase, in any case, is the same gloss.
+  const again = (await (await gloss({ text: 'vagal brake' })).json()) as Gloss;
+  assert.equal(again.at, first.at);
+  assert.deepEqual(
+    (await get<Gloss[]>('/api/glosses')).map((g) => g.id),
+    ['vagal-brake'],
+  );
+  assert.match(textOf(await call('get_topic', { topic: 'glossed-topic' })), /asked to have explained[\s\S]*"Vagal brake"/);
+
+  assert.equal((await gloss({ text: '' })).status, 400);
+  assert.equal((await gloss({ text: 'x'.repeat(200) })).status, 400);
+
+  assert.equal((await fetch(`${BASE}/api/glosses/vagal-brake`, { method: 'DELETE' })).status, 200);
+  assert.deepEqual(await get<Gloss[]>('/api/glosses'), []);
+  assert.equal((await fetch(`${BASE}/api/glosses/vagal-brake`, { method: 'DELETE' })).status, 404);
 });

@@ -4,6 +4,7 @@
 import path from 'node:path';
 import { Backup } from './backup.ts';
 import { SESSIONS_DIR } from './config.ts';
+import { Glosses } from './glosses.ts';
 import { Feed, readSession, SessionCache, summarizeSession, type SessionRecord } from './feed.ts';
 import { Missions } from './missions.ts';
 import type { Outcome } from './reviews.ts';
@@ -45,24 +46,27 @@ export class Gym {
   readonly topics: Topics;
   readonly roadmaps: Roadmaps;
   readonly missions: Missions;
+  readonly glosses: Glosses;
   readonly backup = new Backup();
   private summaries = new SessionCache((record) => summarizeSession(record));
   private statusChanges = new SessionCache((record) => statusChanges(record));
 
-  constructor(feed: Feed, topics: Topics, roadmaps: Roadmaps, missions: Missions) {
+  constructor(feed: Feed, topics: Topics, roadmaps: Roadmaps, missions: Missions, glosses: Glosses) {
     this.feed = feed;
     this.topics = topics;
     this.roadmaps = roadmaps;
     this.missions = missions;
+    this.glosses = glosses;
     topics.events.on('topic', (topic) => feed.events.emit('event', { type: 'topic', topic }));
     roadmaps.events.on('roadmap', (roadmap) => feed.events.emit('event', { type: 'roadmap', roadmap }));
     missions.events.on('mission', (mission) => feed.events.emit('event', { type: 'mission', mission }));
+    glosses.events.on('glosses', (list) => feed.events.emit('event', { type: 'glosses', glosses: list }));
     feed.events.on('event', () => this.backup.schedule());
     this.backup.schedule(30_000);
   }
 
   static async load(): Promise<Gym> {
-    return new Gym(await Feed.load(), await Topics.load(), await Roadmaps.load(), await Missions.load());
+    return new Gym(await Feed.load(), await Topics.load(), await Roadmaps.load(), await Missions.load(), await Glosses.load());
   }
 
   /** The current session's topic, if it has one on the map. */

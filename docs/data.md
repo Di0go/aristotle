@@ -8,6 +8,7 @@ data/
 ├── sessions/<id>.jsonl       one append-only log per session
 ├── roadmaps/<slug>.json      one file per roadmap
 ├── missions/<id>.json        one file per Praxis mission
+├── glosses.json              the phrases he asked to have explained, with their glosses
 └── profile.md                what the tutor has learned about how he learns (written by the skills)
 ```
 
@@ -45,6 +46,10 @@ Quiz items keep the right answers and explanations; the interface only receives 
 `roadmaps/<slug>.json` is a `Roadmap`: title, goal, status (`draft` or `active`) and ordered steps, each a topic by slug with its own goal and why. A step's progress is not stored: it is read from its topic's map.
 
 `missions/<id>.json` is a `Mission`: scope (`step`, `capstone` or `topic`), the roadmap and topic it follows, the brief, criteria and concepts, and later his `debrief` and Claude's review with a verdict per criterion. Reviewing a mission records evidence on its concepts.
+
+## Glosses
+
+`glosses.json` is an array of `Gloss`: a phrase he selected and asked to have explained (from the context menu), the explanation Claude Code wrote, the passage and topic it came from, and when. One per phrase: its `id` is the phrase as a slug, so asking again, in any case, returns the same gloss. Forgetting one removes it from the file. The whole file is rewritten atomically on every change ([`glosses.ts`](../server/glosses.ts)); `get_topic` lists a topic's glosses for the tutor, as gaps he noticed himself.
 
 ## Backup
 
