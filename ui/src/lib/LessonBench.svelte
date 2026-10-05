@@ -58,7 +58,7 @@
     void text;
     if (!box) return;
     box.style.height = 'auto';
-    box.style.height = `${Math.max(box.scrollHeight, 168)}px`;
+    box.style.height = `${box.scrollHeight}px`;
   });
 
   /** A dependency, "id" in this class or "class/id" in another, with its concept when it is on a map. */
@@ -132,7 +132,6 @@
   {#if stepId}
     <section class="bench-section nb">
       <header class="nb-head">
-        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10.5 2.5l3 3L6 13H3v-3z M9 4l3 3" /></svg>
         <h3>Your notes on this step</h3>
         <span class="nb-state" class:on={saved !== ''}>{saved === 'saving' ? 'Saving…' : 'Saved ✓'}</span>
       </header>
@@ -227,27 +226,12 @@
     color: var(--faint);
   }
 
-  /* The notebook: a page with faint ruled lines the text sits on, a margin line, and a quiet saved mark. */
-  .nb {
-    --nb-line: 1.7rem;
-    --nb-rule: color-mix(in srgb, var(--rule) 70%, transparent);
-  }
-
+  /* His notes: a calm, roomy writing space, nothing drawn on it. */
   .nb-head {
     display: flex;
-    align-items: center;
-    gap: 7px;
-    margin-bottom: 8px;
-  }
-
-  .nb-head svg {
-    width: 14px;
-    height: 14px;
-    fill: none;
-    stroke: var(--acc);
-    stroke-width: 1.4;
-    stroke-linejoin: round;
-    stroke-linecap: round;
+    align-items: baseline;
+    gap: 8px;
+    margin-bottom: 10px;
   }
 
   .nb-head h3 {
@@ -262,7 +246,7 @@
     font-size: 0.74rem;
     color: var(--faint);
     opacity: 0;
-    transition: opacity 0.3s;
+    transition: opacity 0.4s;
   }
 
   .nb-state.on {
@@ -272,40 +256,32 @@
   .nb-page {
     display: block;
     width: 100%;
-    min-height: calc(var(--nb-line) * 6 + 20px);
+    min-height: max(280px, 46vh);
     resize: none;
     overflow: hidden;
-    padding: 10px 14px 10px 22px;
-    border: 1px solid var(--rule);
-    border-radius: var(--radius-lg);
+    padding: 16px 18px;
+    border: 1px solid transparent;
+    border-radius: 12px;
+    background: var(--b0);
     color: var(--fg);
-    font: 0.9rem / var(--nb-line) var(--sans);
-    background:
-      linear-gradient(90deg, transparent 13px, var(--acc-line) 13px, var(--acc-line) 14px, transparent 14px),
-      repeating-linear-gradient(
-          to bottom,
-          transparent 0,
-          transparent calc(var(--nb-line) - 1px),
-          var(--nb-rule) calc(var(--nb-line) - 1px),
-          var(--nb-rule) var(--nb-line)
-        )
-        0 4px / 100% var(--nb-line) local,
-      var(--b0);
-    box-shadow: 0 1px 2px rgb(0 0 0 / 0.04);
+    font: 0.95rem / 1.7 var(--sans);
     transition:
-      border-color 0.15s,
-      box-shadow 0.15s;
+      border-color 0.2s,
+      box-shadow 0.2s;
   }
 
   .nb-page::placeholder {
     color: var(--faint);
-    font-style: italic;
+  }
+
+  .nb-page:hover {
+    border-color: var(--rule);
   }
 
   .nb-page:focus {
     outline: none;
-    border-color: var(--acc-line);
-    box-shadow: 0 0 0 3px var(--acc-soft);
+    border-color: var(--rule);
+    box-shadow: 0 2px 14px -6px rgb(0 0 0 / 0.18);
   }
 
   .nb-foot {

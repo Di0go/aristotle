@@ -171,7 +171,7 @@
   {#if topic && !bench.hidden}
     <aside class="bench" class:open={benchOpen} aria-label="About this step">
       <LessonBench {topic} {page} onclose={() => (benchOpen = false)} />
-      <Grip name="--side-w" side="left" min={220} max={480} initial={280} label="Resize the sidebar" />
+      <Grip name="--side-w" side="left" min={240} max={600} initial={340} label="Resize the sidebar" />
     </aside>
     <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
     <div class="bench-scrim" class:open={benchOpen} onclick={() => (benchOpen = false)}></div>
