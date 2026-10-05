@@ -823,31 +823,7 @@ textarea.note {
   padding: 20px 22px;
 }
 
-/* Where one session of a class ends and the next begins: on the class page, and above a live lesson. */
-.session-divider {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-  max-width: var(--measure);
-  margin: 0 auto 4px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid var(--rule);
-  font-size: 0.82rem;
-  font-weight: 600;
-  color: var(--fg-2);
-}
-
-.session-divider .muted {
-  font-weight: 400;
-}
-
-.session-divider.now {
-  margin-top: 28px;
-  color: var(--acc);
-}
-
-/* A part or entry brought into view (from the contents or the library tree) lands below the sticky tab bar. */
-.part,
+/* An entry brought into view (a question waiting for him) lands below the sticky tab bar. */
 .notebook > .entry {
   scroll-margin-top: 64px;
 }

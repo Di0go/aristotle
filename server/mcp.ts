@@ -39,7 +39,7 @@ const THEME = {
 const MATH_AND_DIAGRAMS =
   'Markdown is rendered with LaTeX maths ($...$ inline, $$...$$ on its own lines; write a literal dollar as \\$), ' +
   '```mermaid code blocks as diagrams, and inline <svg> elements (which may animate with SMIL <animate>; Aristotle adds play and replay buttons). ' +
-  'Hover cards: {{term|short definition}} marks a term with a definition he can hover; [[concept-id]], [[other-topic/concept-id]] or [[concept-id|text]] links a concept on the map and shows its preview. ' +
+  'Hover cards: {{term|short definition}} marks a term with a definition he can hover (inside a ==highlight== too: =={{term|definition}}==); [[concept-id]], [[other-topic/concept-id]] or [[concept-id|text]] links a concept on the map and shows its preview. ' +
   'Also: ==highlighted text==; callouts as Obsidian writes them (> [!idea] Title, then > lines; kinds: idea, key, why, context, example, you, careful, term, note); ' +
   '<figure> with <figcaption> around a drawing; ![alt](https://… "caption") for an image with a caption (only images you have checked exist, e.g. Wikimedia Commons); ' +
   'and ```sequence code blocks: Markdown frames split by lines of ---, which he steps through with Next and Back. ' +

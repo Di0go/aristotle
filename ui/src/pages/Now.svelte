@@ -1,14 +1,13 @@
 <script lang="ts">
-  // The live lesson: what Claude is showing and asking right now, with the composer and the lesson's bench.
+  // Home (#/). A review or a training set running now is shown here as it grows, with the composer and its bench:
+  // they belong to no class. Everything else, a live lesson included, is Home: lessons happen in their class.
   import { setContext, tick } from 'svelte';
   import { actions } from '../lib/actions.ts';
   import { claude } from '../lib/claude.svelte.ts';
-  import { classes } from '../lib/classes.svelte.ts';
   import { placeFigures } from '../lib/explorables/index.ts';
   import { feed } from '../lib/feed.svelte.ts';
   import { countsOf, placeOf } from '../lib/library.ts';
   import { link } from '../lib/router.svelte.ts';
-  import ClassHistory from '../lib/ClassHistory.svelte';
   import Composer from '../lib/Composer.svelte';
   import FeedList from '../lib/FeedList.svelte';
   import Grip from '../lib/Grip.svelte';
@@ -23,8 +22,6 @@
   let stopHint = $state(false);
   /** How many items the feed had last time we looked; plain, so reading it doesn't make the scroll effect depend on it. */
   let count = 0;
-  /** Steps taught in the topic's earlier sessions, so this one's are numbered on from them. */
-  let before = $state(0);
 
   const live = $derived(feed.liveSlug !== null);
   const topic = $derived(feed.currentTopic);
@@ -59,21 +56,13 @@
     });
   });
 
-  // A step of this session picked in the library tree: bring it into view.
-  $effect(() => {
-    const key = classes.reveal;
-    if (!key || !feed.items.some((i) => i.id === key)) return;
-    classes.reveal = null;
-    void tick().then(() => document.getElementById(`item-${key}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
-  });
-
   /** Asks Claude to wrap up; if Claude isn't running here, says where to tell it instead. */
   function stop() {
     if (!actions.stopForToday()) stopHint = true;
   }
 </script>
 
-{#if live && feed.session}
+{#if live && feed.session && feed.session.kind !== 'learn'}
   <div class="lesson" class:with-bench={topic || reviewing}>
     <div class="lesson-main">
       <header class="lesson-head">
@@ -106,7 +95,7 @@
           <dd>{KIND[feed.session.kind ?? 'learn']}: {feed.session.goal}</dd>
           {#if place}<dt>roadmap</dt>
             <dd>
-              <a href={link.roadmap(place.roadmap.slug)}>{place.roadmap.title}</a>, step {place.index + 1} of {place.roadmap.steps.length}
+              <a href={link.roadmap(place.roadmap.slug)}>{place.roadmap.title}</a>, topic {place.index + 1} of {place.roadmap.steps.length}
             </dd>{/if}
           {#if topic && counts.total}<dt>progress</dt>
             <dd>{counts.solid} of {counts.total} concepts solid</dd>{/if}
@@ -118,21 +107,13 @@
         {/if}
       </header>
 
-      {#if feed.session.kind === 'learn' && feed.session.topicSlug}
-        <ClassHistory slug={feed.session.topicSlug} exclude={feed.session.id} bind:steps={before} />
-      {/if}
       {#if feed.items.length === 0}
         <div class="lesson-wait">
           <span class="spinner" aria-hidden="true"></span>
           <p>Claude is getting the lesson ready. It usually starts with the big picture, then finds out what you already know.</p>
         </div>
       {:else}
-        <FeedList
-          items={feed.items}
-          pendingId={feed.pending?.id ?? null}
-          figures={placeFigures(feed.session.topicSlug, feed.items)}
-          firstStep={before + 1}
-        />
+        <FeedList items={feed.items} pendingId={feed.pending?.id ?? null} figures={placeFigures(feed.session.topicSlug, feed.items)} />
       {/if}
       <LessonActivity />
       <Composer />

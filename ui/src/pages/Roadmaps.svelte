@@ -217,7 +217,7 @@
                   {#if feed.liveSlug === t.slug}<span class="live">in a lesson now</span>{/if}
                 </td>
                 <td class="muted"
-                  >{#if place}<a href={link.roadmap(place.roadmap.slug)}>{place.roadmap.title}</a>, step {place.index + 1}{:else}—{/if}</td
+                  >{#if place}<a href={link.roadmap(place.roadmap.slug)}>{place.roadmap.title}</a>, topic {place.index + 1}{:else}—{/if}</td
                 >
                 <td>
                   <div class="t-prog">

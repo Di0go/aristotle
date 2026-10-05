@@ -258,7 +258,7 @@
     {:else if topics}
       <div class="empty-state atlas-empty">
         <h2>Nothing on the map yet</h2>
-        <p>Every concept you learn appears here, grouped by roadmap and topic. Start a lesson from Now, or plan a roadmap.</p>
+        <p>Every concept you learn appears here, grouped by roadmap and topic. Start a lesson from Home, or plan a roadmap.</p>
       </div>
     {:else}
       <p class="muted">Loading…</p>

@@ -2,6 +2,7 @@
   // The shell: ribbon, sidebar, tabs, the current page, the status line and the terminal drawer, plus global shortcuts.
   import type { Component } from 'svelte';
   import { claude } from './lib/claude.svelte.ts';
+  import { classes } from './lib/classes.svelte.ts';
   import { feed } from './lib/feed.svelte.ts';
   import { link, router } from './lib/router.svelte.ts';
   import { searchBox } from './lib/search.svelte.ts';
@@ -28,6 +29,7 @@
     roadmap: () => import('./pages/Roadmap.svelte') as never,
     topic: () => import('./pages/Topic.svelte') as never,
     lesson: () => import('./pages/Lesson.svelte') as never,
+    step: () => import('./pages/Step.svelte') as never,
     log: () => import('./pages/Log.svelte') as never,
     session: () => import('./pages/SessionView.svelte') as never,
     praxis: () => import('./pages/Praxis.svelte') as never,
@@ -41,7 +43,7 @@
   const pageProps = $derived.by((): Record<string, unknown> => {
     const r = router.route;
     if (r.page === 'topic') return { slug: r.slug, concept: r.concept };
-    if (r.page === 'lesson') return { slug: r.slug, part: r.part };
+    if (r.page === 'step') return { slug: r.slug, number: r.number };
     if ('slug' in r) return { slug: r.slug };
     if ('id' in r) return { id: r.id };
     return {};
@@ -82,7 +84,7 @@
         <svg viewBox="0 0 18 18" aria-hidden="true"><path d="M3 5h12M3 9h12M3 13h12" /></svg>
       </button>
       <a class="mobile-brand" href={link.now()}><Logo size={20} class="mobile-mark" />aristotle</a>
-      {#if feed.pending}<a class="turn" href={link.now()}>Your turn</a>{/if}
+      {#if feed.pending}<a class="turn" href={classes.liveHref() ?? link.now()}>Your turn</a>{/if}
       <button class="mobile-search" onclick={() => searchBox.toggle(true)} aria-label="Search">
         <svg viewBox="0 0 18 18" aria-hidden="true"><path d="M7.5 3a4.5 4.5 0 1 0 0 9a4.5 4.5 0 1 0 0-9M10.8 10.8l4 4" /></svg>
       </button>

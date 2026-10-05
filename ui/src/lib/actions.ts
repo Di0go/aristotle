@@ -63,7 +63,14 @@ export const actions = {
     );
   },
   train(slug: string) {
-    go(`/train ${slug}`, `Use the train skill: a training set on the topic ${slug}.`, `Training: ${feed.topics[slug]?.title ?? slug}`);
+    go(
+      `/train ${slug}`,
+      `Use the train skill: a training set on the topic ${slug}.`,
+      `Training: ${feed.topics[slug]?.title ?? slug}`,
+      false,
+      undefined,
+      'other',
+    );
   },
   /** Praxis is a conversation (which arena, what fits his life), so it stays on the page with Claude beside it. */
   stepMission(roadmap: Roadmap, index: number) {
@@ -94,6 +101,9 @@ export const actions = {
       slug ? `/review ${slug}` : '/review',
       slug ? `Use the review skill to review what's fading in the topic ${slug}.` : "Use the review skill to review what's fading.",
       'A review of what is fading',
+      false,
+      undefined,
+      'other',
     );
   },
 };
@@ -116,20 +126,22 @@ function pickUp() {
 }
 
 /**
- * Lessons, reviews and training open a session, so they move to Now, except a class continued from its own page.
+ * A lesson waits on its class and moves to the step being taught when it starts; reviews and training open on Home.
  * Planning a roadmap or a mission is a conversation: it stays on the page (where the draft appears) and opens Claude beside it.
  */
-function go(command: string, initial: string, label: string, converse = false, topic?: string) {
+function go(command: string, initial: string, label: string, converse = false, topic?: string, kind: 'learn' | 'other' = 'learn') {
   claude.run(command, initial);
   if (converse) {
     claude.toggle(true);
     return;
   }
   feed.begin(label);
-  // On the topic's own class page, stay: it becomes the live lesson when the session starts, with the class so far above.
+  // A lesson happens in its class: wait on the class (or Home, for a topic not known yet), and go to the step being
+  // taught once it starts. Reviews and training sets have no class: they open on Home.
+  feed.follow = kind === 'learn' ? (topic ?? '*') : null;
   const route = router.route;
-  if (topic && route.page === 'lesson' && route.slug === topic) return;
-  if (location.hash !== link.now() && location.hash !== '') location.hash = link.now();
+  if (topic && (route.page === 'lesson' || route.page === 'step') && route.slug === topic) return;
+  location.hash = kind === 'learn' && topic ? link.lesson(topic) : link.now();
 }
 
 function oneLine(s: string): string {

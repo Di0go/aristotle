@@ -1,7 +1,7 @@
 <script lang="ts">
   // One piece of teaching from `show` (orientation, step, plan, summary, feedback or note), labelled and rendered.
   import Markdown from './Markdown.svelte';
-  import { cleanTitle } from './sections.ts';
+  import { cleanTitle } from './steps.ts';
   import type { BlockItem } from '../../../shared/types.ts';
 
   const LABELS: Record<BlockItem['kind'], string> = {

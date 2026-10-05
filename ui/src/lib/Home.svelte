@@ -1,7 +1,9 @@
 <script lang="ts">
-  // Now, between sessions: everything in progress side by side, so picking what to do is one click.
+  // Home: everything in progress side by side, so picking what to do is one click, and the lesson being taught
+  // right now (it happens in its class: this only points there).
   import { actions } from './actions.ts';
   import { claude } from './claude.svelte.ts';
+  import { classes } from './classes.svelte.ts';
   import { feed } from './feed.svelte.ts';
   import { ago } from './format.ts';
   import { countsOf, placeOf, stepsOf } from './library.ts';
@@ -30,7 +32,18 @@
   const fading = $derived(Object.values(feed.topics).reduce((n, t) => n + countsOf(t).fading, 0));
   const last = $derived(feed.session?.endedAt ? feed.session : null);
   const waited = $derived(feed.starting ? Math.round((now - feed.starting.at) / 1000) : 0);
+  /** The lesson running now, if any: its class and the step being taught. */
+  const teaching = $derived(feed.session?.kind === 'learn' && feed.liveSlug ? feed.session : null);
+  const teachingPage = $derived(teaching ? (classes.pages(teaching.topicSlug)?.at(-1) ?? null) : null);
   const empty = $derived(feed.loaded && inProgress.length === 0 && nextSteps.length === 0);
+
+  // A lesson asked for while its topic wasn't known (a new one): once it is live, go to the step being taught.
+  $effect(() => {
+    const href = classes.liveHref();
+    if (feed.follow !== '*' || !teaching || !href) return;
+    feed.follow = null;
+    location.hash = href;
+  });
 
   // A clock for "still setting up (40 s)" while something is starting.
   $effect(() => {
@@ -62,6 +75,23 @@
         <button class="link" onclick={() => (feed.starting = null)}>Dismiss</button>
       </div>
     </section>
+  {/if}
+
+  {#if teaching}
+    <a class="teaching sheet" href={classes.liveHref() ?? link.lesson(teaching.topicSlug)}>
+      <span class="live-dot" aria-hidden="true"></span>
+      <span class="teaching-text">
+        <span class="kicker">{feed.pending ? 'Your turn' : 'Being taught now'}</span>
+        <span class="teaching-title"
+          >{teaching.topic}{#if teachingPage}<span class="muted">
+              {` · `}{teachingPage.number ? `Step ${teachingPage.number}` : 'Intro'}{teachingPage.title
+                ? `: ${teachingPage.title}`
+                : ''}</span
+            >{/if}</span
+        >
+      </span>
+      <span class="primary small">Open</span>
+    </a>
   {/if}
 
   <header class="page-head">
@@ -98,7 +128,7 @@
           <li class="desk-item sheet">
             {#if place}
               <a class="desk-where" href={link.roadmap(place.roadmap.slug)}
-                >{place.roadmap.title}, step {place.index + 1} of {place.roadmap.steps.length}</a
+                >{place.roadmap.title}, topic {place.index + 1} of {place.roadmap.steps.length}</a
               >
             {/if}
             <h3><a href={link.lesson(t.slug)}>{t.title}</a></h3>
@@ -161,3 +191,49 @@
     <div class="sheet start-sheet"><StartPanel /></div>
   </section>
 </div>
+
+<style>
+  .teaching {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 36px;
+    padding: 16px 18px;
+    color: var(--fg);
+    text-decoration: none;
+    border: 1px solid var(--acc-line);
+  }
+
+  .teaching:hover {
+    border-color: var(--acc);
+    text-decoration: none;
+  }
+
+  .live-dot {
+    flex: none;
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: var(--acc);
+  }
+
+  .teaching-text {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    gap: 2px;
+  }
+
+  .teaching .kicker {
+    margin: 0;
+    color: var(--acc);
+  }
+
+  .teaching-title {
+    font-weight: 600;
+  }
+
+  .teaching-title .muted {
+    font-weight: 400;
+  }
+</style>

@@ -86,7 +86,7 @@
     const node = range.commonAncestorContainer;
     const host = (node instanceof Element ? node : node.parentElement)?.closest(BLOCK);
     const route = router.route;
-    const topic = route.page === 'topic' || route.page === 'lesson' ? route.slug : (feed.liveSlug ?? undefined);
+    const topic = route.page === 'topic' || route.page === 'lesson' || route.page === 'step' ? route.slug : (feed.liveSlug ?? undefined);
     void glossing.ask(text, range, host?.textContent ?? undefined, topic);
   }
 

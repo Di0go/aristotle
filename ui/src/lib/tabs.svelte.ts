@@ -14,6 +14,12 @@ export function pageKey(hash: string): string {
   return (hash || '#/').split('?')[0];
 }
 
+/** The topic whose class a tab shows (its page or one of its steps), if it shows one. */
+function classOf(key: string): string | undefined {
+  const r = router.parse(key);
+  return r.page === 'lesson' || r.page === 'step' ? r.slug : undefined;
+}
+
 /** Parses a tab's hash with the router's own rules. */
 export function routeOf(key: string): Route {
   return router.parse(key);
@@ -27,7 +33,7 @@ class Tabs {
     addEventListener('hashchange', () => this.visit(location.hash));
   }
 
-  /** Closes a tab. Closing the open one moves to its left neighbour (the right one if it was first, Now if none is left). */
+  /** Closes a tab. Closing the open one moves to its left neighbour (the right one if it was first, Home if none is left). */
   close(key: string) {
     const i = this.list.indexOf(key);
     if (i === -1) return;
@@ -37,12 +43,15 @@ class Tabs {
     if (wasActive) location.hash = this.list[Math.max(0, i - 1)] ?? '#/';
   }
 
+  /** A class has one tab, whichever of its pages is open: moving between steps moves that tab along. */
   private visit(hash: string) {
     const key = pageKey(hash);
-    if (!this.list.includes(key)) {
-      this.list = [...this.list, key].slice(-MAX);
-      this.save();
-    }
+    if (this.list.includes(key)) return;
+    const slug = classOf(key);
+    const same = slug ? this.list.findIndex((k) => classOf(k) === slug) : -1;
+    if (same !== -1) this.list = this.list.map((k, i) => (i === same ? key : k));
+    else this.list = [...this.list, key].slice(-MAX);
+    this.save();
   }
 
   private save() {

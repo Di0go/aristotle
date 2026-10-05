@@ -27,7 +27,7 @@
   {#if feed.pending}<span class="turn">Your turn</span>{:else if feed.wrapping}<span class="work">Wrapping up…</span
     >{:else if live && claude.busy}<span class="work">Claude is working…</span>{/if}
   {#if topic && counts.total}<span>{counts.solid} of {counts.total} solid</span>{/if}
-  {#if place}<span>step {place.index + 1} of {place.roadmap.steps.length}</span>{/if}
+  {#if place}<span>topic {place.index + 1} of {place.roadmap.steps.length}</span>{/if}
   {#if live && claude.running && !feed.wrapping}<button
       class="stop"
       onclick={() => actions.stopForToday()}

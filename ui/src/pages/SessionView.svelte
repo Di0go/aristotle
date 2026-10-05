@@ -1,5 +1,6 @@
 <script lang="ts">
   // One past session, read back in full: every step, check and answer, and its handoff.
+  import { classes } from '../lib/classes.svelte.ts';
   import { setContext } from 'svelte';
   import { feed } from '../lib/feed.svelte.ts';
   import { duration, formatDay, formatTime } from '../lib/format.ts';
@@ -46,7 +47,7 @@
           >{:else}{record.session.topic}{/if}
       </h1>
       <p class="page-lede">{record.session.goal}</p>
-      {#if live}<p><a href={link.now()}>This is the current session: open it in Now</a></p>{/if}
+      {#if live}<p><a href={classes.liveHref() ?? link.now()}>This is the session running now: open it</a></p>{/if}
     </header>
     <FeedList {items} readonly={!live} pendingId={live ? (feed.pending?.id ?? null) : null} />
   {:else if missing}

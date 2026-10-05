@@ -9,7 +9,7 @@
 
   /** The main places, each with its icon (20×20, stroked). The library comes after them, with its own rule for "here". */
   const PLACES = [
-    { page: 'now', label: 'Now', href: link.now(), icon: 'M4 4.5h12v11H4zM7 8.5h6M7 11.5h4' },
+    { page: 'now', label: 'Home', href: link.now(), icon: 'M4 4.5h12v11H4zM7 8.5h6M7 11.5h4' },
     {
       page: 'map',
       label: 'Map',

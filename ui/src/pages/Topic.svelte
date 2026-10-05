@@ -198,7 +198,7 @@
   {:else if missing}
     <div class="empty-state">
       <h2>No such topic</h2>
-      <p><a href={link.now()}>Back to Now</a></p>
+      <p><a href={link.now()}>Back to Home</a></p>
     </div>
   {:else}
     <p class="muted">Loading…</p>

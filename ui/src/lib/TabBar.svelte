@@ -15,6 +15,7 @@
   const ICONS: Record<Route['page'], string> = {
     now: NOTE,
     lesson: NOTE,
+    step: NOTE,
     map: GRAPH,
     topic: GRAPH,
     progress: 'M4.5 16V10M10 16V4.5M15.5 16v-4',
@@ -37,7 +38,7 @@
     const r = routeOf(key);
     switch (r.page) {
       case 'now':
-        return feed.session && !feed.session.endedAt ? feed.session.topic : 'Now';
+        return feed.session && !feed.session.endedAt && feed.session.kind !== 'learn' ? feed.session.topic : 'Home';
       case 'progress':
         return 'Progress';
       case 'map':
@@ -52,7 +53,9 @@
       case 'topic':
         return feed.topics[r.slug]?.title ?? r.slug;
       case 'lesson':
-        return `${topicTitle(r.slug)}: class`;
+        return topicTitle(r.slug);
+      case 'step':
+        return `${topicTitle(r.slug)}: ${r.number ? `step ${r.number}` : 'intro'}`;
       case 'praxis':
         return 'Praxis';
       case 'mission':

@@ -23,6 +23,11 @@ class LiveFeed {
   loaded = $state(false);
   /** He asked to stop for today; cleared when the session ends. */
   wrapping = $state(false);
+  /**
+   * A lesson asked for from here, to be taken to once it starts: a topic's slug, or "*" when its topic isn't known
+   * yet (a new one). Whichever page sees it start takes him there and clears it.
+   */
+  follow = $state<string | null>(null);
   /** Something was started from the interface and its session hasn't appeared yet. */
   starting = $state<{ label: string; at: number; after: string | null } | null>(null);
   /** Bumped on every topic change, so pages can refetch summaries. */
@@ -55,7 +60,7 @@ class LiveFeed {
     this.source.onmessage = (e) => this.apply(JSON.parse(e.data) as FeedEvent);
   }
 
-  /** Marks that something was asked of Claude, so Now can say so until the session starts. */
+  /** Marks that something was asked of Claude, so Home and the class can say so until the session starts. */
   begin(label: string) {
     this.starting = { label, at: Date.now(), after: this.session?.id ?? null };
   }

@@ -144,7 +144,7 @@ Words alone are the weakest way to teach anything physical, spatial or timed. Ev
 
 - Maths in LaTeX: `$...$` inline, `$$...$$` on its own lines; `\$` for a literal dollar.
 - **Hover cards.** The first time a step uses a technical term, define it inline: `{{vagus nerve|Cranial nerve X: carries most of the parasympathetic signal to the heart.}}`. When a step leans on a concept already on a map, link it: `[[hormone-vs-nerve-signal]]` or `[[other-topic/concept-id|your words]]`, with ids exactly as on the map.
-- Signal what matters (Mayer's signalling principle): ==highlight== the one phrase to remember, and one or two callouts at most (`> [!key] Title`; kinds: idea, key, why, context, example, you (his own life), careful (a misconception), term, note).
+- Signal what matters (Mayer's signalling principle): ==highlight== the one phrase to remember (when that phrase is a term, it carries its definition inside the highlight, so it can be hovered: `=={{SAM axis|sympathetic nerves plus adrenaline from the adrenal medulla: the fast arm}}==`), and one or two callouts at most (`> [!key] Title`; kinds: idea, key, why, context, example, you (his own life), careful (a misconception), term, note).
 - Short paragraphs, a bold lead-in when a paragraph has a job, lists for parallel items. One step fits on one screen, picture included.
 
 ## Profile

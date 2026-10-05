@@ -1,13 +1,14 @@
 <script lang="ts">
-  // The library pane: roadmaps as folders, steps inside, and in each step's topic two folders: its Class (every
-  // step taught, numbered across sessions, with how its checks went) and its Concepts. Then loose topics.
-  import { classes, type ClassStep } from './classes.svelte.ts';
+  // The library pane: roadmaps as folders, steps inside, and in each step's topic two folders: its Class (its
+  // pages, the intro and every step taught, with how its checks went) and its Concepts. Then loose topics.
+  import { classes } from './classes.svelte.ts';
   import { feed } from './feed.svelte.ts';
   import { countsOf, looseTopics, markOf, outline, placeOf, stepsOf } from './library.ts';
   import { link, router } from './router.svelte.ts';
   import { migrateKey } from './storage.ts';
   import Grip from './Grip.svelte';
   import Logo from './Logo.svelte';
+  import { pageLabel, stepMark, type ClassPage } from './steps.ts';
   import type { Topic } from '../../../shared/types.ts';
 
   const OPEN_KEY = 'aristotle.tree-open';
@@ -25,11 +26,12 @@
   const route = $derived(router.route);
   const roadmaps = $derived(feed.roadmapList);
   const loose = $derived(looseTopics(feed.topics, roadmaps));
-  const currentTopic = $derived(route.page === 'topic' || route.page === 'lesson' ? route.slug : (feed.liveSlug ?? undefined));
+  const onClass = $derived(route.page === 'lesson' || route.page === 'step' ? route.slug : undefined);
+  const currentTopic = $derived(route.page === 'topic' ? route.slug : (onClass ?? feed.liveSlug ?? undefined));
 
   // Open the way down to whatever is on screen.
   $effect(() => {
-    const slug = route.page === 'topic' || route.page === 'lesson' ? route.slug : undefined;
+    const slug = route.page === 'topic' ? route.slug : onClass;
     if (!slug) return;
     const place = placeOf(slug, roadmaps);
     if (place && !isOpen(`r:${place.roadmap.slug}`)) toggle(`r:${place.roadmap.slug}`, true);
@@ -55,6 +57,12 @@
     }
   }
 
+  /** A folder's name opens its page and the folder with it, as in a file tree; the chevron alone folds it. */
+  function opened(key: string) {
+    if (!isOpen(key)) toggle(key, true);
+    onnavigate?.();
+  }
+
   /** Roadmaps and a topic's class start open; topics and their concepts start closed. */
   function isOpen(key: string): boolean {
     return open[key] ?? (key.startsWith('r:') || key.startsWith('c:'));
@@ -66,20 +74,10 @@
     return (concept ? route.concept === concept : !route.concept) ? 'page' : undefined;
   }
 
-  /** aria-current for a topic's class row (no part given) or one of its steps. */
-  function currentClass(slug: string, part?: string): 'page' | undefined {
-    if (route.page !== 'lesson' || route.slug !== slug) return undefined;
-    return (part ? route.part === part : !route.part) ? 'page' : undefined;
-  }
-
-  /** How a step's checks went, in a few characters: right out of graded, written, or what is left to answer. */
-  function tally(s: ClassStep): { text: string; tone: '' | 'all' | 'todo' } {
-    const c = s.checks;
-    const graded = c.right + c.wrong + c.dontKnow;
-    if (c.unanswered) return { text: 'to answer', tone: 'todo' };
-    if (graded) return { text: `${c.right}/${graded}`, tone: c.right === graded ? 'all' : '' };
-    if (c.written) return { text: '✓', tone: 'all' };
-    return { text: '', tone: '' };
+  /** aria-current for a topic's class (no page given) or one of its pages. */
+  function currentClass(slug: string, p?: ClassPage): 'page' | undefined {
+    if (p) return route.page === 'step' && route.slug === slug && route.number === p.number ? 'page' : undefined;
+    return route.page === 'lesson' && route.slug === slug ? 'page' : undefined;
   }
 </script>
 
@@ -100,8 +98,8 @@
   {@const key = `t:${slug}`}
   <li>
     <div class="row" class:here={currentTopic === slug} class:unstarted={!t}>
-      {#if t}{@render chevron(key, title)}{:else}<span class="chev-space"></span>{/if}
-      <a href={link.lesson(slug)} onclick={onnavigate} aria-current={currentClass(slug)}>
+      {@render chevron(key, title)}
+      <a href={link.lesson(slug)} onclick={() => opened(key)} aria-current={currentClass(slug)}>
         <span class="name">{number !== undefined ? `${number} · ` : ''}{title}</span>
       </a>
       {#if feed.liveSlug === slug}
@@ -110,27 +108,37 @@
         <span class="count">{c.solid}/{c.total}</span>
       {/if}
     </div>
+    {#if !t && isOpen(key)}
+      <ul class="sub">
+        <li class="leaf-note"><a href={link.lesson(slug)} onclick={onnavigate}>Not started yet: begin the class</a></li>
+      </ul>
+    {/if}
     {#if t && isOpen(key)}
-      {@const steps = isOpen(`c:${slug}`) ? classes.steps(slug) : null}
+      {@const pages = isOpen(`c:${slug}`) ? classes.pages(slug) : null}
       <ul class="sub">
         <li>
           <div class="row sub-dir">
             {@render chevron(`c:${slug}`, `the class of ${title}`)}
-            <a href={link.lesson(slug)} onclick={onnavigate}><span class="name">Class</span></a>
+            <a href={link.lesson(slug)} onclick={() => opened(`c:${slug}`)} aria-current={currentClass(slug)}
+              ><span class="name">Class</span></a
+            >
           </div>
           {#if isOpen(`c:${slug}`)}
             <ul class="leaves">
-              {#if steps === null}
+              {#if pages === null}
                 <li class="leaf-note">Loading…</li>
-              {:else if steps.length === 0}
-                <li class="leaf-note">No steps yet</li>
+              {:else if pages.length === 0}
+                <li class="leaf-note">Nothing taught yet</li>
               {/if}
-              {#each steps ?? [] as s (s.key)}
-                {@const m = tally(s)}
-                {@const now = s.live && s === steps?.at(-1)}
+              {#each pages ?? [] as p, i (p.number)}
+                {@const m = stepMark(p)}
+                {@const latest = i === (pages?.length ?? 0) - 1}
+                {@const now = p.live && latest && feed.liveSlug === slug}
                 <li>
-                  <a class="row leaf" href={link.lesson(slug, s.key)} onclick={onnavigate} aria-current={currentClass(slug, s.key)}>
-                    <span class="num">{s.number}</span><span class="name">{s.title ?? `Step ${s.number}`}</span>
+                  <a class="row leaf" href={link.step(slug, p.number)} onclick={onnavigate} aria-current={currentClass(slug, p)}>
+                    <span class="num">{p.number || ''}</span><span class="name"
+                      >{p.title ?? (p.upcoming ? 'Warming up' : pageLabel(p))}</span
+                    >
                     {#if now}<span class="live" title="Being taught now"></span>{:else if m.text}<span class="mark {m.tone}">{m.text}</span
                       >{/if}
                   </a>
@@ -143,7 +151,9 @@
           <li>
             <div class="row sub-dir">
               {@render chevron(`k:${slug}`, `the concepts of ${title}`)}
-              <a href={link.topic(slug)} onclick={onnavigate} aria-current={current(slug)}><span class="name">Concepts</span></a>
+              <a href={link.topic(slug)} onclick={() => opened(`k:${slug}`)} aria-current={current(slug)}
+                ><span class="name">Concepts</span></a
+              >
               <span class="count">{c.solid}/{c.total}</span>
             </div>
             {#if isOpen(`k:${slug}`)}
@@ -199,7 +209,7 @@
         <li class="folder">
           <div class="row dir" class:here={route.page === 'roadmap' && route.slug === r.slug}>
             {@render chevron(key, r.title)}
-            <a href={link.roadmap(r.slug)} onclick={onnavigate}><span class="name">{r.title}</span></a>
+            <a href={link.roadmap(r.slug)} onclick={() => opened(key)}><span class="name">{r.title}</span></a>
             <span class="count">{steps.filter((s) => s.state === 'done').length}/{steps.length}</span>
           </div>
           {#if isOpen(key)}
@@ -335,6 +345,15 @@
     color: var(--faint);
   }
 
+  .leaf-note a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  .leaf-note a:hover {
+    color: var(--acc);
+  }
+
   .num {
     flex: none;
     min-width: 1.1em;
@@ -351,8 +370,12 @@
     font-variant-numeric: tabular-nums;
   }
 
-  .mark.all {
+  .mark.done {
     color: var(--solid);
+  }
+
+  .mark.mixed {
+    color: var(--shaky);
   }
 
   .mark.todo {
@@ -450,8 +473,7 @@
     background: var(--acc);
   }
 
-  .chev,
-  .chev-space {
+  .chev {
     flex: none;
     width: 18px;
     height: 27px;

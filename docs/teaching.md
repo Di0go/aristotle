@@ -45,7 +45,7 @@ These are in [`CLAUDE.md`](../CLAUDE.md) because they hold whichever skill is ru
 - **The knowledge map stays true** (`update_map`): what is solid, what is shaky and why, what rests on what.
 - If `quiz` or `ask` returns "No answer yet", end the turn; `collect_answers` when he is back.
 - **Questions outlive their session.** One left unanswered stays answerable in the class page after the session ends. When he answers one that no tool call is waiting for, Aristotle tells Claude: "collect my answers" if its session is still going, otherwise it continues the topic (or the review or training). So `teach`, `review` and `train` call `collect_answers` before `start_session`, which would otherwise leave those answers in the old session.
-- **Hover cards are the tutor's to write**: `{{term|definition}}` and `[[concept-id]]` only exist where Claude puts them, so `show` answers a teaching step that has neither with a reminder to add them in the next steps.
+- **Hover cards are the tutor's to write** (a highlighted term carries its definition inside the highlight): `{{term|definition}}` and `[[concept-id]]` only exist where Claude puts them, so `show` answers a teaching step that has neither with a reminder to add them in the next steps.
 - **Claude Code starts when Aristotle opens**, idle in the terminal drawer, so the first request never waits for it to boot; what is sent while it starts is typed in once it is ready.
 - **Accuracy first**: verify any fact, name, date or formula before teaching it (the `researcher` subagent), and mark real uncertainty.
 
