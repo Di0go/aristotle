@@ -22,8 +22,9 @@ Styles for one component live in its `<style>` block; the files above are for wh
 ```
 ┌ribbon─┬ library tree           ┬ tabs ─────────────────────────────┐
 │ Home  │ course                 │ page                      │ bench │
-│ Map   │  └ class               │ (Home, a class, a step,   │ (on a │
-│ Search│     └ intro, steps     │  the map, a course…)      │  step)│
+│Courses│  └ class               │ (Home, a class, a step,   │ (on a │
+│ Map   │     └ intro, steps     │  the map, a course…)      │  step)│
+│ Search│                        │
 │ Claude│                        │                           │       │
 └───────┴────────────────────────┴ status line ──────────────────────┘
                                    terminal drawer (Claude Code, Ctrl+`)
@@ -41,7 +42,7 @@ Concepts are what a class teaches, shown beside it, never a level of their own. 
 
 ### Places
 
-- **Ribbon**: four labelled places, Home, Map, Search and Claude, with the appearance menu below ([`Ribbon.svelte`](../ui/src/lib/Ribbon.svelte)). The library is the tree; Progress, the Log and Missions are reached from Home's panels.
+- **Ribbon**: five labelled places, Home, Courses (every course and class, `#/roadmaps`), Map, Search and Claude, with the appearance menu below ([`Ribbon.svelte`](../ui/src/lib/Ribbon.svelte)). Progress, the Log and Missions are reached from Home's panels; Home keeps a Courses panel too.
 - **Library tree**: courses, their classes, and in each class its pages: the Intro and every step, each with its mark ([`Sidebar.svelte`](../ui/src/lib/Sidebar.svelte), [`library.ts`](../ui/src/lib/library.ts)). Every folder folds with its arrow; clicking a folder's name opens its page and unfolds it.
 - **Home** (`#/`, [`Home.svelte`](../ui/src/lib/Home.svelte)) is the dashboard. One card says what to do now, with the one primary button (answer the question waiting, continue the last class, start the next class of a course); then panels, each a short live list with its way onwards at the foot: This week (minutes, concepts made solid, days in a row, the last two weeks), Courses, To review (fading and coming due), Recent answers, Words you looked up, Missions. A review or a training set running now shows here, since neither belongs to a class ([`Now.svelte`](../ui/src/pages/Now.svelte)).
 - **A class** (`#/lesson/<slug>`, [`Lesson.svelte`](../ui/src/pages/Lesson.svelte)): where you are, with its one button; the pages, one mark each (✓ done with nothing wrong, `1/2` when something went wrong, "to answer", ● being taught now); the box to continue; and beside them what the class teaches, its concepts, with training, review and its mission. Its concepts open on **the class's map** (`#/topics/<slug>?c=<concept>`, [`Topic.svelte`](../ui/src/pages/Topic.svelte)): the outline, the graph and one concept's record.

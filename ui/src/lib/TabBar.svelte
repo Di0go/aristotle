@@ -47,7 +47,7 @@
         return 'Log';
       case 'roadmaps':
       case 'topics':
-        return 'Library';
+        return 'Courses';
       case 'roadmap':
         return feed.roadmaps?.[r.slug]?.title ?? r.slug;
       case 'topic':

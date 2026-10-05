@@ -6,8 +6,9 @@
   import { searchBox } from './search.svelte.ts';
   import { ACCENTS, theme } from './theme.svelte.ts';
 
-  /** The four places, each with its icon (20×20, stroked) and its name under it. Everything else is reached from them. */
+  /** The five places, each with its icon (20×20, stroked) and its name under it. Everything else is reached from them. */
   const HOME = 'M4 4.5h12v11H4zM7 8.5h6M7 11.5h4';
+  const COURSES = 'M4 4h3.5v12H4zM8.5 4H12v12H8.5zM13.2 4.6l3.2-.9 3 11.6-3.2.9z';
   const MAP = 'M5 6.5a1.8 1.8 0 1 0 0-.01M15 5.5a1.8 1.8 0 1 0 0-.01M10 15a1.8 1.8 0 1 0 0-.01M6.8 6.3l6.4-.8M6 8.2l3 5.2M14 7.2l-3 5.9';
 
   /** The appearance popover is open. */
@@ -18,9 +19,11 @@
   const section = $derived(
     route.page === 'map' || route.page === 'topic'
       ? 'map'
-      : ['now', 'progress', 'log', 'session', 'praxis', 'mission'].includes(route.page)
-        ? 'now'
-        : '',
+      : ['roadmaps', 'roadmap', 'topics'].includes(route.page)
+        ? 'courses'
+        : ['now', 'progress', 'log', 'session', 'praxis', 'mission'].includes(route.page)
+          ? 'now'
+          : '',
   );
   const live = $derived(feed.liveSlug !== null);
 
@@ -36,6 +39,10 @@
     <svg viewBox="0 0 20 20" aria-hidden="true"><path d={HOME} /></svg>
     <span class="lbl">Home</span>
     {#if feed.pending}<i class="pip turn" title="Your turn"></i>{:else if live}<i class="pip"></i>{/if}
+  </a>
+  <a class="rib" class:on={section === 'courses'} href={link.roadmaps()} aria-current={section === 'courses' ? 'page' : undefined}>
+    <svg viewBox="0 0 20 20" aria-hidden="true"><path d={COURSES} transform="translate(-1.2 0)" /></svg>
+    <span class="lbl">Courses</span>
   </a>
   <a class="rib" class:on={section === 'map'} href={link.map()} aria-current={section === 'map' ? 'page' : undefined}>
     <svg viewBox="0 0 20 20" aria-hidden="true"><path d={MAP} /></svg>

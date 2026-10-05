@@ -101,7 +101,7 @@
   <!-- Header, and the form for a new roadmap or topic -->
   <header class="lib-head">
     <div>
-      <h1 class="page-title">Library</h1>
+      <h1 class="page-title">Courses</h1>
       <p class="lib-count">
         {plural(feed.roadmapList.length, 'course')} · {plural(Object.keys(feed.topics).length, 'class', 'classes')} started · {totals.solid} of
         {plural(totals.concepts, 'concept')} solid

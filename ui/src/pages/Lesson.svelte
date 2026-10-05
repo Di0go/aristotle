@@ -88,7 +88,7 @@
         <span class="sep">/</span>
         <span>class {place.index + 1} of {place.roadmap.steps.length}</span>
       {:else}
-        <a href={link.roadmaps()}>Library</a>
+        <a href={link.roadmaps()}>Courses</a>
       {/if}
     </nav>
     <h1 class="page-title">{title}</h1>

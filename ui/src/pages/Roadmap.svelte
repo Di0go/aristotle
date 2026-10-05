@@ -40,7 +40,7 @@
   {#if roadmap}
     <!-- Header -->
     <header class="page-head">
-      <nav class="crumbs"><a href={link.roadmaps()}>Library</a><span class="sep">/</span><span>Course</span></nav>
+      <nav class="crumbs"><a href={link.roadmaps()}>Courses</a><span class="sep">/</span><span>Course</span></nav>
       <h1 class="page-title">{roadmap.title}</h1>
       <p class="page-lede">{roadmap.goal}</p>
       <div class="head-actions">
