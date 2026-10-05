@@ -52,7 +52,11 @@ export const actions = {
   /** Continue a topic's lesson; what he typed, if anything, goes along as his first words. */
   continueTopic(slug: string, said = '') {
     const words = oneLine(said) ? ` I said: "${oneLine(said)}"` : '';
-    go(`/teach continue ${slug}.${words}`, `Use the teach skill to continue the topic ${slug} where I left off.${words}`, `Continuing ${feed.topics[slug]?.title ?? slug}`);
+    go(
+      `/teach continue ${slug}.${words}`,
+      `Use the teach skill to continue the topic ${slug} where I left off.${words}`,
+      `Continuing ${feed.topics[slug]?.title ?? slug}`,
+    );
   },
   train(slug: string) {
     go(`/train ${slug}`, `Use the train skill: a training set on the topic ${slug}.`, `Training: ${feed.topics[slug]?.title ?? slug}`);
@@ -71,7 +75,12 @@ export const actions = {
     go(`/praxis topic ${slug}`, `Use the praxis skill: design a mission for the topic ${slug}.`, 'A Praxis mission', true);
   },
   capstone(roadmap: Roadmap) {
-    go(`/praxis capstone ${roadmap.slug}`, `Use the praxis skill: design the capstone mission for my roadmap ${roadmap.slug}.`, `The capstone of ${roadmap.title}`, true);
+    go(
+      `/praxis capstone ${roadmap.slug}`,
+      `Use the praxis skill: design the capstone mission for my roadmap ${roadmap.slug}.`,
+      `The capstone of ${roadmap.title}`,
+      true,
+    );
   },
   reviewMission(id: string) {
     go(`/praxis review ${id}`, `Use the praxis skill: review my debrief of the mission ${id}.`, 'Reviewing a mission', true);

@@ -1,4 +1,5 @@
 <script lang="ts">
+  // One piece of teaching from `show` (orientation, step, plan, summary, feedback or note), labelled and rendered.
   import type { BlockItem } from '../../../shared/types.ts';
   import Markdown from './Markdown.svelte';
 

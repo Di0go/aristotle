@@ -1,4 +1,5 @@
 <script lang="ts">
+  // The log: every session, grouped by day, each linking to its full record.
   import { feed } from '../lib/feed.svelte.ts';
   import { link } from '../lib/router.svelte.ts';
   import { formatDay, formatTime, plural } from '../lib/format.ts';

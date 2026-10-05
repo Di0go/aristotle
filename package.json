@@ -3,14 +3,25 @@
   "private": true,
   "type": "module",
   "description": "A personal tutor: Claude Code teaches, this app is where you learn.",
+  "engines": {
+    "node": ">=24"
+  },
   "scripts": {
-    "start": "vite build && node server/control.ts restart",
+    "dev": "node scripts/dev.ts",
+    "dev:snapshot": "node scripts/dev.ts snapshot",
+    "seed": "node scripts/seed.ts",
+    "start": "node server/control.ts restart --build",
     "app": "node server/control.ts",
     "serve": "node server/index.ts",
-    "dev": "node --watch server/index.ts & vite; kill %1",
     "build": "vite build",
     "check": "svelte-check --tsconfig ./tsconfig.json --fail-on-warnings",
-    "test": "node --test 'tests/*.test.ts'"
+    "lint": "biome check .",
+    "format": "biome check --write .",
+    "test": "node --test 'tests/*.test.ts'",
+    "docs": "node scripts/docs.ts",
+    "gates": "node scripts/gates.ts",
+    "release": "node scripts/release.ts",
+    "prepare": "git config core.hooksPath .githooks || true"
   },
   "packageManager": "pnpm@10.34.5",
   "dependencies": {
@@ -30,6 +41,7 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.5.15",
     "@sveltejs/vite-plugin-svelte": "^7.3.1",
     "@types/dompurify": "^3.2.0",
     "@types/node": "^26.6.4",

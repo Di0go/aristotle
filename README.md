@@ -147,9 +147,9 @@ Then Aristotle lives at **https://aristotle.test**. The certificate authority is
 |---|---|
 | `pnpm start` | Build the interface and (re)start the server |
 | `pnpm app status` · `start` · `stop` · `restart` | Control the server (through systemd when the service is installed) |
-| `pnpm dev` | The server plus the Vite dev server, with reload |
-| `pnpm check` | Type-check everything |
-| `pnpm test` | End-to-end tests: a real server, a real MCP client, real HTTP answers |
+| `pnpm dev` | A separate dev instance with demo data, reloaded as you edit ([make it yours](#make-it-yours)) |
+| `pnpm release` | Ship what you committed to the app you learn in, with a rollback |
+| `pnpm gates` | Every check: docs, lint, types, end-to-end tests, build |
 
 ### In Claude Code
 
@@ -204,24 +204,23 @@ git push -u origin main
 cd .. && pnpm app restart
 ```
 
-To pause it, start the server with `DATA_BACKUP=off`. To stop backing up to the remote, `git -C data remote remove origin`. Your files keep working either way; Git only adds their history.
+To pause it, start the server with `ARISTOTLE_BACKUP=off`. To stop backing up to the remote, `git -C data remote remove origin`. Your files keep working either way; Git only adds their history.
 
-<details>
-<summary><b>Project layout</b></summary>
+## Make it yours
 
-<br>
+Aristotle is meant to change as you use it. `pnpm dev` runs a second instance beside the one you learn in, with its own port and a demo library, so you can try a change without touching your lessons. `pnpm release` ships it to your real app once it passes every check, and `pnpm release --rollback` undoes it. Open Claude Code in the project and ask for what you want: the repository tells it how.
 
 ```
 server/      Node HTTP server, run directly as TypeScript: MCP tools, feed, maps, reviews, missions, search
 ui/          Svelte 5 + Vite interface: pages, the visual kit, explorables, charts
 shared/      types shared by both
 .claude/     the skills and subagents that make up the method
-scripts/     the optional login service, certificate and hostname setup
-tests/       end-to-end tests
-docs/        images for this page
+scripts/     dev instance, seed data, gates, release, docs, the login service and hostname setup
+tests/       end-to-end tests, and the tests that keep the docs true
+docs/        how it is built and how to change it
 ```
 
-</details>
+Start at [docs/README.md](docs/README.md) and [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Credits
 

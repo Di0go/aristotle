@@ -1,3 +1,5 @@
+// The interface's entry point: fonts and stylesheets, then the app mounted on the page.
+
 import 'katex/dist/katex.min.css';
 import '@fontsource-variable/jetbrains-mono/wght.css';
 import '@fontsource-variable/jetbrains-mono/wght-italic.css';

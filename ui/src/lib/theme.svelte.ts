@@ -15,7 +15,7 @@ const KEY = 'mind-gym.look';
 
 const isAccent = (v: unknown): v is Accent => ACCENTS.some((a) => a.id === v);
 
-/** Blue, unless this install chose another in .gym/settings.json (the server writes it on <html>). */
+/** Blue, unless this install chose another in .aristotle/settings.json (the server writes it on <html>). */
 const DEFAULT_ACCENT: Accent = isAccent(document.documentElement.dataset.accent) ? document.documentElement.dataset.accent : 'blue';
 
 function read(): { mode: Mode; accent: Accent } {

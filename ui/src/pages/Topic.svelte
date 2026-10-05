@@ -1,4 +1,5 @@
 <script lang="ts">
+  // A topic's page: its knowledge map as a graph, the concept panel, the outline and its sessions.
   import { feed } from '../lib/feed.svelte.ts';
   import { link } from '../lib/router.svelte.ts';
   import { ago, formatDay, formatTime, plural } from '../lib/format.ts';

@@ -70,7 +70,15 @@ export async function findImages(query: string, limit = 8): Promise<{ images: Fo
   let rejected = 0;
   for (const p of pages) {
     const info = p.imageinfo?.[0] as
-      | { thumburl?: string; url?: string; descriptionurl?: string; thumbwidth?: number; thumbheight?: number; mime?: string; extmetadata?: Record<string, Meta> }
+      | {
+          thumburl?: string;
+          url?: string;
+          descriptionurl?: string;
+          thumbwidth?: number;
+          thumbheight?: number;
+          mime?: string;
+          extmetadata?: Record<string, Meta>;
+        }
       | undefined;
     if (!info || !/^image\/(jpeg|png|svg\+xml|gif|webp)$/.test(info.mime ?? '')) continue;
     const m = info.extmetadata ?? {};
@@ -126,10 +134,15 @@ export async function viewImage(src: string, width = 0, height = 0): Promise<Buf
     <g stroke="#ff2d55" stroke-opacity="0.55" stroke-width="1" fill="#ff2d55" font-family="sans-serif" font-size="12" font-weight="700">${lines.join('')}</g>
   </svg>`;
   return new Promise((resolve, reject) => {
-    const child = execFile('rsvg-convert', ['--format', 'png'], { encoding: 'buffer', maxBuffer: 40 * 1024 * 1024, timeout: 20_000 }, (err, stdout, stderr) => {
-      if (err) reject(new Error(String(stderr || err.message).trim()));
-      else resolve(stdout);
-    });
+    const child = execFile(
+      'rsvg-convert',
+      ['--format', 'png'],
+      { encoding: 'buffer', maxBuffer: 40 * 1024 * 1024, timeout: 20_000 },
+      (err, stdout, stderr) => {
+        if (err) reject(new Error(String(stderr || err.message).trim()));
+        else resolve(stdout);
+      },
+    );
     child.stdin?.end(svg);
   });
 }

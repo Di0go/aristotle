@@ -53,8 +53,7 @@ export const link = {
   roadmaps: () => '#/roadmaps',
   roadmap: (slug: string) => `#/roadmaps/${encodeURIComponent(slug)}`,
   topics: () => '#/topics',
-  topic: (slug: string, concept?: string) =>
-    `#/topics/${encodeURIComponent(slug)}${concept ? `?c=${encodeURIComponent(concept)}` : ''}`,
+  topic: (slug: string, concept?: string) => `#/topics/${encodeURIComponent(slug)}${concept ? `?c=${encodeURIComponent(concept)}` : ''}`,
   /** The class itself: every step so far, readable without starting anything. */
   lesson: (slug: string) => `#/lesson/${encodeURIComponent(slug)}`,
   log: () => '#/log',

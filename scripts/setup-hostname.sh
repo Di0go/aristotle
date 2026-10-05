@@ -6,21 +6,21 @@
 #   2. /etc/aristotle.nft redirects 127.0.0.82:80 to Aristotle on 127.0.0.1:4747, and :443 to its HTTPS on :4748.
 #   3. aristotle-nome.service loads that rule at boot.
 #   4. Aristotle's certificate authority (from scripts/tls.sh, limited to aristotle.test) goes into the system
-#      trust store (p11-kit), which Firefox and Chromium read. Then .gym/tls/installed tells the server
+#      trust store (p11-kit), which Firefox and Chromium read. Then .aristotle/tls/installed tells the server
 #      to send http://aristotle.test to https.
 # It also takes out what the app had when it was the Mind Gym on gym.test: its hosts line, its nftables
-# rule and unit, and its old authority (left by tls.sh as .gym/tls/retired-ca.crt).
+# rule and unit, and its old authority (left by tls.sh as .aristotle/tls/retired-ca.crt).
 #
 # Run scripts/tls.sh first (as yourself), then as root:
 #   pkexec bash /home/diogo/Projects/Learn/scripts/setup-hostname.sh
 # Safe to run again.
 # To undo: systemctl disable --now aristotle-nome.service, delete /etc/aristotle.nft and the unit,
-# remove the aristotle.test lines from /etc/hosts, trust anchor --remove .gym/tls/ca.crt, and delete .gym/tls.
+# remove the aristotle.test lines from /etc/hosts, trust anchor --remove .aristotle/tls/ca.crt, and delete .aristotle/tls.
 set -euo pipefail
 
 NAME=aristotle.test
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
-TLS=$ROOT/.gym/tls
+TLS=$ROOT/.aristotle/tls
 
 if [[ $EUID -ne 0 ]]; then
   echo "Run as root: pkexec bash $0" >&2

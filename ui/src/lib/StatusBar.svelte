@@ -1,4 +1,5 @@
 <script lang="ts">
+  // A thin bar of solid, shaky and not-yet counts (and fading), with an optional legend.
   import type { ConceptStatus } from '../../../shared/types.ts';
 
   let {

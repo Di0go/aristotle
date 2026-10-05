@@ -162,7 +162,10 @@ export class Gym {
       if (res.change) changes.set(topic.slug, [...(changes.get(topic.slug) ?? []), res.change]);
       if (r.kind === 'problem' && difficulty) problems.set(topic.slug, [...(problems.get(topic.slug) ?? []), r.outcome]);
       const before = res.recallBefore === undefined ? '' : `, recall was ~${Math.round(res.recallBefore * 100)}%`;
-      const next = res.concept.review && res.concept.status === 'solid' ? `next review ${res.concept.review.due.slice(0, 10)}` : 'not scheduled (not solid)';
+      const next =
+        res.concept.review && res.concept.status === 'solid'
+          ? `next review ${res.concept.review.due.slice(0, 10)}`
+          : 'not scheduled (not solid)';
       lines.push(`${topic.slug}/${concept.id}: ${r.outcome}${before}; ${res.change ? 'now shaky; ' : ''}${next}`);
     }
 
@@ -299,7 +302,10 @@ export class Gym {
       byDay.set(localDay(c.at), [...status.values()].filter((s) => s === 'solid').length);
     }
     // The maps are the truth for today, including any change made outside a session.
-    byDay.set(localDay(new Date().toISOString()), this.topics.all().reduce((n, t) => n + t.concepts.filter((c) => c.status === 'solid').length, 0));
+    byDay.set(
+      localDay(new Date().toISOString()),
+      this.topics.all().reduce((n, t) => n + t.concepts.filter((c) => c.status === 'solid').length, 0),
+    );
     const solid = [...byDay].sort(([a], [b]) => a.localeCompare(b)).map(([day, count]) => ({ day, count }));
 
     // Answers per week, from the evidence on every concept.

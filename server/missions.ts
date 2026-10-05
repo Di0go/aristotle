@@ -48,7 +48,10 @@ export class Missions {
   /** The missions of a roadmap step (by topic) or of a whole roadmap (its capstone). */
   of(where: { topic?: string; roadmap?: string; scope?: MissionScope }): Mission[] {
     return this.all().filter(
-      (m) => (!where.topic || m.topic === where.topic) && (!where.roadmap || m.roadmap === where.roadmap) && (!where.scope || m.scope === where.scope),
+      (m) =>
+        (!where.topic || m.topic === where.topic) &&
+        (!where.roadmap || m.roadmap === where.roadmap) &&
+        (!where.scope || m.scope === where.scope),
     );
   }
 
@@ -124,7 +127,7 @@ export class Missions {
     const previous = this.saving.get(mission.id) ?? Promise.resolve();
     const next = previous.then(async () => {
       const tmp = `${file}.tmp`;
-      await writeFile(tmp, JSON.stringify(mission, null, 2) + '\n');
+      await writeFile(tmp, `${JSON.stringify(mission, null, 2)}\n`);
       await rename(tmp, file);
     });
     this.saving.set(mission.id, next);

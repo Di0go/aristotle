@@ -1,13 +1,13 @@
 // Versions data/ in its own Git repository, kept apart from the code so his learning history never
 // lands in the app's repo. Once activity has been quiet for a while (or a session ends), commit whatever
 // changed; if that repository has a remote (one he set up, private), push it too.
-// Off when data/ isn't a Git repository, or with DATA_BACKUP=off. Setup: README, "Your data".
+// Off when data/ isn't a Git repository, in dev, or with ARISTOTLE_BACKUP=off. Setup: README, "Your data".
 
 import { execFile } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { promisify } from 'node:util';
-import { DATA_DIR } from './config.ts';
+import { BACKUP, DATA_DIR } from './config.ts';
 
 const run = promisify(execFile);
 const git = (...args: string[]) => run('git', args, { cwd: DATA_DIR, timeout: 60_000 });
@@ -30,8 +30,7 @@ export class Backup {
   private status: BackupStatus;
 
   constructor() {
-    this.enabled =
-      process.env.DATA_BACKUP !== 'off' && existsSync(path.join(DATA_DIR, '.git'));
+    this.enabled = BACKUP && existsSync(path.join(DATA_DIR, '.git'));
     this.status = { enabled: this.enabled, pending: false };
   }
 

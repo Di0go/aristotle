@@ -14,5 +14,5 @@
     "skipLibCheck": true,
     "resolveJsonModule": true
   },
-  "include": ["shared/**/*.ts", "server/**/*.ts", "ui/src/**/*.ts", "ui/src/**/*.svelte", "tests/**/*.ts"]
+  "include": ["shared/**/*.ts", "server/**/*.ts", "ui/src/**/*.ts", "ui/src/**/*.svelte", "tests/**/*.ts", "scripts/**/*.ts", "*.ts"]
 }

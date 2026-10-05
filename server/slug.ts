@@ -1,3 +1,5 @@
+// Turns titles into the stable kebab-case ids used for topics, roadmaps, missions and file names.
+
 export function slugify(s: string): string {
   return (
     s

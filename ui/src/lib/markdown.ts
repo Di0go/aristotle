@@ -85,7 +85,7 @@ const conceptLink: TokenizerAndRendererExtension = {
     return i === -1 ? undefined : i;
   },
   tokenizer(src) {
-    const m = /^\[\[([^\[\]|]+?)(?:\|([^\[\]]+?))?\]\]/.exec(src);
+    const m = /^\[\[([^[\]|]+?)(?:\|([^[\]]+?))?\]\]/.exec(src);
     if (m) return { type: 'conceptLink', raw: m[0], ref: m[1].trim(), label: (m[2] ?? '').trim() };
   },
   renderer(token) {
@@ -100,8 +100,27 @@ const ANIMATION_TAGS = ['animate', 'animateTransform', 'animateMotion', 'set', '
 /** Elements that point at another element by href: allowed only to point inside the same drawing. */
 const REFERENCING = ['use', 'mpath'];
 const ANIMATION_ATTRS = [
-  'attributeName', 'attributeType', 'begin', 'dur', 'end', 'repeatCount', 'repeatDur', 'values', 'keyTimes',
-  'keySplines', 'calcMode', 'from', 'to', 'by', 'additive', 'accumulate', 'restart', 'path', 'rotate', 'keyPoints', 'type',
+  'attributeName',
+  'attributeType',
+  'begin',
+  'dur',
+  'end',
+  'repeatCount',
+  'repeatDur',
+  'values',
+  'keyTimes',
+  'keySplines',
+  'calcMode',
+  'from',
+  'to',
+  'by',
+  'additive',
+  'accumulate',
+  'restart',
+  'path',
+  'rotate',
+  'keyPoints',
+  'type',
 ];
 
 // <use> and <mpath> may only reference something in the page ("#id"), never an outside file.
@@ -123,7 +142,10 @@ DOMPurify.addHook('uponSanitizeAttribute', (node, data) => {
 const CALLOUTS: Record<string, { label: string; icon: string }> = {
   idea: { label: 'The idea', icon: '<circle cx="8" cy="7" r="4.5"/><path d="M6 13h4M6.5 15h3"/>' },
   key: { label: 'Key point', icon: '<path d="M2 8h8M10 8l-3-3M10 8l-3 3"/><circle cx="12.5" cy="8" r="1.5"/>' },
-  why: { label: 'Why this matters', icon: '<circle cx="8" cy="8" r="6"/><path d="M6.3 6.2a1.8 1.8 0 1 1 2.4 1.7c-.5.2-.7.6-.7 1.1M8 11.4v.2"/>' },
+  why: {
+    label: 'Why this matters',
+    icon: '<circle cx="8" cy="8" r="6"/><path d="M6.3 6.2a1.8 1.8 0 1 1 2.4 1.7c-.5.2-.7.6-.7 1.1M8 11.4v.2"/>',
+  },
   context: { label: 'Where we are', icon: '<circle cx="8" cy="8" r="6"/><circle cx="8" cy="8" r="2"/>' },
   example: { label: 'Example', icon: '<path d="M3 13l3-8 3 5 2-3 2 6"/>' },
   you: { label: 'In your world', icon: '<circle cx="8" cy="5.5" r="2.5"/><path d="M3.5 14c.6-2.6 2.3-4 4.5-4s3.9 1.4 4.5 4"/>' },
@@ -131,7 +153,15 @@ const CALLOUTS: Record<string, { label: string; icon: string }> = {
   term: { label: 'Term', icon: '<path d="M3 3h10M8 3v10"/>' },
   note: { label: 'Note', icon: '<path d="M3 2.5h7l3 3v8H3z"/><path d="M5.5 7h5M5.5 9.5h5"/>' },
 };
-const ALIASES: Record<string, string> = { tip: 'idea', important: 'key', warning: 'careful', caution: 'careful', info: 'note', definition: 'term', question: 'why' };
+const ALIASES: Record<string, string> = {
+  tip: 'idea',
+  important: 'key',
+  warning: 'careful',
+  caution: 'careful',
+  info: 'note',
+  definition: 'term',
+  question: 'why',
+};
 
 let drawings = 0;
 
@@ -150,7 +180,9 @@ function scopeIds(root: DocumentFragment) {
       el.id = prefix + el.id;
     }
     const swap = (v: string) =>
-      v.replace(/^#(.+)$/, (m, id) => (names.has(id) ? `#${prefix}${id}` : m)).replace(/url\(#([^)]+)\)/g, (m, id) => (names.has(id) ? `url(#${prefix}${id})` : m));
+      v
+        .replace(/^#(.+)$/, (m, id) => (names.has(id) ? `#${prefix}${id}` : m))
+        .replace(/url\(#([^)]+)\)/g, (m, id) => (names.has(id) ? `url(#${prefix}${id})` : m));
     for (const el of svg.querySelectorAll('*')) {
       for (const attr of [...el.attributes]) {
         if (attr.value.includes('#')) el.setAttribute(attr.name, swap(attr.value));

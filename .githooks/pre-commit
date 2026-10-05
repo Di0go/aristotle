@@ -1,0 +1,8 @@
+#!/usr/bin/env sh
+# The fast gates on every commit (~5 s): generated docs, lint and format, types. Regenerates the docs'
+# reference blocks first and adds them to the commit, so they never fall behind the code.
+# Installed by `pnpm install` (core.hooksPath). `git commit --no-verify` skips it; the pre-push hook still runs.
+set -eu
+git diff --cached --quiet && exit 0
+node scripts/docs.ts --stage
+pnpm gates --quick

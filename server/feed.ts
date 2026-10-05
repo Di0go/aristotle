@@ -178,7 +178,7 @@ export class Feed {
     applyOp(this.record, op);
     const file = this.file;
     if (!file) throw new Error('No session file');
-    this.writing = this.writing.then(() => appendFile(file, JSON.stringify(op) + '\n'));
+    this.writing = this.writing.then(() => appendFile(file, `${JSON.stringify(op)}\n`));
     await this.writing;
   }
 
@@ -219,7 +219,7 @@ export class Feed {
 
   async answerQuiz(id: string, picks: { choice: number | null; note?: string }[]): Promise<QuizItem> {
     const item = findInteractive(this.items, id);
-    if (!item || item.type !== 'quiz') throw new AnswerError('No such quiz');
+    if (item?.type !== 'quiz') throw new AnswerError('No such quiz');
     if (item.answeredAt) throw new AnswerError('Already answered');
     if (picks.length !== item.questions.length) throw new AnswerError('One pick per question');
     const responses = item.questions.map((q, i): QuizResponse => {
@@ -237,7 +237,7 @@ export class Feed {
 
   async answerAsk(id: string, text: string): Promise<AskItem> {
     const item = findInteractive(this.items, id);
-    if (!item || item.type !== 'ask') throw new AnswerError('No such question');
+    if (item?.type !== 'ask') throw new AnswerError('No such question');
     if (item.answeredAt) throw new AnswerError('Already answered');
     if (!text.trim()) throw new AnswerError('Empty answer');
     await this.commit({ op: 'answer', id, at: new Date().toISOString(), response: text });

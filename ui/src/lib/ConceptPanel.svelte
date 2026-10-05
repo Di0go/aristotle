@@ -1,4 +1,5 @@
 <script lang="ts">
+  // The side panel for one concept on a map: status, what it rests on and leads to, notes, and its check record.
   import { isFading, type Concept, type Evidence, type Topic } from '../../../shared/types.ts';
   import { feed } from './feed.svelte.ts';
   import { formatDay, formatTime, onDay } from './format.ts';

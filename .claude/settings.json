@@ -1,6 +1,20 @@
 {
   "enabledMcpjsonServers": ["aristotle"],
+  "disabledMcpjsonServers": ["aristotle-dev"],
   "permissions": {
     "allow": ["mcp__aristotle", "WebSearch", "WebFetch"]
+  },
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR\"/scripts/claude-stop-hook.ts",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
   }
 }

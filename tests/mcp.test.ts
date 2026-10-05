@@ -12,7 +12,18 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import WebSocket from 'ws';
 import { allowed } from '../server/images.ts';
-import type { FeedState, Mission, Progress, PublicItem, ReviewQueue, Roadmap, SearchHit, SessionSummary, Topic, TopicSummary } from '../shared/types.ts';
+import type {
+  FeedState,
+  Mission,
+  Progress,
+  PublicItem,
+  ReviewQueue,
+  Roadmap,
+  SearchHit,
+  SessionSummary,
+  Topic,
+  TopicSummary,
+} from '../shared/types.ts';
 
 const PORT = 4799;
 const TLS_PORT = 4798;
@@ -26,12 +37,12 @@ async function startServer() {
   server = spawn('node', ['server/index.ts'], {
     env: {
       ...process.env,
-      GYM_PORT: String(PORT),
-      GYM_DATA_DIR: dataDir,
-      GYM_TLS_DIR: tlsDir,
-      GYM_TLS_PORT: String(TLS_PORT),
-      GYM_WAIT_MS: '1500',
-      GYM_CLAUDE_CMD: 'bash --norc --noprofile',
+      ARISTOTLE_PORT: String(PORT),
+      ARISTOTLE_DATA_DIR: dataDir,
+      ARISTOTLE_TLS_DIR: tlsDir,
+      ARISTOTLE_TLS_PORT: String(TLS_PORT),
+      ARISTOTLE_WAIT_MS: '1500',
+      ARISTOTLE_CLAUDE_CMD: 'bash --norc --noprofile',
       PS1: '$ ',
     },
     stdio: 'inherit',
@@ -49,7 +60,7 @@ before(async () => {
   dataDir = await mkdtemp(path.join(tmpdir(), 'aristotle-test-'));
   // A certificate from the real script, marked as trusted the way setup-hostname.sh does.
   tlsDir = await mkdtemp(path.join(tmpdir(), 'aristotle-tls-'));
-  assert.equal(spawnSync('bash', ['scripts/tls.sh'], { env: { ...process.env, GYM_TLS_DIR: tlsDir }, stdio: 'ignore' }).status, 0);
+  assert.equal(spawnSync('bash', ['scripts/tls.sh'], { env: { ...process.env, ARISTOTLE_TLS_DIR: tlsDir }, stdio: 'ignore' }).status, 0);
   await writeFile(path.join(tlsDir, 'installed'), '');
   await startServer();
   client = new Client({ name: 'test', version: '0' });
@@ -139,7 +150,13 @@ test('a session builds a map, records evidence and leaves a handoff', async () =
 
   const quiz = call('quiz', {
     questions: [
-      { question: 'What is $(3dx - 2dy)(1, 2)$?', options: ['-1', '7', '3'], correct: 0, explanation: '3·1 − 2·2 = −1', concept: 'covector' },
+      {
+        question: 'What is $(3dx - 2dy)(1, 2)$?',
+        options: ['-1', '7', '3'],
+        correct: 0,
+        explanation: '3·1 − 2·2 = −1',
+        concept: 'covector',
+      },
       { question: 'Is a covector linear?', options: ['Yes', 'No'], correct: 0, explanation: 'By definition.', concept: 'nowhere' },
     ],
   });
@@ -173,7 +190,10 @@ test('a session builds a map, records evidence and leaves a handoff', async () =
   const covector = topic.concepts.find((c) => c.id === 'covector')!;
   assert.equal(covector.status, 'solid');
   assert.ok(covector.solidSince);
-  assert.deepEqual(covector.evidence.map((e) => e.result), ['right']);
+  assert.deepEqual(
+    covector.evidence.map((e) => e.result),
+    ['right'],
+  );
   assert.equal(topic.concepts.find((c) => c.id === 'one-form')!.evidence[0].kind, 'ask');
 
   const state = await get<FeedState>('/api/state');
@@ -277,15 +297,14 @@ test('solid concepts get a review schedule; practice moves it and the training l
   const feedTypes = (await get<FeedState>('/api/state')).items.map((i) => i.type);
   assert.equal(feedTypes.at(-1), 'map');
 
-  const level = textOf(
-    await call('record_practice', { results: [{ concept: 'b', outcome: 'right', kind: 'problem' }], difficulty: 1 }),
-  );
+  const level = textOf(await call('record_practice', { results: [{ concept: 'b', outcome: 'right', kind: 'problem' }], difficulty: 1 }));
   assert.match(level, /Training level for spaced: 1 → 2\/10/);
-  const miss = textOf(
-    await call('record_practice', { results: [{ concept: 'b', outcome: 'wrong', kind: 'problem' }], difficulty: 2 }),
-  );
+  const miss = textOf(await call('record_practice', { results: [{ concept: 'b', outcome: 'wrong', kind: 'problem' }], difficulty: 2 }));
   assert.match(miss, /Training level for spaced: 2 → 1\/10/);
-  assert.match(textOf(await call('record_practice', { results: [{ concept: 'nope', outcome: 'right', kind: 'recall' }] })), /no such concept/);
+  assert.match(
+    textOf(await call('record_practice', { results: [{ concept: 'nope', outcome: 'right', kind: 'recall' }] })),
+    /no such concept/,
+  );
 
   // Becoming solid again counts as a successful review on the same card.
   await call('update_map', { concepts: [{ id: 'a', status: 'solid' }] });
@@ -316,11 +335,17 @@ test('a concept past its review date is fading, and a review session practises i
   const open = await waitForPending('ask');
   await answer({ id: open.id, text: 'A is A.' });
   await ask;
-  assert.match(textOf(await call('record_practice', { results: [{ concept: 'spaced/a', outcome: 'right', kind: 'recall' }] })), /spaced\/a: right/);
+  assert.match(
+    textOf(await call('record_practice', { results: [{ concept: 'spaced/a', outcome: 'right', kind: 'recall' }] })),
+    /spaced\/a: right/,
+  );
 
   const queue = await get<ReviewQueue>('/api/reviews');
   assert.equal(queue.fading.length, 0);
-  assert.deepEqual(queue.practised.map((p) => `${p.topic}/${p.id}:${p.result}`), ['spaced/a:right']);
+  assert.deepEqual(
+    queue.practised.map((p) => `${p.topic}/${p.id}:${p.result}`),
+    ['spaced/a:right'],
+  );
   const evidence = (await get<Topic>('/api/topics/spaced')).concepts.find((c) => c.id === 'a')!.evidence;
   assert.equal(evidence.at(-2)?.kind, 'ask', 'the written answer is recorded on the concept in the other topic');
 
@@ -368,7 +393,11 @@ test('the terminal runs the command, takes messages, and only opens to Aristotle
   await until(() => messages.some((m) => m.type === 'state' && m.running));
 
   ws.send(JSON.stringify({ type: 'send', text: 'echo gym-$((40+2)) $COLUMNS' }));
-  const output = () => messages.filter((m) => m.type === 'output').map((m) => m.data).join('');
+  const output = () =>
+    messages
+      .filter((m) => m.type === 'output')
+      .map((m) => m.data)
+      .join('');
   await until(() => /gym-42 120/.test(output()));
 
   // A second window catches up on what is already on screen.
@@ -382,7 +411,8 @@ test('the terminal runs the command, takes messages, and only opens to Aristotle
 });
 
 test('preview_svg renders an SVG to a PNG in either theme', async () => {
-  const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 40"><line x1="10" y1="20" x2="110" y2="20" stroke="currentColor"/><text x="10" y="15" fill="currentColor">v</text></svg>';
+  const svg =
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 40"><line x1="10" y1="20" x2="110" y2="20" stroke="currentColor"/><text x="10" y="15" fill="currentColor">v</text></svg>';
   for (const dark of [false, true]) {
     const res = await call('preview_svg', { svg, dark });
     const [image] = res.content as { type: string; data: string; mimeType: string }[];
@@ -398,10 +428,20 @@ test('preview_svg renders an SVG to a PNG in either theme', async () => {
 test('run starts the command with the request as its first message, or types it in when running', async () => {
   const { ws, messages } = await openTerminal(BASE);
   await until(() => messages.some((m) => m.type === 'state'));
-  const output = () => messages.filter((m) => m.type === 'output').map((m) => m.data).join('');
+  const output = () =>
+    messages
+      .filter((m) => m.type === 'output')
+      .map((m) => m.data)
+      .join('');
 
   // Not running: the request becomes an argument. Bash takes it as a script path, which shows it arrived intact.
-  ws.send(JSON.stringify({ type: 'run', text: '/teach the french revolution', initial: 'Use the teach skill to teach me: the french revolution' }));
+  ws.send(
+    JSON.stringify({
+      type: 'run',
+      text: '/teach the french revolution',
+      initial: 'Use the teach skill to teach me: the french revolution',
+    }),
+  );
   await until(() => /bash: Use the teach skill to teach me: the french revolution: /.test(output()));
   await until(() => messages.some((m) => m.type === 'exit'));
 
@@ -432,7 +472,7 @@ test('aristotle.test is served over https with its own certificate, and its page
   const ca = await readFile(path.join(tlsDir, 'ca.crt'));
   const page = await requestName(true, '/topics', ca);
   assert.equal(page.status, 200);
-  assert.deepEqual(JSON.parse((await requestName(true, '/api/health', ca)).body), { ok: true });
+  assert.equal(JSON.parse((await requestName(true, '/api/health', ca)).body).ok, true);
   await assert.rejects(requestName(true, '/', undefined), /self-signed|unable to (get|verify)/, 'only its own authority vouches for it');
 
   assert.deepEqual(await requestName(false, '/topics?x=1', ca), { status: 307, location: 'https://aristotle.test/topics?x=1', body: '' });
@@ -440,7 +480,12 @@ test('aristotle.test is served over https with its own certificate, and its page
   assert.equal((await fetch(`${BASE}/`)).status, 200, 'localhost stays on http');
 
   // ws hands servername on to tls.connect, though its types leave it out.
-  const tlsOptions: WebSocket.ClientOptions = { ca, servername: 'aristotle.test', headers: { host: 'aristotle.test' }, origin: 'https://aristotle.test' } as WebSocket.ClientOptions;
+  const tlsOptions: WebSocket.ClientOptions = {
+    ca,
+    servername: 'aristotle.test',
+    headers: { host: 'aristotle.test' },
+    origin: 'https://aristotle.test',
+  } as WebSocket.ClientOptions;
   const ws = new WebSocket(`wss://127.0.0.1:${TLS_PORT}/api/terminal`, tlsOptions);
   await new Promise((resolve, reject) => ws.on('open', resolve).on('error', reject));
   ws.close();
@@ -461,11 +506,20 @@ test('a roadmap orders topics and reads its progress off their maps', async () =
   const [roadmap] = await get<Roadmap[]>('/api/roadmaps');
   assert.equal(roadmap.slug, 'geometry-path');
   assert.equal(roadmap.status, 'draft');
-  assert.deepEqual(roadmap.steps.map((s) => s.topic), ['differential-forms', 'stokes-theorem']);
+  assert.deepEqual(
+    roadmap.steps.map((s) => s.topic),
+    ['differential-forms', 'stokes-theorem'],
+  );
 
   // Revising replaces the steps and keeps the roadmap's identity.
   const revised = textOf(
-    await call('save_roadmap', { roadmap: 'geometry-path', title: 'Geometry path', goal: 'Read Maxwell in forms', status: 'active', steps: steps.reverse() }),
+    await call('save_roadmap', {
+      roadmap: 'geometry-path',
+      title: 'Geometry path',
+      goal: 'Read Maxwell in forms',
+      status: 'active',
+      steps: steps.reverse(),
+    }),
   );
   assert.match(revised, /Roadmap updated/);
   const after = await get<Roadmap>('/api/roadmaps/geometry-path');
@@ -493,7 +547,9 @@ test('images: only licences that allow reuse get through', () => {
 
 test('a question can carry the step that leads into it, in one call', async () => {
   await call('start_session', { topic: 'Differential forms', goal: 'One call per step' });
-  const res = textOf(await call('ask', { prompt: 'Why?', kind: 'explain', lead: { markdown: 'Here is the step.', title: 'The step', concept: 'vector' } }));
+  const res = textOf(
+    await call('ask', { prompt: 'Why?', kind: 'explain', lead: { markdown: 'Here is the step.', title: 'The step', concept: 'vector' } }),
+  );
   assert.match(res, /No answer yet/);
   const items = (await get<FeedState>('/api/state')).items;
   const [step, ask] = items.slice(-2);
@@ -520,22 +576,36 @@ test('a Praxis mission is set, debriefed in the interface, and reviewed into pra
   const saved = textOf(await call('save_mission', mission));
   assert.match(saved, /Mission created .*#\/praxis\/rewrite-the-field-equations-in-forms/);
   assert.match(saved, /Not on any map: differential-forms\/nope/);
-  assert.match(textOf(await call('get_roadmap', { roadmap: 'geometry-path' })), /Praxis missions:\n- rewrite-the-field-equations-in-forms: .*\[open\]/);
+  assert.match(
+    textOf(await call('get_roadmap', { roadmap: 'geometry-path' })),
+    /Praxis missions:\n- rewrite-the-field-equations-in-forms: .*\[open\]/,
+  );
 
   // Nothing to review until he debriefs.
-  assert.equal((await call('review_mission', { mission: 'rewrite-the-field-equations-in-forms', verdict: 'achieved', critique: 'x' })).isError, true);
+  assert.equal(
+    (await call('review_mission', { mission: 'rewrite-the-field-equations-in-forms', verdict: 'achieved', critique: 'x' })).isError,
+    true,
+  );
   assert.equal((await post('rewrite-the-field-equations-in-forms', { action: 'debrief', text: '  ' })).status, 400);
-  const debriefed = (await (await post('rewrite-the-field-equations-in-forms', { action: 'debrief', text: 'Did both; dF = 0 and d*F = J.' })).json()) as Mission;
+  const debriefed = (await (
+    await post('rewrite-the-field-equations-in-forms', { action: 'debrief', text: 'Did both; dF = 0 and d*F = J.' })
+  ).json()) as Mission;
   assert.equal(debriefed.status, 'debriefed');
   assert.match(textOf(await call('list_missions', { status: 'debriefed' })), /rewrite-the-field-equations-in-forms/);
-  assert.match(textOf(await call('list_missions', { mission: 'rewrite-the-field-equations-in-forms' })), /His debrief .*\n.*dF = 0 and d\*F = J/);
+  assert.match(
+    textOf(await call('list_missions', { mission: 'rewrite-the-field-equations-in-forms' })),
+    /His debrief .*\n.*dF = 0 and d\*F = J/,
+  );
 
   const reviewed = textOf(
     await call('review_mission', {
       mission: 'rewrite-the-field-equations-in-forms',
       verdict: 'partly',
       critique: 'Sound on the first.',
-      results: [{ concept: 'vector', outcome: 'wrong' }, { concept: 'covector', outcome: 'right' }],
+      results: [
+        { concept: 'vector', outcome: 'wrong' },
+        { concept: 'covector', outcome: 'right' },
+      ],
     }),
   );
   assert.match(reviewed, /Reviewed \(partly\)/);

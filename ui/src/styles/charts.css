@@ -1,3 +1,5 @@
+/* Charts on the Progress page: cards, axes, bars and their tables (ui/src/lib/charts). */
+
 .chart-pair {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(420px, 100%), 1fr));

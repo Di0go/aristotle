@@ -6,10 +6,7 @@ import path from 'node:path';
 import pty from 'node-pty';
 import type { IPty } from 'node-pty';
 import type { WebSocket } from 'ws';
-import { ROOT } from './config.ts';
-
-/** The command to run; tests swap in a shell. */
-const COMMAND = process.env.GYM_CLAUDE_CMD ?? 'claude';
+import { CLAUDE_CMD as COMMAND, ROOT } from './config.ts';
 /** Output kept for clients that connect later, so the drawer shows the whole recent screen. */
 const BUFFER_LIMIT = 256 * 1024;
 
@@ -120,8 +117,7 @@ export class Terminal {
       else if (msg.type === 'send' && typeof msg.text === 'string') this.send(msg.text);
       else if (msg.type === 'run' && typeof msg.text === 'string') {
         this.run(msg.text, typeof msg.initial === 'string' ? msg.initial : undefined);
-      }
-      else if (msg.type === 'resize') this.resize(msg.cols, msg.rows);
+      } else if (msg.type === 'resize') this.resize(msg.cols, msg.rows);
     });
     ws.on('close', () => this.clients.delete(ws));
   }

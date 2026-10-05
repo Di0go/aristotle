@@ -4,11 +4,7 @@ import { execFile } from 'node:child_process';
 import { randomInt } from 'node:crypto';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
-import type {
-  CallToolResult,
-  ServerNotification,
-  ServerRequest,
-} from '@modelcontextprotocol/sdk/types.js';
+import type { CallToolResult, ServerNotification, ServerRequest } from '@modelcontextprotocol/sdk/types.js';
 import * as z from 'zod';
 import { KEEPALIVE_MS, URL_CLEAN, WAIT_MS } from './config.ts';
 import type { Gym } from './gym.ts';
@@ -16,7 +12,15 @@ import { describeMission, summarizeMission } from './missions.ts';
 import { describeRoadmap } from './roadmaps.ts';
 import { findImages, viewImage } from './images.ts';
 import { describeTopic } from './topics.ts';
-import { stepState, type AskItem, type FadingConcept, type MapChange, type QuizItem, type QuizQuestion, type TopicSummary } from '../shared/types.ts';
+import {
+  stepState,
+  type AskItem,
+  type FadingConcept,
+  type MapChange,
+  type QuizItem,
+  type QuizQuestion,
+  type TopicSummary,
+} from '../shared/types.ts';
 
 type Extra = RequestHandlerExtra<ServerRequest, ServerNotification>;
 
@@ -53,10 +57,7 @@ const STATUSES =
   'Statuses: "unknown" = he has not shown he holds it; "shaky" = partly (needed help, inconsistent, or holds a misconception: say which in `note`); ' +
   '"solid" = he got a check on it right without help, ideally by producing or applying it rather than recognising it.';
 
-const conceptParam = z
-  .string()
-  .optional()
-  .describe('Id of the map concept this is about; "topic/id" for a concept in another topic');
+const conceptParam = z.string().optional().describe('Id of the map concept this is about; "topic/id" for a concept in another topic');
 
 export function createMcpServer(gym: Gym): McpServer {
   const mcp = new McpServer(
@@ -93,7 +94,15 @@ export function createMcpServer(gym: Gym): McpServer {
     },
     async ({ topic }) => {
       const t = gym.topics.get(topic);
-      if (!t) return error(`No topic "${topic}". Topics: ${gym.topics.list().map((x) => x.slug).join(', ') || 'none'}.`);
+      if (!t)
+        return error(
+          `No topic "${topic}". Topics: ${
+            gym.topics
+              .list()
+              .map((x) => x.slug)
+              .join(', ') || 'none'
+          }.`,
+        );
       const sessions = (await gym.listSessions(t.slug)).slice(0, 5);
       const recent = sessions.map(
         (s) =>
@@ -130,14 +139,26 @@ export function createMcpServer(gym: Gym): McpServer {
     'get_roadmap',
     {
       title: 'Read a roadmap',
-      description: "Read a roadmap: its goal, and every step in order with its goal, why it comes there, and the state of the step's topic.",
+      description:
+        "Read a roadmap: its goal, and every step in order with its goal, why it comes there, and the state of the step's topic.",
       inputSchema: { roadmap: z.string().min(1).describe('Roadmap slug or title') },
     },
     async ({ roadmap }) => {
       const r = gym.roadmaps.get(roadmap);
-      if (!r) return error(`No roadmap "${roadmap}". Roadmaps: ${gym.roadmaps.all().map((x) => x.slug).join(', ') || 'none'}.`);
+      if (!r)
+        return error(
+          `No roadmap "${roadmap}". Roadmaps: ${
+            gym.roadmaps
+              .all()
+              .map((x) => x.slug)
+              .join(', ') || 'none'
+          }.`,
+        );
       const missions = gym.missions.of({ roadmap: r.slug });
-      return text(describeRoadmap(r, (slug) => gym.topics.get(slug)) + (missions.length ? `\n\nPraxis missions:\n${missions.map(summarizeMission).join('\n')}` : ''));
+      return text(
+        describeRoadmap(r, (slug) => gym.topics.get(slug)) +
+          (missions.length ? `\n\nPraxis missions:\n${missions.map(summarizeMission).join('\n')}` : ''),
+      );
     },
   );
 
@@ -149,7 +170,7 @@ export function createMcpServer(gym: Gym): McpServer {
         'Create a roadmap, or replace the steps of an existing one (pass its slug as `roadmap`): reordering, adding and dropping steps all go through here. ' +
         'Aristotle shows it on the Roadmaps page straight away, so he can read it there while you plan it together. ' +
         'Save it as "draft" while planning and as "active" only once he has approved it. ' +
-        'Each step becomes a topic named after its title, so keep a step\'s title stable once it has been started, ' +
+        "Each step becomes a topic named after its title, so keep a step's title stable once it has been started, " +
         'and pass `topic` to point a step at a topic that already exists under another name.',
       inputSchema: {
         roadmap: z.string().optional().describe('Slug of the roadmap to replace; omit to create one'),
@@ -172,7 +193,9 @@ export function createMcpServer(gym: Gym): McpServer {
     async ({ roadmap, title, goal, status, steps }) => {
       if (roadmap && !gym.roadmaps.get(roadmap)) return error(`No roadmap "${roadmap}" to replace; omit \`roadmap\` to create one.`);
       const { roadmap: r, created } = await gym.roadmaps.save({ title, goal, status, steps }, roadmap);
-      return text(`Roadmap ${created ? 'created' : 'updated'} (${URL_CLEAN}/#/roadmaps/${r.slug}):\n${describeRoadmap(r, (slug) => gym.topics.get(slug))}`);
+      return text(
+        `Roadmap ${created ? 'created' : 'updated'} (${URL_CLEAN}/#/roadmaps/${r.slug}):\n${describeRoadmap(r, (slug) => gym.topics.get(slug))}`,
+      );
     },
   );
 
@@ -181,8 +204,8 @@ export function createMcpServer(gym: Gym): McpServer {
     {
       title: 'Save a Praxis mission',
       description:
-        'Create a Praxis mission, or rewrite one (pass its id as `mission`): a real task he does outside the app that puts a step\'s ' +
-        '(or a whole roadmap\'s) concepts to work for his own advantage, in one of his projects, his training, on his computer, or anywhere when nothing of his fits. ' +
+        "Create a Praxis mission, or rewrite one (pass its id as `mission`): a real task he does outside the app that puts a step's " +
+        "(or a whole roadmap's) concepts to work for his own advantage, in one of his projects, his training, on his computer, or anywhere when nothing of his fits. " +
         'He sees it on the Praxis page and on the roadmap, does it, and writes a debrief there; you then judge it with `review_mission`. ' +
         'scope "step" follows a roadmap step (pass `topic`, the step\'s topic slug, and `roadmap`); "capstone" closes a roadmap (pass `roadmap`); "topic" follows a topic outside any roadmap. ' +
         'Rewriting keeps his debrief and your review. ' +
@@ -193,7 +216,10 @@ export function createMcpServer(gym: Gym): McpServer {
         scope: z.enum(['step', 'capstone', 'topic']),
         roadmap: z.string().optional().describe('Roadmap slug (step and capstone missions)'),
         topic: z.string().optional().describe('Topic slug (step and topic missions)'),
-        arena: z.string().min(1).describe('Where it happens, short: a project ("~/Projects/Machine"), "training", "this computer", "anywhere"'),
+        arena: z
+          .string()
+          .min(1)
+          .describe('Where it happens, short: a project ("~/Projects/Machine"), "training", "this computer", "anywhere"'),
         why: z.string().min(1).describe('What it gets him, in a sentence or two: the advantage, not the lesson'),
         brief: z.string().min(1).describe('What to do, in Markdown: the situation, the task, any constraints, and what to bring back'),
         criteria: z.array(z.string().min(1)).min(1).max(8).describe('Done when: observable results he can report on'),
@@ -214,7 +240,9 @@ export function createMcpServer(gym: Gym): McpServer {
       );
       return text(
         `Mission ${created ? 'created' : 'rewritten'} (${URL_CLEAN}/#/praxis/${m.id}): ${summarizeMission(m).slice(2)}` +
-          (missing.length ? `\nNot on any map: ${missing.join(', ')}. Use "topic/id" for concepts; they are needed to record the review.` : ''),
+          (missing.length
+            ? `\nNot on any map: ${missing.join(', ')}. Use "topic/id" for concepts; they are needed to record the review.`
+            : ''),
       );
     },
   );
@@ -249,7 +277,7 @@ export function createMcpServer(gym: Gym): McpServer {
       title: 'Review a Praxis mission',
       description:
         'Close a mission he has debriefed: a verdict, your critique (shown to him on the mission), and a result per concept it used. ' +
-        'Results count as practice: right pushes a concept\'s next review out, wrong makes a solid concept shaky. ' +
+        "Results count as practice: right pushes a concept's next review out, wrong makes a solid concept shaky. " +
         'Before judging, check what you can (read the repo, the files, the numbers he reports) and ask for anything missing. ' +
         SAME_MARKDOWN,
       inputSchema: {
@@ -258,9 +286,16 @@ export function createMcpServer(gym: Gym): McpServer {
         critique: z
           .string()
           .min(1)
-          .describe('In Markdown: what he did against each criterion, what was sound, the first thing that went wrong if anything did, and the next step'),
+          .describe(
+            'In Markdown: what he did against each criterion, what was sound, the first thing that went wrong if anything did, and the next step',
+          ),
         results: z
-          .array(z.object({ concept: z.string().min(1).describe('"topic/id", or an id in the mission\'s topic'), outcome: z.enum(['right', 'partial', 'wrong']) }))
+          .array(
+            z.object({
+              concept: z.string().min(1).describe('"topic/id", or an id in the mission\'s topic'),
+              outcome: z.enum(['right', 'partial', 'wrong']),
+            }),
+          )
           .default([]),
       },
     },
@@ -288,7 +323,10 @@ export function createMcpServer(gym: Gym): McpServer {
         'Call it when a sitting starts and whenever the topic or kind changes.',
       inputSchema: {
         kind: z.enum(['learn', 'review', 'train']).default('learn'),
-        topic: z.string().optional().describe('Existing topic slug, or the title of a new topic, e.g. "Differential forms". Not for review'),
+        topic: z
+          .string()
+          .optional()
+          .describe('Existing topic slug, or the title of a new topic, e.g. "Differential forms". Not for review'),
         goal: z.string().min(1).describe('What he wants from this session, in one sentence'),
         topic_goal: z.string().optional().describe("For a new topic: what he ultimately wants from it. Defaults to the session's goal"),
       },
@@ -303,7 +341,8 @@ export function createMcpServer(gym: Gym): McpServer {
         );
       }
       const onRoadmap = roadmapContext(gym, t.slug);
-      if (created) return text(`New topic "${t.title}" (${t.slug}) created; ${kind} session ${session.id} started. The map is empty.${onRoadmap}`);
+      if (created)
+        return text(`New topic "${t.title}" (${t.slug}) created; ${kind} session ${session.id} started. The map is empty.${onRoadmap}`);
       const s = formatSummary(gym.topics.list().find((x) => x.slug === t.slug)!);
       return text(`${kind} session ${session.id} started on an existing topic:\n${s}\nCall get_topic for the full map.${onRoadmap}`);
     },
@@ -324,7 +363,8 @@ export function createMcpServer(gym: Gym): McpServer {
     async ({ topic, limit }) => {
       const fading = gym.topics.fading(topic);
       const upcoming = gym.topics.upcoming(7);
-      if (fading.length === 0) return text(`Nothing is fading${topic ? ` in ${topic}` : ''}. ${upcoming} concepts come due in the next 7 days.`);
+      if (fading.length === 0)
+        return text(`Nothing is fading${topic ? ` in ${topic}` : ''}. ${upcoming} concepts come due in the next 7 days.`);
       return text(
         `${fading.length} fading${topic ? ` in ${topic}` : ''} (${upcoming} more due within 7 days):\n` +
           fading.slice(0, limit).map(formatFading).join('\n'),
@@ -338,8 +378,8 @@ export function createMcpServer(gym: Gym): McpServer {
       title: 'Record practice results',
       description:
         'Record how he did on review questions and training problems, after you have judged his answers. ' +
-        'Each result moves that concept\'s review schedule (right pushes the next review further out, partial a little, wrong brings it back and makes a solid concept shaky). ' +
-        'For training problems, pass the `difficulty` you set them at: clean solves at or above the topic\'s training level raise it, a miss lowers it. ' +
+        "Each result moves that concept's review schedule (right pushes the next review further out, partial a little, wrong brings it back and makes a solid concept shaky). " +
+        "For training problems, pass the `difficulty` you set them at: clean solves at or above the topic's training level raise it, a miss lowers it. " +
         'Quizzes and asks in lessons are recorded automatically; use this for reviews and training.',
       inputSchema: {
         results: z
@@ -578,10 +618,16 @@ export function createMcpServer(gym: Gym): McpServer {
     async ({ query, limit }) => {
       try {
         const { images, rejected } = await findImages(query, limit);
-        if (images.length === 0) return text(`No reusable images found for "${query}"${rejected ? ` (${rejected} skipped for their licence)` : ''}. Try other words.`);
+        if (images.length === 0)
+          return text(
+            `No reusable images found for "${query}"${rejected ? ` (${rejected} skipped for their licence)` : ''}. Try other words.`,
+          );
         return text(
           images
-            .map((im, i) => `${i + 1}. ${im.title} (${im.width}x${im.height})\n   src: ${im.src}\n   page: ${im.page}\n   licence: ${im.license}${im.licenseUrl ? ` (${im.licenseUrl})` : ''}\n   credit: ${im.credit}`)
+            .map(
+              (im, i) =>
+                `${i + 1}. ${im.title} (${im.width}x${im.height})\n   src: ${im.src}\n   page: ${im.page}\n   licence: ${im.license}${im.licenseUrl ? ` (${im.licenseUrl})` : ''}\n   credit: ${im.credit}`,
+            )
             .join('\n') + (rejected ? `\n(${rejected} more skipped for their licence.)` : ''),
         );
       } catch (err) {
@@ -666,7 +712,13 @@ function renderSvg(svg: string, dark: boolean): Promise<Buffer> {
 /** The step that leads into a question, when it comes in the same call. */
 async function showLead(gym: Gym, lead?: { markdown: string; title?: string; concept?: string }) {
   if (!lead) return;
-  await gym.feed.add({ type: 'block', kind: 'step', markdown: lead.markdown, ...(lead.title ? { title: lead.title } : {}), ...(lead.concept ? { concept: lead.concept } : {}) });
+  await gym.feed.add({
+    type: 'block',
+    kind: 'step',
+    markdown: lead.markdown,
+    ...(lead.title ? { title: lead.title } : {}),
+    ...(lead.concept ? { concept: lead.concept } : {}),
+  });
   if (lead.concept) await gym.focus(lead.concept);
 }
 

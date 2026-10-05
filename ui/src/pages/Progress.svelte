@@ -1,4 +1,5 @@
 <script lang="ts">
+  // Progress: what is solid over time, activity by week, and what is fading.
   import { feed } from '../lib/feed.svelte.ts';
   import { link } from '../lib/router.svelte.ts';
   import { ago, plural } from '../lib/format.ts';

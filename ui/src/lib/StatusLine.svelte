@@ -9,9 +9,20 @@
   const topic = $derived(live ? feed.currentTopic : null);
   const counts = $derived(countsOf(topic ?? undefined));
   const place = $derived(topic ? placeOf(topic.slug, feed.roadmapList) : null);
+
+  // The dev instance (pnpm dev) says so, here and in the tab title, so it is never mistaken for the real one.
+  let dev = $state(false);
+  fetch('/api/health')
+    .then((r) => r.json())
+    .then((h: { instance?: string }) => {
+      dev = h.instance === 'dev';
+      if (dev && !document.title.startsWith('[dev]')) document.title = `[dev] ${document.title}`;
+    })
+    .catch(() => {});
 </script>
 
 <footer class="statusline">
+  {#if dev}<span class="dev" title="The dev instance: its own port and data (.dev/), never your real library">dev</span>{/if}
   {#if feed.pending}<span class="turn">Your turn</span>{:else if feed.wrapping}<span class="work">Wrapping up…</span>{:else if live && claude.busy}<span class="work">Claude is working…</span>{/if}
   {#if topic && counts.total}<span>{counts.solid} of {counts.total} solid</span>{/if}
   {#if place}<span>step {place.index + 1} of {place.roadmap.steps.length}</span>{/if}
@@ -35,6 +46,18 @@
     font-size: 0.75rem;
     color: var(--faint);
     white-space: nowrap;
+  }
+
+  .dev {
+    margin-right: auto;
+    padding: 0 6px;
+    border-radius: 3px;
+    background: var(--acc);
+    color: var(--b0);
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    line-height: 18px;
   }
 
   .turn {

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Makes the certificate for https://aristotle.test, as the user (no root), in .gym/tls.
+# Makes the certificate for https://aristotle.test, as the user (no root), in .aristotle/tls.
 #
 # Same pattern as playground.test on this machine: Aristotle gets its own certificate authority, and that
 # authority carries nameConstraints, so it can only ever sign aristotle.test, even if its key leaves this folder.
@@ -11,9 +11,9 @@
 # certificate. Restart Aristotle after.
 set -euo pipefail
 
-NAME=${GYM_HOSTNAME:-aristotle.test}
+NAME=${ARISTOTLE_HOSTNAME:-aristotle.test}
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
-TLS=${GYM_TLS_DIR:-$ROOT/.gym/tls}
+TLS=${ARISTOTLE_TLS_DIR:-${ARISTOTLE_STATE_DIR:-$ROOT/.aristotle}/tls}
 mkdir -p "$TLS"
 chmod 700 "$TLS"
 cd "$TLS"

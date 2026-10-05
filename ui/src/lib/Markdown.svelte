@@ -1,4 +1,5 @@
 <script lang="ts">
+  // Renders lesson Markdown and brings it to life: mermaid diagrams, sequences, explorables and the visual kit's figures.
   import { getContext, mount, unmount } from 'svelte';
   import { feed } from './feed.svelte.ts';
   import { link } from './router.svelte.ts';

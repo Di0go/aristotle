@@ -1,7 +1,16 @@
 // The hierarchy everything hangs on: roadmaps hold steps, a step is a topic, a topic holds concepts.
 // Topics that belong to no roadmap are "loose".
 
-import { isFading, stepState, type Concept, type ConceptStatus, type Mission, type Roadmap, type StepState, type Topic } from '../../../shared/types.ts';
+import {
+  isFading,
+  stepState,
+  type Concept,
+  type ConceptStatus,
+  type Mission,
+  type Roadmap,
+  type StepState,
+  type Topic,
+} from '../../../shared/types.ts';
 
 export interface Place {
   roadmap: Roadmap;
@@ -47,7 +56,9 @@ export function markOf(concept: Concept): ConceptStatus | 'fading' {
  */
 export function outline(topic: Topic): Concept[] {
   const byId = new Map(topic.concepts.map((c) => [c.id, c]));
-  const order = [...topic.concepts].sort((a, b) => a.firstSeen.localeCompare(b.firstSeen) || topic.concepts.indexOf(a) - topic.concepts.indexOf(b));
+  const order = [...topic.concepts].sort(
+    (a, b) => a.firstSeen.localeCompare(b.firstSeen) || topic.concepts.indexOf(a) - topic.concepts.indexOf(b),
+  );
   const out: Concept[] = [];
   const state = new Map<string, 'visiting' | 'done'>();
   const visit = (c: Concept) => {
@@ -112,7 +123,8 @@ export function missionsDue(roadmaps: Roadmap[], topics: Record<string, Topic>, 
     if (r.status !== 'active') continue;
     const steps = stepsOf(r, topics);
     for (const s of steps) {
-      if (s.state === 'done' && !live.some((m) => m.scope === 'step' && m.topic === s.slug)) out.push({ roadmap: r, index: s.index, title: s.title });
+      if (s.state === 'done' && !live.some((m) => m.scope === 'step' && m.topic === s.slug))
+        out.push({ roadmap: r, index: s.index, title: s.title });
     }
     if (steps.length && steps.every((s) => s.state === 'done') && !live.some((m) => m.scope === 'capstone' && m.roadmap === r.slug)) {
       out.push({ roadmap: r, index: null, title: r.title });

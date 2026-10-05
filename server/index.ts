@@ -4,12 +4,27 @@
 import http from 'node:http';
 import https from 'node:https';
 import type { Duplex } from 'node:stream';
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { WebSocketServer } from 'ws';
-import { ACCENT, ALLOWED_NAMES, ALLOWED_PORTS, HOST, HOSTNAME, PORT, TLS_DIR, TLS_PORT, TLS_TRUSTED, UI_DIR, URL_CLEAN } from './config.ts';
+import {
+  ACCENT,
+  ALLOWED_NAMES,
+  ALLOWED_PORTS,
+  HOST,
+  HOSTNAME,
+  INSTANCE,
+  PORT,
+  ROOT,
+  TLS_DIR,
+  TLS_ENABLED,
+  TLS_PORT,
+  TLS_TRUSTED,
+  UI_DIR,
+  URL_CLEAN,
+} from './config.ts';
 import { PID_FILE } from './control.ts';
 import { AnswerError, publicItem } from './feed.ts';
 import { Gym } from './gym.ts';
@@ -35,7 +50,13 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
     const url = new URL(req.url ?? '/', 'http://localhost');
     // Once the browsers trust the certificate, pages on http://aristotle.test move to https. Not /api/: a page
     // still open over http keeps its live feed and terminal, which a redirect to another origin would break.
-    if (TLS_TRUSTED && !('encrypted' in req.socket) && req.headers.host === HOSTNAME && !url.pathname.startsWith('/api/') && url.pathname !== '/mcp') {
+    if (
+      TLS_TRUSTED &&
+      !('encrypted' in req.socket) &&
+      req.headers.host === HOSTNAME &&
+      !url.pathname.startsWith('/api/') &&
+      url.pathname !== '/mcp'
+    ) {
       res.writeHead(307, { Location: `https://${HOSTNAME}${req.url ?? '/'}` }).end();
       return;
     }
@@ -62,7 +83,7 @@ function upgrade(req: http.IncomingMessage, socket: Duplex, head: Buffer) {
 }
 
 const server = http.createServer(handle).on('upgrade', upgrade);
-const tls = existsSync(path.join(TLS_DIR, 'server.crt'))
+const tls = TLS_ENABLED
   ? https
       .createServer({ key: readFileSync(path.join(TLS_DIR, 'server.key')), cert: readFileSync(path.join(TLS_DIR, 'server.crt')) }, handle)
       .on('upgrade', upgrade)
@@ -85,7 +106,7 @@ async function handleMcp(req: http.IncomingMessage, res: http.ServerResponse) {
 }
 
 async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, route: string, params: URLSearchParams) {
-  if (req.method === 'GET' && route === '/api/health') return json(res, 200, { ok: true });
+  if (req.method === 'GET' && route === '/api/health') return json(res, 200, { ok: true, instance: INSTANCE, root: ROOT });
   if (req.method === 'GET' && route === '/api/state') return json(res, 200, feed.state());
   if (req.method === 'GET' && route === '/api/events') return streamEvents(req, res);
   if (req.method === 'GET' && route === '/api/topics') return json(res, 200, gym.topics.list());
@@ -109,7 +130,8 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ro
         if (!text) return json(res, 400, { error: 'Write what happened first' });
         return json(res, 200, await gym.missions.debrief(id, text));
       }
-      if (body?.action === 'drop' || body?.action === 'restore') return json(res, 200, await gym.missions.setDropped(id, body.action === 'drop'));
+      if (body?.action === 'drop' || body?.action === 'restore')
+        return json(res, 200, await gym.missions.setDropped(id, body.action === 'drop'));
       return json(res, 400, { error: 'Unknown action' });
     } catch (err) {
       if (err instanceof MissionError) return json(res, 400, { error: (err as Error).message });
@@ -189,7 +211,8 @@ async function serveStatic(res: http.ServerResponse, pathname: string) {
       return send(res, 503, 'The interface is not built yet. Run: pnpm build');
     }
   }
-  if (ACCENT && file.endsWith(`${path.sep}index.html`)) body = Buffer.from(body.toString('utf8').replace('<html lang="en">', `<html lang="en" data-accent="${ACCENT}">`));
+  if (ACCENT && file.endsWith(`${path.sep}index.html`))
+    body = Buffer.from(body.toString('utf8').replace('<html lang="en">', `<html lang="en" data-accent="${ACCENT}">`));
   const type = TYPES[path.extname(file)] ?? 'application/octet-stream';
   const cache = file.includes(`${path.sep}assets${path.sep}`) ? 'public, max-age=31536000, immutable' : 'no-cache';
   res.writeHead(200, { 'Content-Type': type, 'Cache-Control': cache }).end(body);
@@ -245,7 +268,7 @@ tls?.on('error', portInUse(TLS_PORT));
 server.listen(PORT, HOST, () => {
   mkdirSync(path.dirname(PID_FILE), { recursive: true });
   writeFileSync(PID_FILE, String(process.pid));
-  console.log(`${new Date().toISOString()} Aristotle running at ${URL_CLEAN} (http://localhost:${PORT})`);
+  console.log(`${new Date().toISOString()} Aristotle (${INSTANCE}) running at ${URL_CLEAN} (http://localhost:${PORT})`);
 });
 tls?.listen(TLS_PORT, HOST);
 

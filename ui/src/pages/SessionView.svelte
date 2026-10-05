@@ -1,4 +1,5 @@
 <script lang="ts">
+  // One past session, read back in full: every step, check and answer, and its handoff.
   import { setContext } from 'svelte';
   import { feed } from '../lib/feed.svelte.ts';
   import { link } from '../lib/router.svelte.ts';

@@ -50,9 +50,7 @@ export class Topics {
   }
 
   list(): TopicSummary[] {
-    return [...this.topics.values()]
-      .map(summarize)
-      .sort((a, b) => b.updated.localeCompare(a.updated));
+    return [...this.topics.values()].map(summarize).sort((a, b) => b.updated.localeCompare(a.updated));
   }
 
   /** Finds a topic by slug or title, or creates it. */
@@ -259,7 +257,7 @@ export class Topics {
     const previous = this.saving.get(topic.slug) ?? Promise.resolve();
     const next = previous.then(async () => {
       const tmp = `${file}.tmp`;
-      await writeFile(tmp, JSON.stringify(topic, null, 2) + '\n');
+      await writeFile(tmp, `${JSON.stringify(topic, null, 2)}\n`);
       await rename(tmp, file);
     });
     this.saving.set(topic.slug, next);

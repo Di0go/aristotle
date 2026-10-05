@@ -1,43 +1,60 @@
 // Start, stop and check the Aristotle server. Used by the bridge and by `pnpm app <command>`.
 // Never writes to stdout: the bridge's stdout is Claude Code's MCP channel.
+//
+// The live instance goes through systemd when aristotle.service is installed (scripts/install-service.sh).
+// That service may run another checkout of the code (the release copy, scripts/release.ts), so `start --build`
+// refuses to build here for it. A dev instance (ARISTOTLE_INSTANCE=dev) never touches systemd.
 
 import { spawn, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, openSync, readFileSync } from 'node:fs';
 import path from 'node:path';
-import { PORT, ROOT, UI_DIR, URL_CLEAN } from './config.ts';
+import { INSTANCE, PORT, ROOT, STATE_DIR, UI_DIR, URL_CLEAN } from './config.ts';
 
-const STATE_DIR = path.join(ROOT, '.gym');
 // One pid file per port, so test servers on other ports never touch the real one's.
 export const PID_FILE = path.join(STATE_DIR, `server-${PORT}.pid`);
 export const LOG_FILE = path.join(STATE_DIR, 'server.log');
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-/** The systemd user service from scripts/install-service.sh, when installed. */
+/** The systemd user service from scripts/install-service.sh, when installed. Only ever the live instance's. */
 const SERVICE = 'aristotle.service';
 const systemctl = (...args: string[]) => spawnSync('systemctl', ['--user', ...args, SERVICE], { stdio: 'ignore' }).status === 0;
-export const serviceEnabled = () => systemctl('is-enabled', '--quiet');
+export const serviceEnabled = () => INSTANCE === 'live' && systemctl('is-enabled', '--quiet');
 
-export async function isRunning(): Promise<boolean> {
+/** The checkout the service runs, from its WorkingDirectory. */
+export function serviceRoot(): string | undefined {
+  const out = spawnSync('systemctl', ['--user', 'show', '--property=WorkingDirectory', '--value', SERVICE], { encoding: 'utf8' });
+  return out.status === 0 && out.stdout.trim() ? out.stdout.trim() : undefined;
+}
+
+export async function health(): Promise<{ ok: boolean; instance?: string; root?: string } | null> {
   try {
-    return (await fetch(`http://localhost:${PORT}/api/health`, { signal: AbortSignal.timeout(1000) })).ok;
+    const res = await fetch(`http://localhost:${PORT}/api/health`, { signal: AbortSignal.timeout(1000) });
+    return res.ok ? ((await res.json()) as { ok: boolean; instance?: string; root?: string }) : null;
   } catch {
-    return false;
+    return null;
   }
+}
+
+export const isRunning = async () => Boolean(await health());
+
+/** Builds the interface into dist/ui of this checkout. */
+export function build(stdio: 'inherit' | number = 'inherit') {
+  return (
+    spawnSync(process.execPath, [path.join(ROOT, 'node_modules/vite/bin/vite.js'), 'build'], {
+      cwd: ROOT,
+      stdio: ['ignore', stdio, stdio],
+    }).status === 0
+  );
 }
 
 export async function start(): Promise<boolean> {
   if (await isRunning()) return true;
   mkdirSync(STATE_DIR, { recursive: true });
   const log = openSync(LOG_FILE, 'a');
-  if (!existsSync(path.join(UI_DIR, 'index.html'))) {
-    spawnSync(process.execPath, [path.join(ROOT, 'node_modules/vite/bin/vite.js'), 'build'], {
-      cwd: ROOT,
-      stdio: ['ignore', log, log],
-    });
-  }
   if (serviceEnabled()) systemctl('start');
   else {
+    if (!existsSync(path.join(UI_DIR, 'index.html'))) build(log);
     spawn(process.execPath, [path.join(ROOT, 'server/index.ts')], {
       cwd: ROOT,
       detached: true,
@@ -71,14 +88,29 @@ export async function stop(): Promise<void> {
 }
 
 if (import.meta.main) {
-  const command = process.argv[2] ?? 'status';
+  const [command = 'status', flag] = process.argv.slice(2);
   const say = (m: string) => console.error(m);
-  if (command === 'start') say((await start()) ? `Running at ${URL_CLEAN} (http://localhost:${PORT})` : `Failed to start; see ${LOG_FILE}`);
-  else if (command === 'stop') {
+  const where = `${URL_CLEAN} (http://localhost:${PORT})`;
+  const runs = serviceEnabled() ? serviceRoot() : undefined;
+
+  if (command === 'start' || command === 'restart') {
+    if (flag === '--build') {
+      // Building here only changes what runs when this checkout is the one being served.
+      if (runs && path.resolve(runs) !== ROOT) {
+        say(`The live app runs the release copy in ${runs}, not this checkout.`);
+        say('To ship what is committed here: pnpm release. To try changes first: pnpm dev.');
+        process.exit(1);
+      }
+      if (!build()) process.exit(1);
+    }
+    if (command === 'restart') await stop();
+    say((await start()) ? `Running at ${where}` : `Failed to start; see ${LOG_FILE}`);
+  } else if (command === 'stop') {
     await stop();
     say('Stopped');
-  } else if (command === 'restart') {
-    await stop();
-    say((await start()) ? `Restarted at ${URL_CLEAN} (http://localhost:${PORT})` : `Failed to start; see ${LOG_FILE}`);
-  } else say((await isRunning()) ? `Running at ${URL_CLEAN} (http://localhost:${PORT})` : 'Not running');
+  } else {
+    const h = await health();
+    if (!h) say('Not running');
+    else say(`Running at ${where}: ${h.instance ?? 'live'} instance, code in ${h.root ?? '?'}${runs ? ' (systemd)' : ''}`);
+  }
 }

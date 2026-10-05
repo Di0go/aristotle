@@ -17,11 +17,7 @@ interface Doc {
   at: string;
 }
 
-const fold = (s: string) =>
-  s
-    .normalize('NFKD')
-    .replace(/[̀-ͯ]/g, '')
-    .toLowerCase();
+const fold = (s: string) => s.normalize('NFKD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
 /** Markdown down to the words: no fences, LaTeX delimiters, links, tags or markup characters. */
 function plain(md: string): string {
@@ -89,22 +85,30 @@ export class Search {
     const docs: Doc[] = [];
     for (const r of this.gym.roadmaps.all()) {
       docs.push({ hit: { kind: 'roadmap', title: r.title, slug: r.slug, snippet: r.goal }, title: r.title, body: r.goal, at: r.updated });
-      r.steps.forEach((s, i) =>
+      for (const [i, s] of r.steps.entries()) {
         docs.push({
           hit: { kind: 'step', title: s.title, slug: s.topic, context: `${r.title} · step ${i + 1}`, snippet: s.goal },
           title: s.title,
           body: `${s.goal} ${s.why ?? ''}`,
           at: r.updated,
-        }),
-      );
+        });
+      }
     }
     const steps = new Set(this.gym.roadmaps.all().flatMap((r) => r.steps.map((s) => s.topic)));
     for (const t of this.gym.topics.all()) {
       // A step already stands for its topic.
-      if (!steps.has(t.slug)) docs.push({ hit: { kind: 'topic', title: t.title, slug: t.slug, snippet: t.goal }, title: t.title, body: t.goal, at: t.updated });
+      if (!steps.has(t.slug))
+        docs.push({ hit: { kind: 'topic', title: t.title, slug: t.slug, snippet: t.goal }, title: t.title, body: t.goal, at: t.updated });
       for (const c of t.concepts) {
         docs.push({
-          hit: { kind: 'concept', title: c.label, slug: t.slug, concept: c.id, context: t.title, ...(c.summary ? { snippet: c.summary } : {}) },
+          hit: {
+            kind: 'concept',
+            title: c.label,
+            slug: t.slug,
+            concept: c.id,
+            context: t.title,
+            ...(c.summary ? { snippet: c.summary } : {}),
+          },
           title: c.label,
           body: `${c.summary ?? ''} ${c.note ?? ''}`,
           at: c.updated,
@@ -147,10 +151,15 @@ function indexSession(id: string, record: Awaited<ReturnType<typeof readSession>
   const docs: Doc[] = [];
   for (const item of record.items) {
     if (item.type === 'block') docs.push(doc(item.title ?? s.goal, plain(item.markdown), item.at));
-    else if (item.type === 'ask') docs.push(doc(item.kind === 'problem' ? 'Problem' : 'Question', plain(`${item.prompt} ${item.response ?? ''}`), item.at));
+    else if (item.type === 'ask')
+      docs.push(doc(item.kind === 'problem' ? 'Problem' : 'Question', plain(`${item.prompt} ${item.response ?? ''}`), item.at));
     // An unanswered quiz keeps its answers hidden here too.
-    else if (item.type === 'quiz') docs.push(doc('Quiz', plain(item.questions.map((q) => (item.answeredAt ? `${q.question} ${q.explanation}` : q.question)).join(' ')), item.at));
+    else if (item.type === 'quiz')
+      docs.push(
+        doc('Quiz', plain(item.questions.map((q) => (item.answeredAt ? `${q.question} ${q.explanation}` : q.question)).join(' ')), item.at),
+      );
   }
-  if (record.handoff) docs.push(doc('Done for now', `${record.handoff.locked} ${record.handoff.shaky} ${record.handoff.next}`, record.handoff.at));
+  if (record.handoff)
+    docs.push(doc('Done for now', `${record.handoff.locked} ${record.handoff.shaky} ${record.handoff.next}`, record.handoff.at));
   return docs;
 }

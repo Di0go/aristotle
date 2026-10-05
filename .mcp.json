@@ -3,6 +3,11 @@
     "aristotle": {
       "command": "node",
       "args": ["server/bridge.ts"]
+    },
+    "aristotle-dev": {
+      "command": "node",
+      "args": ["server/bridge.ts"],
+      "env": { "ARISTOTLE_INSTANCE": "dev" }
     }
   }
 }

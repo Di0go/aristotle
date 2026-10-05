@@ -18,13 +18,11 @@ The method is in the skills: `teach` for lessons (use it whenever he wants to le
 
 ## Working on the app
 
-- Look: a terminal (dark by default, light on a switch). Tokens (colours, type, both themes) live in `ui/src/styles/base.css`; one self-hosted font, JetBrains Mono (Fontsource). The sidebar is the library tree (roadmap > step > concept); lessons have a context panel beside them. Search (Ctrl+K or /) runs on the server (`server/search.ts`) over the library, missions and session text.
-- Stack: Svelte 5 + Vite interface (`ui/`), a plain Node HTTP server run directly as TypeScript (`server/`), types shared in `shared/`. The MCP endpoint is `/mcp` on the same server.
-- Claude Code reaches the server through `server/bridge.ts` (stdio, see `.mcp.json`), which starts the server if it isn't running. The server can also run Claude Code itself, in a pseudo-terminal streamed to the interface (`server/terminal.ts`); its WebSocket must only ever accept Aristotle's own Origin.
-- https://aristotle.test uses a certificate from its own CA, limited to aristotle.test by nameConstraints (`scripts/tls.sh`, kept in `.gym/tls`) and trusted by `scripts/setup-hostname.sh`; the server serves it on 4748, which 443 is forwarded to.
-- When installed, `aristotle.service` (systemd user service, `scripts/install-service.sh`) runs the server at login; `server/control.ts` goes through systemd when it is enabled.
-- `pnpm check` (types), `pnpm test` (end to end: real server, MCP client, HTTP answers), `pnpm start` (build the interface and restart the server), `pnpm app status|start|stop|restart`.
-- After changing server code run `pnpm app restart`; after changing the interface run `pnpm build`.
-- `data/` is not part of the app's repo (it is git-ignored): it is its own Git repository, local only for now. The server commits it by itself after quiet periods and pushes only if that repository has a remote (`server/backup.ts`, `DATA_BACKUP=off` disables it). Never add `data/` to the app's repo.
-- `data/` is his learning history. Never delete or rewrite it by hand. Session logs (`data/sessions/`) are append-only JSON Lines; topic maps (`data/topics/`) change only through the server.
-- Run `pnpm check` and `pnpm test` before calling a change done.
+Read [docs/README.md](docs/README.md) first: it says which doc covers what. [docs/development.md](docs/development.md) is the workflow, [docs/extending.md](docs/extending.md) where each kind of change goes, [docs/architecture.md](docs/architecture.md) the map of every file.
+
+- **Two apps, never mixed.** The live app he learns in runs from the release copy (`~/.local/share/aristotle/app`, systemd), on `data/`. You change this checkout and try it in the **dev instance**: `pnpm dev` (http://localhost:5173, its own data in `.dev/data`, reloads on save). Never restart, rebuild or experiment on the live app to test a change; ship it with `pnpm release` once it is committed, and only when he asks.
+- To try a tool or skill end to end, use the `aristotle-dev` MCP server (off by default), never `aristotle`. `pnpm seed --force` resets the demo data; `pnpm dev:snapshot` copies his real data into dev.
+- **`data/` is his learning history.** Never delete, rewrite or commit it; it is its own Git repository, changed only through the server (formats in [docs/data.md](docs/data.md)).
+- **Docs move with the code.** When you change an area, update the prose in its doc ([scripts/doc-zones.ts](scripts/doc-zones.ts)); the Stop hook will send you back if you don't. Reference tables are generated (`pnpm docs`), never edited by hand. Every new source file starts with a comment saying what it is for.
+- **Done means `pnpm gates` passes** (docs, Biome, types, end-to-end tests, build). Look at UI changes in the dev instance, in both themes.
+- Security lines that must hold: the server listens on 127.0.0.1 only, checks Host and Origin, and the terminal WebSocket only ever accepts Aristotle's own Origin.

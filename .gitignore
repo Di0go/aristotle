@@ -1,5 +1,10 @@
 node_modules/
 dist/
-.gym/
+# This install's state: certificate, settings, pid files, log (server/config.ts STATE_DIR).
+.aristotle/
+# The dev instance's data and state (pnpm dev).
+.dev/
 *.log
+# The learning history: its own Git repository, never part of the app's.
 data/
+.env

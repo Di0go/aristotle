@@ -1,4 +1,5 @@
 <script lang="ts">
+  // The live lesson: what Claude is showing and asking right now, with the composer and the lesson's bench.
   import { placeFigures } from '../lib/explorables/index.ts';
   import { setContext } from 'svelte';
   import { tick } from 'svelte';

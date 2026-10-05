@@ -41,7 +41,7 @@ export function labelBox(label: string): { w: number; h: number; lines: string[]
   for (const word of words) {
     const line = lines[lines.length - 1];
     if (!line) lines[lines.length - 1] = word;
-    else if ((line + ' ' + word).length <= MAX_CHARS) lines[lines.length - 1] = `${line} ${word}`;
+    else if (`${line} ${word}`.length <= MAX_CHARS) lines[lines.length - 1] = `${line} ${word}`;
     else lines.push(word);
   }
   let out = lines.slice(0, 2);
@@ -160,8 +160,16 @@ const GHOST = { w: 200, h: 76 };
  * onto new rows), a box per topic with its concepts inside, steps not started as empty frames, and a last band
  * for topics on no roadmap. Links between topics are drawn concept to concept.
  */
-export function layoutAtlas(roadmaps: Roadmap[], topicsBySlug: Record<string, Topic>): { bands: PlacedBand[]; boxes: PlacedBox[]; layout: Layout } {
-  const groups: { key: string; title: string; roadmap?: Roadmap; items: { topic?: Topic; step?: RoadmapStep; number?: number; title: string }[] }[] = [];
+export function layoutAtlas(
+  roadmaps: Roadmap[],
+  topicsBySlug: Record<string, Topic>,
+): { bands: PlacedBand[]; boxes: PlacedBox[]; layout: Layout } {
+  const groups: {
+    key: string;
+    title: string;
+    roadmap?: Roadmap;
+    items: { topic?: Topic; step?: RoadmapStep; number?: number; title: string }[];
+  }[] = [];
   const used = new Set<string>();
   for (const r of roadmaps) {
     groups.push({
@@ -208,14 +216,29 @@ export function layoutAtlas(roadmaps: Roadmap[], topicsBySlug: Record<string, To
         rowY += rowH + ROW_GAP;
         rowH = 0;
       }
-      const box: PlacedBox = { key: `${g.key}:${item.topic?.slug ?? item.step?.topic}`, topic: item.topic, step: item.step, number: item.number, title: item.title, x, y: rowY, w, h };
+      const box: PlacedBox = {
+        key: `${g.key}:${item.topic?.slug ?? item.step?.topic}`,
+        topic: item.topic,
+        step: item.step,
+        number: item.number,
+        title: item.title,
+        x,
+        y: rowY,
+        w,
+        h,
+      };
       placed.push(box);
       if (l && item.topic) {
         const dx = x + PAD + (w - PAD * 2 - l.width) / 2;
         const dy = rowY + LABEL_H;
         for (const n of l.nodes) nodes.push({ ...n, key: `${item.topic.slug}/${n.key}`, x: n.x + dx, y: n.y + dy });
         for (const e of l.edges) {
-          edges.push({ key: `${item.topic.slug}:${e.key}`, from: `${item.topic.slug}/${e.from}`, to: `${item.topic.slug}/${e.to}`, d: translate(e.d, dx, dy) });
+          edges.push({
+            key: `${item.topic.slug}:${e.key}`,
+            from: `${item.topic.slug}/${e.from}`,
+            to: `${item.topic.slug}/${e.to}`,
+            d: translate(e.d, dx, dy),
+          });
         }
       }
       x += w + BOX_GAP;
@@ -261,7 +284,12 @@ export function layoutAtlas(roadmaps: Roadmap[], topicsBySlug: Record<string, To
         const x2 = b.x;
         const y2 = b.y + b.h / 2;
         const bend = Math.max(40, Math.abs(x2 - x1) / 2);
-        edges.push({ key: `x:${slug}/${id}->${t.slug}/${c.id}`, from: dep, to: `${t.slug}/${c.id}`, d: `M${x1},${y1} C${x1 + bend},${y1} ${x2 - bend},${y2} ${x2},${y2}` });
+        edges.push({
+          key: `x:${slug}/${id}->${t.slug}/${c.id}`,
+          from: dep,
+          to: `${t.slug}/${c.id}`,
+          d: `M${x1},${y1} C${x1 + bend},${y1} ${x2 - bend},${y2} ${x2},${y2}`,
+        });
       }
     }
   }

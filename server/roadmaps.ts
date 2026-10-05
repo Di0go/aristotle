@@ -77,7 +77,7 @@ export class Roadmaps {
     const previous = this.saving.get(roadmap.slug) ?? Promise.resolve();
     const next = previous.then(async () => {
       const tmp = `${file}.tmp`;
-      await writeFile(tmp, JSON.stringify(roadmap, null, 2) + '\n');
+      await writeFile(tmp, `${JSON.stringify(roadmap, null, 2)}\n`);
       await rename(tmp, file);
     });
     this.saving.set(roadmap.slug, next);

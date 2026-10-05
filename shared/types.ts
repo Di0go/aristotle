@@ -305,8 +305,7 @@ export interface Progress {
 }
 
 /** An unanswered quiz reaches the interface without its answer key. */
-export type PublicQuestion = Omit<QuizQuestion, 'correct' | 'explanation'> &
-  Partial<Pick<QuizQuestion, 'correct' | 'explanation'>>;
+export type PublicQuestion = Omit<QuizQuestion, 'correct' | 'explanation'> & Partial<Pick<QuizQuestion, 'correct' | 'explanation'>>;
 export type PublicQuizItem = Omit<QuizItem, 'questions'> & { questions: PublicQuestion[] };
 export type PublicItem = BlockItem | PublicQuizItem | AskItem | MapItem;
 

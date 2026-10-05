@@ -1,4 +1,5 @@
 <script lang="ts">
+  // The shell: ribbon, sidebar, tabs, the current page, the status line and the terminal drawer, plus global shortcuts.
   import { feed } from './lib/feed.svelte.ts';
   import { claude } from './lib/claude.svelte.ts';
   import './lib/theme.svelte.ts';

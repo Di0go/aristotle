@@ -1,7 +1,7 @@
 // Spaced review of concepts with FSRS: every solid concept carries a review card; when its due date
 // passes, the concept is "fading" until he practises it again.
 
-import { createEmptyCard, fsrs, Rating, State, type Card, type Grade } from 'ts-fsrs';
+import { createEmptyCard, fsrs, Rating, type State, type Card, type Grade } from 'ts-fsrs';
 import type { ReviewState } from '../shared/types.ts';
 
 // Days, not minutes: concepts are reviewed across sessions, not drilled within one.
