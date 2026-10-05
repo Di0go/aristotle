@@ -3,6 +3,7 @@
   // what it leads to; then his own notebook for the step, kept with it. It folds away to give the step the width.
   import { bench } from './bench.svelte.ts';
   import { feed } from './feed.svelte.ts';
+  import { ago } from './format.ts';
   import { markOf, splitRef } from './library.ts';
   import { link } from './router.svelte.ts';
   import { pageLabel, type ClassPage } from './steps.ts';
@@ -15,6 +16,7 @@
   let text = $state('');
   let saved = $state<'saved' | 'saving' | ''>('');
   let timer: ReturnType<typeof setTimeout> | undefined;
+  let box = $state<HTMLTextAreaElement>();
   /** The step this notebook belongs to, so a late save never lands on the next step's page. */
   let shownFor = '';
 
@@ -49,6 +51,14 @@
       text = note?.text ?? '';
       saved = '';
     }
+  });
+
+  // The page grows with what he writes, a line at a time, so the notebook never scrolls inside itself.
+  $effect(() => {
+    void text;
+    if (!box) return;
+    box.style.height = 'auto';
+    box.style.height = `${Math.max(box.scrollHeight, 168)}px`;
   });
 
   /** A dependency, "id" in this class or "class/id" in another, with its concept when it is on a map. */
@@ -120,18 +130,20 @@
   {/if}
 
   {#if stepId}
-    <section class="bench-section">
-      <div class="bench-row">
-        <h3 class="bench-title">Your notes</h3>
-        <span class="bench-count">{saved === 'saving' ? 'Saving…' : saved === 'saved' ? 'Saved' : ''}</span>
-      </div>
+    <section class="bench-section nb">
+      <header class="nb-head">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10.5 2.5l3 3L6 13H3v-3z M9 4l3 3" /></svg>
+        <h3>Your notes on this step</h3>
+        <span class="nb-state" class:on={saved !== ''}>{saved === 'saving' ? 'Saving…' : 'Saved ✓'}</span>
+      </header>
       <textarea
-        class="notebook-box"
+        class="nb-page"
+        bind:this={box}
         bind:value={text}
         oninput={onInput}
-        rows="8"
-        placeholder="Anything you want to keep from this step, in your words. It stays here, with the step."
+        placeholder="Write what you want to keep from this step, in your own words…"
         aria-label="Your notes on this step"></textarea>
+      {#if note}<p class="nb-foot">Kept with this step · {ago(note.updated)}</p>{/if}
     </section>
   {/if}
 </div>
@@ -215,20 +227,90 @@
     color: var(--faint);
   }
 
-  .notebook-box {
-    width: 100%;
-    min-height: 140px;
-    resize: vertical;
-    padding: 10px 12px;
-    background: var(--b0);
-    border: 1px solid var(--rule);
-    border-radius: var(--radius);
-    color: var(--fg);
-    font: 0.88rem/1.55 var(--sans);
+  /* The notebook: a page with faint ruled lines the text sits on, a margin line, and a quiet saved mark. */
+  .nb {
+    --nb-line: 1.7rem;
+    --nb-rule: color-mix(in srgb, var(--rule) 70%, transparent);
   }
 
-  .notebook-box:focus {
+  .nb-head {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    margin-bottom: 8px;
+  }
+
+  .nb-head svg {
+    width: 14px;
+    height: 14px;
+    fill: none;
+    stroke: var(--acc);
+    stroke-width: 1.4;
+    stroke-linejoin: round;
+    stroke-linecap: round;
+  }
+
+  .nb-head h3 {
+    margin: 0;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--fg);
+  }
+
+  .nb-state {
+    margin-left: auto;
+    font-size: 0.74rem;
+    color: var(--faint);
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+
+  .nb-state.on {
+    opacity: 1;
+  }
+
+  .nb-page {
+    display: block;
+    width: 100%;
+    min-height: calc(var(--nb-line) * 6 + 20px);
+    resize: none;
+    overflow: hidden;
+    padding: 10px 14px 10px 22px;
+    border: 1px solid var(--rule);
+    border-radius: var(--radius-lg);
+    color: var(--fg);
+    font: 0.9rem / var(--nb-line) var(--sans);
+    background:
+      linear-gradient(90deg, transparent 13px, var(--acc-line) 13px, var(--acc-line) 14px, transparent 14px),
+      repeating-linear-gradient(
+          to bottom,
+          transparent 0,
+          transparent calc(var(--nb-line) - 1px),
+          var(--nb-rule) calc(var(--nb-line) - 1px),
+          var(--nb-rule) var(--nb-line)
+        )
+        0 4px / 100% var(--nb-line) local,
+      var(--b0);
+    box-shadow: 0 1px 2px rgb(0 0 0 / 0.04);
+    transition:
+      border-color 0.15s,
+      box-shadow 0.15s;
+  }
+
+  .nb-page::placeholder {
+    color: var(--faint);
+    font-style: italic;
+  }
+
+  .nb-page:focus {
     outline: none;
-    border-color: var(--acc);
+    border-color: var(--acc-line);
+    box-shadow: 0 0 0 3px var(--acc-soft);
+  }
+
+  .nb-foot {
+    margin: 6px 2px 0;
+    font-size: 0.72rem;
+    color: var(--faint);
   }
 </style>
