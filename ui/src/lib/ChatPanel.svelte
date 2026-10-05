@@ -318,18 +318,18 @@
         oninput={onInput}
         onkeydown={onKey}
         rows="1"
-        placeholder="Ask Aristotle…"
+        placeholder={page ? `Ask about ${pageLabel(page).toLowerCase()}…` : `Ask about ${title}…`}
         aria-label="Message Aristotle"></textarea>
       <div class="bar">
         <button class="tool" onclick={startTag} title="Tag a step, a concept or a class">@</button>
-        <span class="knows" title={where}><i></i>Knows where you are</span>
+        <span class="spacer"></span>
         {#if sending}
           <button class="send stop" onclick={stop} title="Stop the answer" aria-label="Stop the answer">
-            <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="4.5" y="4.5" width="7" height="7" rx="1.5" /></svg>
+            <svg viewBox="0 0 12 12" aria-hidden="true"><rect x="1" y="1" width="10" height="10" rx="2" /></svg>
           </button>
         {:else}
           <button class="send" onclick={() => void send()} disabled={!text.trim()} title="Send (Enter)" aria-label="Send">
-            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 13V3.5M3.8 7.5L8 3.3l4.2 4.2" /></svg>
+            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 12.5V3.8M4 7.6L8 3.6l4 4" /></svg>
           </button>
         {/if}
       </div>
@@ -659,46 +659,36 @@
     color: var(--fg);
   }
 
-  .knows {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    margin-right: auto;
-    padding: 2px 8px;
-    border-radius: 99px;
-    background: var(--b1);
-    font-size: 0.72rem;
-    color: var(--muted);
-    white-space: nowrap;
-    cursor: default;
+  .spacer {
+    flex: 1;
   }
 
-  .knows i {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: var(--solid);
-  }
-
+  /* Send: a quiet square until there is something to send, then solid; Stop takes its place while Aristotle writes. */
   .send {
     display: grid;
     place-items: center;
-    width: 30px;
-    height: 30px;
+    width: 32px;
+    height: 32px;
     padding: 0;
     border: 0;
-    border-radius: 50%;
+    border-radius: 10px;
     background: var(--acc);
     color: var(--on-acc);
     cursor: pointer;
     transition:
-      opacity 0.15s,
+      background-color 0.15s,
+      color 0.15s,
       transform 0.1s;
   }
 
   .send:disabled {
-    opacity: 0.35;
+    background: transparent;
+    color: var(--faint);
     cursor: default;
+  }
+
+  .send:not(:disabled):hover {
+    filter: brightness(1.08);
   }
 
   .send:not(:disabled):active {
@@ -706,21 +696,27 @@
   }
 
   .send svg {
-    width: 15px;
-    height: 15px;
+    width: 16px;
+    height: 16px;
     fill: none;
     stroke: currentColor;
-    stroke-width: 1.8;
+    stroke-width: 2;
     stroke-linecap: round;
     stroke-linejoin: round;
   }
 
   .send.stop {
-    background: var(--fg);
-    color: var(--bg, var(--b0));
+    background: var(--b2);
+    color: var(--fg);
+  }
+
+  .send.stop:hover {
+    background: var(--hover);
   }
 
   .send.stop svg {
+    width: 12px;
+    height: 12px;
     fill: currentColor;
     stroke: none;
   }
