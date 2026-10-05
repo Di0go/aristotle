@@ -8,16 +8,18 @@
   import { feed } from './feed.svelte.ts';
 
   let now = $state(Date.now());
+
+  const secs = $derived(claude.busy ? Math.max(0, Math.round((now - claude.busySince) / 1000)) : 0);
+  const phase = $derived(feed.wrapping ? 'wrapping' : feed.pending ? 'turn' : claude.busy ? 'working' : claude.running ? 'waiting' : 'off');
+  /** " (pondering), 12 s": Claude Code's own word for it, and the seconds once there are a few. */
+  const detail = $derived(`${claude.doing ? ` (${claude.doing.replace('…', '').toLowerCase()})` : ''}${secs >= 3 ? `, ${secs} s` : ''}`);
+
+  // The clock only ticks while there is something to time.
   $effect(() => {
     if (!claude.busy && !feed.wrapping) return;
     const t = setInterval(() => (now = Date.now()), 1000);
     return () => clearInterval(t);
   });
-
-  const secs = $derived(claude.busy ? Math.max(0, Math.round((now - claude.busySince) / 1000)) : 0);
-  const phase = $derived(
-    feed.wrapping ? 'wrapping' : feed.pending ? 'turn' : claude.busy ? 'working' : claude.running ? 'waiting' : 'off',
-  );
 </script>
 
 {#if phase === 'working' || phase === 'wrapping'}
@@ -32,7 +34,7 @@
       {#if phase === 'wrapping'}
         Wrapping up: updating your map and writing where to pick up next time.
       {:else}
-        Claude is preparing the next step{claude.doing ? ` (${claude.doing.replace('…', '').toLowerCase()})` : ''}{secs >= 3 ? `, ${secs} s` : ''}.
+        Claude is preparing the next step{detail}.
         {#if secs > 45}<span class="muted"> Longer steps can take a minute, especially with a figure.</span>{/if}
       {/if}
     </p>

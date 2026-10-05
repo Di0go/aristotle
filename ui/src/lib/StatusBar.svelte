@@ -2,21 +2,13 @@
   // A thin bar of solid, shaky and not-yet counts (and fading), with an optional legend.
   import type { ConceptStatus } from '../../../shared/types.ts';
 
-  let {
-    counts,
-    fading = 0,
-    legend = false,
-  }: { counts: Record<ConceptStatus, number>; fading?: number; legend?: boolean } = $props();
+  let { counts, fading = 0, legend = false }: { counts: Record<ConceptStatus, number>; fading?: number; legend?: boolean } = $props();
 
   const total = $derived(counts.solid + counts.shaky + counts.unknown);
 </script>
 
 {#if total > 0}
-  <div
-    class="status-bar"
-    role="img"
-    aria-label="{counts.solid} solid ({fading} fading), {counts.shaky} shaky, {counts.unknown} not yet"
-  >
+  <div class="status-bar" role="img" aria-label="{counts.solid} solid ({fading} fading), {counts.shaky} shaky, {counts.unknown} not yet">
     <span class="seg solid" style:flex-grow={counts.solid - fading}></span>
     <span class="seg fading" style:flex-grow={fading}></span>
     <span class="seg shaky" style:flex-grow={counts.shaky}></span>

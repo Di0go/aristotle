@@ -1,50 +1,14 @@
 <script lang="ts">
   // Progress: what is solid over time, activity by week, and what is fading.
-  import { feed } from '../lib/feed.svelte.ts';
-  import { link } from '../lib/router.svelte.ts';
-  import { ago, plural } from '../lib/format.ts';
   import { actions } from '../lib/actions.ts';
-  import StepChart from '../lib/charts/StepChart.svelte';
-  import StackedColumns from '../lib/charts/StackedColumns.svelte';
-  import TableView from '../lib/charts/TableView.svelte';
   import { longDay, shortDay, weekLabel } from '../lib/charts/scale.ts';
+  import { feed } from '../lib/feed.svelte.ts';
+  import { ago, dayKey, plural } from '../lib/format.ts';
+  import { link } from '../lib/router.svelte.ts';
+  import StackedColumns from '../lib/charts/StackedColumns.svelte';
+  import StepChart from '../lib/charts/StepChart.svelte';
+  import TableView from '../lib/charts/TableView.svelte';
   import type { FadingConcept, Progress } from '../../../shared/types.ts';
-
-  let progress = $state<Progress | null>(null);
-
-  $effect(() => {
-    void feed.topicVersion;
-    void fetch('/api/progress')
-      .then((r) => r.json())
-      .then((p: Progress) => (progress = p));
-  });
-
-  const solidNow = $derived(progress?.solid.at(-1)?.count ?? 0);
-  /** Solid concepts gained over the last seven days. */
-  const solidDelta = $derived.by(() => {
-    if (!progress) return 0;
-    const weekAgo = new Date(Date.now() - 7 * 86_400_000);
-    const key = `${weekAgo.getFullYear()}-${String(weekAgo.getMonth() + 1).padStart(2, '0')}-${String(weekAgo.getDate()).padStart(2, '0')}`;
-    const before = [...progress.solid].reverse().find((p) => p.day <= key)?.count ?? 0;
-    return solidNow - before;
-  });
-  const thisWeekMinutes = $derived.by(() => {
-    const row = progress?.minutes.at(-1);
-    if (!row) return 0;
-    const monday = new Date();
-    monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
-    const key = `${monday.getFullYear()}-${String(monday.getMonth() + 1).padStart(2, '0')}-${String(monday.getDate()).padStart(2, '0')}`;
-    return row.week === key ? row.learn + row.review + row.train : 0;
-  });
-  const fadingByTopic = $derived.by(() => {
-    const groups = new Map<string, { title: string; concepts: FadingConcept[] }>();
-    for (const f of progress?.fading ?? []) {
-      const g = groups.get(f.topic) ?? { title: f.topicTitle, concepts: [] };
-      g.concepts.push(f);
-      groups.set(f.topic, g);
-    }
-    return [...groups].map(([slug, g]) => ({ slug, ...g }));
-  });
 
   const RESULT_SERIES = [
     { key: 'right', label: 'Right', color: 'var(--right)' },
@@ -56,6 +20,46 @@
     { key: 'review', label: 'Reviews', color: 'var(--series-2)' },
     { key: 'train', label: 'Training', color: 'var(--series-3)' },
   ];
+
+  let progress = $state<Progress | null>(null);
+
+  const solidNow = $derived(progress?.solid.at(-1)?.count ?? 0);
+  /** Solid concepts gained over the last seven days. */
+  const solidDelta = $derived.by(() => {
+    if (!progress) return 0;
+    const key = dayKey(new Date(Date.now() - 7 * 86_400_000));
+    const before = [...progress.solid].reverse().find((p) => p.day <= key)?.count ?? 0;
+    return solidNow - before;
+  });
+  /** Minutes this week, counted only if the last row is this week's (weeks start on Monday). */
+  const thisWeekMinutes = $derived.by(() => {
+    const row = progress?.minutes.at(-1);
+    if (!row) return 0;
+    const monday = new Date();
+    monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
+    return row.week === dayKey(monday) ? row.learn + row.review + row.train : 0;
+  });
+  const fadingByTopic = $derived.by(() => {
+    const groups = new Map<string, { title: string; concepts: FadingConcept[] }>();
+    for (const f of progress?.fading ?? []) {
+      const g = groups.get(f.topic) ?? { title: f.topicTitle, concepts: [] };
+      g.concepts.push(f);
+      groups.set(f.topic, g);
+    }
+    return [...groups].map(([slug, g]) => ({ slug, ...g }));
+  });
+  /** This week's answers in a sentence, for before there are two weeks to chart. */
+  const answersSoFar = $derived.by(() => {
+    const a = progress?.answers[0];
+    return a ? ` This week: ${a.right} right, ${a.partial} partly right, ${a.wrong} wrong.` : '';
+  });
+
+  $effect(() => {
+    void feed.topicVersion;
+    void fetch('/api/progress')
+      .then((r) => r.json())
+      .then((p: Progress) => (progress = p));
+  });
 
   function hours(min: number): string {
     return min < 60 ? `${min} min` : `${Math.floor(min / 60)} h ${min % 60} min`;
@@ -69,6 +73,7 @@
   </header>
 
   {#if progress}
+    <!-- Headline numbers -->
     <div class="tiles">
       <div class="tile">
         <span class="tile-label">Solid concepts</span>
@@ -92,10 +97,13 @@
       </div>
     </div>
 
+    <!-- Fading -->
     <section>
       <h2 class="section-title">Fading</h2>
       {#if fadingByTopic.length === 0}
-        <p class="muted">Nothing is fading. {progress.upcoming ? `${plural(progress.upcoming, 'concept')} come due in the next 7 days.` : ''}</p>
+        <p class="muted">
+          Nothing is fading. {progress.upcoming ? `${plural(progress.upcoming, 'concept')} come due in the next 7 days.` : ''}
+        </p>
       {:else}
         <div class="fading-intro">
           <p class="muted">Solid once, now due for practice. Recalling them just as they fade is what makes them last.</p>
@@ -109,7 +117,9 @@
                 {#each g.concepts as f (f.id)}
                   <li>
                     <a href={link.topic(f.topic, f.id)}><i class="dot fading"></i>{f.label}</a>
-                    <span class="muted">~{Math.round(f.recall * 100)}% recall{f.lastPractised ? `, practised ${ago(f.lastPractised)}` : ''}</span>
+                    <span class="muted"
+                      >~{Math.round(f.recall * 100)}% recall{f.lastPractised ? `, practised ${ago(f.lastPractised)}` : ''}</span
+                    >
                   </li>
                 {/each}
               </ul>
@@ -119,6 +129,7 @@
       {/if}
     </section>
 
+    <!-- Charts -->
     <section>
       <h2 class="section-title">Solid concepts over time</h2>
       {#if progress.solid.length >= 2}
@@ -139,7 +150,11 @@
             <StackedColumns
               label="Answers per week by result"
               series={RESULT_SERIES}
-              rows={progress.answers.map((a) => ({ key: a.week, label: shortDay(a.week), values: { right: a.right, partial: a.partial, wrong: a.wrong } }))}
+              rows={progress.answers.map((a) => ({
+                key: a.week,
+                label: shortDay(a.week),
+                values: { right: a.right, partial: a.partial, wrong: a.wrong },
+              }))}
             />
             <TableView
               columns={['Week', 'Right', 'Partly right', "Wrong or didn't know"]}
@@ -147,7 +162,9 @@
             />
           </div>
         {:else}
-          <p class="muted">Weekly charts start after your second week.{progress.answers[0] ? ` This week: ${progress.answers[0].right} right, ${progress.answers[0].partial} partly right, ${progress.answers[0].wrong} wrong.` : ''}</p>
+          <p class="muted">
+            Weekly charts start after your second week.{answersSoFar}
+          </p>
         {/if}
       </section>
 
@@ -159,7 +176,11 @@
               label="Minutes per week by kind of session"
               series={KIND_SERIES}
               unit="min"
-              rows={progress.minutes.map((m) => ({ key: m.week, label: shortDay(m.week), values: { learn: m.learn, review: m.review, train: m.train } }))}
+              rows={progress.minutes.map((m) => ({
+                key: m.week,
+                label: shortDay(m.week),
+                values: { learn: m.learn, review: m.review, train: m.train },
+              }))}
             />
             <TableView
               columns={['Week', 'Lessons (min)', 'Reviews (min)', 'Training (min)']}
@@ -172,6 +193,7 @@
       </section>
     </div>
 
+    <!-- Training levels -->
     {#if progress.training.length}
       <section>
         <h2 class="section-title">Training level</h2>
@@ -180,7 +202,14 @@
           {#each progress.training as t (t.topic)}
             <li>
               <a href={link.topic(t.topic)}>{t.title}</a>
-              <span class="meter" role="meter" aria-valuemin="1" aria-valuemax="10" aria-valuenow={t.level} aria-label="Training level for {t.title}">
+              <span
+                class="meter"
+                role="meter"
+                aria-valuemin="1"
+                aria-valuemax="10"
+                aria-valuenow={t.level}
+                aria-label="Training level for {t.title}"
+              >
                 <span style:width="{t.level * 10}%"></span>
               </span>
               <span class="muted">{t.level}/10</span>
@@ -202,7 +231,7 @@
   .tiles {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
-    border-top: 1.5px solid var(--ink);
+    border-top: 1.5px solid var(--fg);
     border-bottom: 1px solid var(--rule);
   }
 
@@ -220,7 +249,7 @@
 
   .tile-label {
     font-size: 0.81rem;
-    color: var(--graphite);
+    color: var(--muted);
   }
 
   .tile-value {
@@ -231,7 +260,7 @@
 
   .tile-sub {
     font-size: 0.8rem;
-    color: var(--graphite);
+    color: var(--muted);
   }
 
   .tile-sub.up {
@@ -270,7 +299,7 @@
 
   .fading-group h3 a,
   .fading-group li a {
-    color: var(--ink);
+    color: var(--fg);
     text-decoration: none;
   }
 
@@ -338,6 +367,6 @@
   .meter span {
     display: block;
     height: 100%;
-    background: var(--cyan);
+    background: var(--acc);
   }
 </style>

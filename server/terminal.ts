@@ -7,6 +7,7 @@ import pty from 'node-pty';
 import type { IPty } from 'node-pty';
 import type { WebSocket } from 'ws';
 import { CLAUDE_CMD as COMMAND, ROOT } from './config.ts';
+
 /** Output kept for clients that connect later, so the drawer shows the whole recent screen. */
 const BUFFER_LIMIT = 256 * 1024;
 
@@ -16,6 +17,7 @@ export type TerminalMessage =
   | { type: 'output'; data: string; replay?: boolean }
   | { type: 'exit'; code: number };
 
+/** What the drawer sends; anything malformed is ignored. */
 type ClientMessage =
   | { type: 'start'; resume?: boolean }
   | { type: 'run'; text: string; initial?: string }
@@ -100,10 +102,11 @@ export class Terminal {
     setTimeout(() => this.proc?.write('\r'), 120);
   }
 
+  /** Connects a drawer: it gets the state and the recent screen, then its messages drive the terminal. */
   attach(ws: WebSocket) {
     this.clients.add(ws);
-    send(ws, { type: 'state', running: this.running });
-    send(ws, { type: 'output', data: this.buffer, replay: true });
+    sendTo(ws, { type: 'state', running: this.running });
+    sendTo(ws, { type: 'output', data: this.buffer, replay: true });
     ws.on('message', (raw) => {
       let msg: ClientMessage;
       try {
@@ -122,6 +125,7 @@ export class Terminal {
     ws.on('close', () => this.clients.delete(ws));
   }
 
+  /** Ignores sizes no real drawer has. */
   private resize(cols: number, rows: number) {
     if (!Number.isInteger(cols) || !Number.isInteger(rows) || cols < 10 || rows < 4 || cols > 500 || rows > 200) return;
     this.cols = cols;
@@ -130,10 +134,10 @@ export class Terminal {
   }
 
   private broadcast(msg: TerminalMessage) {
-    for (const ws of this.clients) send(ws, msg);
+    for (const ws of this.clients) sendTo(ws, msg);
   }
 }
 
-function send(ws: WebSocket, msg: TerminalMessage) {
+function sendTo(ws: WebSocket, msg: TerminalMessage) {
   if (ws.readyState === ws.OPEN) ws.send(JSON.stringify(msg));
 }

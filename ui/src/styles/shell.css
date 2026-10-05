@@ -1,12 +1,14 @@
 /* The frame: icon ribbon, library pane (resizable), then the stage with its tabs; a status line along the
    bottom. The page scrolls with the window; the panes and the tab bar stay put. */
 
+/* Tokens: heights the frame's sticky parts leave for each other */
 :root {
   --drawer-space: 0px;
   --status-h: 26px;
   --tabs-h: 39px;
 }
 
+/* Layout */
 .app {
   display: grid;
   grid-template-columns: var(--ribbon-w) var(--files-w) minmax(0, 1fr);
@@ -71,7 +73,7 @@ body.resizing {
   display: none;
 }
 
-/* A page: left-aligned, generous, never cramped. */
+/* Pages: left-aligned, generous, never cramped. */
 .page {
   max-width: 1120px;
   padding: 44px clamp(24px, 4vw, 56px) 96px;
@@ -133,6 +135,7 @@ body.resizing {
   min-width: 0;
 }
 
+/* Small screens: the library slides in over the page, under a bar with the menu and search. */
 @media (max-width: 960px) {
   .app {
     grid-template-columns: minmax(0, 1fr);
@@ -253,13 +256,9 @@ body.resizing {
   box-shadow: 0 -14px 30px -20px rgb(0 0 0 / 0.35);
   transform: translateY(calc(100% + var(--status-h)));
   visibility: hidden;
-  transition: transform 0.2s var(--ease), visibility 0s linear 0.2s;
-}
-
-@media (max-width: 960px) {
-  .drawer {
-    left: 0;
-  }
+  transition:
+    transform 0.2s var(--ease),
+    visibility 0s linear 0.2s;
 }
 
 .drawer.open {
@@ -321,6 +320,12 @@ body.resizing {
   height: 100%;
 }
 
+@media (max-width: 960px) {
+  .drawer {
+    left: 0;
+  }
+}
+
 /* The message box at the foot of a lesson. */
 .composer {
   position: sticky;
@@ -346,12 +351,12 @@ body.resizing {
   font-size: 0.92rem;
   background: var(--b1);
   border-color: var(--rule);
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
 }
 
 .composer .primary {
   height: 42px;
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
 }
 
 .composer-off {
@@ -360,6 +365,7 @@ body.resizing {
   color: var(--faint);
 }
 
+/* Claude waiting on a question in the terminal: a bar above the message box that opens it. */
 .asking {
   display: block;
   width: 100%;

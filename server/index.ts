@@ -1,12 +1,12 @@
 // The Aristotle server: the interface, its live feed, and the MCP endpoint Claude Code connects to.
 // Listens on 127.0.0.1 only: HTTP, and HTTPS for aristotle.test when scripts/tls.sh has made its certificate.
 
-import http from 'node:http';
-import https from 'node:https';
-import type { Duplex } from 'node:stream';
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
+import http from 'node:http';
+import https from 'node:https';
 import path from 'node:path';
+import type { Duplex } from 'node:stream';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { WebSocketServer } from 'ws';
 import {
@@ -40,6 +40,21 @@ const search = new Search(gym);
 const terminal = new Terminal();
 const sockets = new WebSocketServer({ noServer: true });
 
+/** Content types of the files the interface build is made of. */
+const TYPES: Record<string, string> = {
+  '.html': 'text/html; charset=utf-8',
+  '.js': 'text/javascript; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
+  '.svg': 'image/svg+xml',
+  '.png': 'image/png',
+  '.ico': 'image/x-icon',
+  '.woff2': 'font/woff2',
+  '.woff': 'font/woff',
+  '.ttf': 'font/ttf',
+  '.json': 'application/json',
+};
+
+/** Every HTTP request: security checks first, then MCP, the API or the interface's files. */
 async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
   try {
     // Only answer requests addressed to this machine by name, and only from our own pages:
@@ -82,13 +97,7 @@ function upgrade(req: http.IncomingMessage, socket: Duplex, head: Buffer) {
   sockets.handleUpgrade(req, socket, head, (ws) => terminal.attach(ws));
 }
 
-const server = http.createServer(handle).on('upgrade', upgrade);
-const tls = TLS_ENABLED
-  ? https
-      .createServer({ key: readFileSync(path.join(TLS_DIR, 'server.key')), cert: readFileSync(path.join(TLS_DIR, 'server.crt')) }, handle)
-      .on('upgrade', upgrade)
-  : undefined;
-
+/** Claude Code's MCP endpoint (POST only). */
 async function handleMcp(req: http.IncomingMessage, res: http.ServerResponse) {
   if (req.method !== 'POST') {
     res.writeHead(405, { Allow: 'POST' }).end();
@@ -105,49 +114,15 @@ async function handleMcp(req: http.IncomingMessage, res: http.ServerResponse) {
   await transport.handleRequest(req, res);
 }
 
+/** The interface's JSON API. Every route is listed in docs/architecture.md (generated from the checks below). */
 async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, route: string, params: URLSearchParams) {
+  /** The part of the route after `prefix`: a slug or an id. */
+  const tail = (prefix: string) => decodeURIComponent(route.slice(prefix.length));
+
+  // The live session
   if (req.method === 'GET' && route === '/api/health') return json(res, 200, { ok: true, instance: INSTANCE, root: ROOT });
   if (req.method === 'GET' && route === '/api/state') return json(res, 200, feed.state());
   if (req.method === 'GET' && route === '/api/events') return streamEvents(req, res);
-  if (req.method === 'GET' && route === '/api/topics') return json(res, 200, gym.topics.list());
-  if (req.method === 'GET' && route === '/api/map') return json(res, 200, gym.topics.all());
-  if (req.method === 'GET' && route === '/api/roadmaps') return json(res, 200, gym.roadmaps.all());
-  if (req.method === 'GET' && route.startsWith('/api/roadmaps/')) {
-    const roadmap = gym.roadmaps.get(decodeURIComponent(route.slice('/api/roadmaps/'.length)));
-    return roadmap ? json(res, 200, roadmap) : json(res, 404, { error: 'No such roadmap' });
-  }
-  if (req.method === 'GET' && route.startsWith('/api/topics/')) {
-    const topic = gym.topics.get(decodeURIComponent(route.slice('/api/topics/'.length)));
-    return topic ? json(res, 200, topic) : json(res, 404, { error: 'No such topic' });
-  }
-  if (req.method === 'GET' && route === '/api/missions') return json(res, 200, gym.missions.all());
-  if (req.method === 'POST' && route.startsWith('/api/missions/')) {
-    const id = decodeURIComponent(route.slice('/api/missions/'.length));
-    const body = (await readJson(req)) as { action?: string; text?: unknown } | null;
-    try {
-      if (body?.action === 'debrief') {
-        const text = String(body.text ?? '').trim();
-        if (!text) return json(res, 400, { error: 'Write what happened first' });
-        return json(res, 200, await gym.missions.debrief(id, text));
-      }
-      if (body?.action === 'drop' || body?.action === 'restore')
-        return json(res, 200, await gym.missions.setDropped(id, body.action === 'drop'));
-      return json(res, 400, { error: 'Unknown action' });
-    } catch (err) {
-      if (err instanceof MissionError) return json(res, 400, { error: (err as Error).message });
-      throw err;
-    }
-  }
-  if (req.method === 'GET' && route === '/api/search') return json(res, 200, await search.query(params.get('q') ?? ''));
-  if (req.method === 'GET' && route === '/api/sessions') return json(res, 200, await gym.listSessions());
-  if (req.method === 'GET' && route === '/api/progress') return json(res, 200, await gym.progress());
-  if (req.method === 'GET' && route === '/api/reviews') return json(res, 200, gym.reviewQueue());
-  if (req.method === 'GET' && route === '/api/backup') return json(res, 200, gym.backup.state());
-  if (req.method === 'GET' && route.startsWith('/api/sessions/')) {
-    const record = await gym.readSession(decodeURIComponent(route.slice('/api/sessions/'.length)));
-    if (!record?.session) return json(res, 404, { error: 'No such session' });
-    return json(res, 200, { session: record.session, items: record.items.map(publicItem), handoff: record.handoff });
-  }
   if (req.method === 'POST' && route === '/api/answer') {
     const body = (await readJson(req)) as Partial<QuizAnswerBody & AskAnswerBody> | null;
     if (!body || typeof body.id !== 'string') return json(res, 400, { error: 'Missing id' });
@@ -161,9 +136,54 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ro
       throw err;
     }
   }
+
+  // Topics, roadmaps and missions
+  if (req.method === 'GET' && route === '/api/topics') return json(res, 200, gym.topics.list());
+  if (req.method === 'GET' && route.startsWith('/api/topics/')) {
+    const topic = gym.topics.get(tail('/api/topics/'));
+    return topic ? json(res, 200, topic) : json(res, 404, { error: 'No such topic' });
+  }
+  if (req.method === 'GET' && route === '/api/map') return json(res, 200, gym.topics.all());
+  if (req.method === 'GET' && route === '/api/roadmaps') return json(res, 200, gym.roadmaps.all());
+  if (req.method === 'GET' && route.startsWith('/api/roadmaps/')) {
+    const roadmap = gym.roadmaps.get(tail('/api/roadmaps/'));
+    return roadmap ? json(res, 200, roadmap) : json(res, 404, { error: 'No such roadmap' });
+  }
+  if (req.method === 'GET' && route === '/api/missions') return json(res, 200, gym.missions.all());
+  if (req.method === 'POST' && route.startsWith('/api/missions/')) {
+    const id = tail('/api/missions/');
+    const body = (await readJson(req)) as { action?: string; text?: unknown } | null;
+    try {
+      if (body?.action === 'debrief') {
+        const text = String(body.text ?? '').trim();
+        if (!text) return json(res, 400, { error: 'Write what happened first' });
+        return json(res, 200, await gym.missions.debrief(id, text));
+      }
+      if (body?.action === 'drop' || body?.action === 'restore')
+        return json(res, 200, await gym.missions.setDropped(id, body.action === 'drop'));
+      return json(res, 400, { error: 'Unknown action' });
+    } catch (err) {
+      if (err instanceof MissionError) return json(res, 400, { error: err.message });
+      throw err;
+    }
+  }
+
+  // History, progress and search
+  if (req.method === 'GET' && route === '/api/sessions') return json(res, 200, await gym.listSessions());
+  if (req.method === 'GET' && route.startsWith('/api/sessions/')) {
+    const record = await gym.readSession(tail('/api/sessions/'));
+    if (!record?.session) return json(res, 404, { error: 'No such session' });
+    return json(res, 200, { session: record.session, items: record.items.map(publicItem), handoff: record.handoff });
+  }
+  if (req.method === 'GET' && route === '/api/progress') return json(res, 200, await gym.progress());
+  if (req.method === 'GET' && route === '/api/reviews') return json(res, 200, gym.reviewQueue());
+  if (req.method === 'GET' && route === '/api/search') return json(res, 200, await search.query(params.get('q') ?? ''));
+  if (req.method === 'GET' && route === '/api/backup') return json(res, 200, gym.backup.state());
+
   return json(res, 404, { error: 'Not found' });
 }
 
+/** The live feed as server-sent events, with a ping every 20 seconds while nothing happens. */
 function streamEvents(req: http.IncomingMessage, res: http.ServerResponse) {
   res.writeHead(200, {
     'Content-Type': 'text/event-stream',
@@ -180,19 +200,7 @@ function streamEvents(req: http.IncomingMessage, res: http.ServerResponse) {
   });
 }
 
-const TYPES: Record<string, string> = {
-  '.html': 'text/html; charset=utf-8',
-  '.js': 'text/javascript; charset=utf-8',
-  '.css': 'text/css; charset=utf-8',
-  '.svg': 'image/svg+xml',
-  '.png': 'image/png',
-  '.ico': 'image/x-icon',
-  '.woff2': 'font/woff2',
-  '.woff': 'font/woff',
-  '.ttf': 'font/ttf',
-  '.json': 'application/json',
-};
-
+/** The built interface from dist/ui; unknown paths get index.html so the app can route them. */
 async function serveStatic(res: http.ServerResponse, pathname: string) {
   const rel = path.normalize(decodeURIComponent(pathname)).replace(/^(\.\.[/\\])+/, '');
   let file = path.join(UI_DIR, rel);
@@ -218,12 +226,14 @@ async function serveStatic(res: http.ServerResponse, pathname: string) {
   res.writeHead(200, { 'Content-Type': type, 'Cache-Control': cache }).end(body);
 }
 
+/** A Host header naming this machine on one of our ports. */
 function localHost(host: string | undefined): boolean {
   if (!host) return false;
   const [name, port = '80'] = host.split(':');
   return ALLOWED_NAMES.includes(name) && ALLOWED_PORTS.includes(Number(port));
 }
 
+/** An Origin header for one of our own pages. */
 function localOrigin(origin: string): boolean {
   try {
     return localHost(new URL(origin).host);
@@ -232,6 +242,7 @@ function localOrigin(origin: string): boolean {
   }
 }
 
+/** The request body as JSON; null when it is malformed or over 1 MB. */
 async function readJson(req: http.IncomingMessage): Promise<unknown> {
   let size = 0;
   const chunks: Buffer[] = [];
@@ -255,6 +266,14 @@ function send(res: http.ServerResponse, status: number, message: string) {
   res.writeHead(status, { 'Content-Type': 'text/plain; charset=utf-8' }).end(message);
 }
 
+// Start: HTTP always, HTTPS too when there is a certificate. Both on 127.0.0.1 only.
+const server = http.createServer(handle).on('upgrade', upgrade);
+const tls = TLS_ENABLED
+  ? https
+      .createServer({ key: readFileSync(path.join(TLS_DIR, 'server.key')), cert: readFileSync(path.join(TLS_DIR, 'server.crt')) }, handle)
+      .on('upgrade', upgrade)
+  : undefined;
+
 const portInUse = (port: number) => (err: NodeJS.ErrnoException) => {
   if (err.code === 'EADDRINUSE') {
     console.error(`Port ${port} is already in use: Aristotle is probably already running.`);
@@ -272,6 +291,7 @@ server.listen(PORT, HOST, () => {
 });
 tls?.listen(TLS_PORT, HOST);
 
+/** Closes both servers and removes the pid file, so a later `pnpm app stop` never signals a stale pid. */
 function shutdown() {
   rmSync(PID_FILE, { force: true });
   terminal.stop();

@@ -14,24 +14,6 @@ export type Route =
   | { page: 'praxis' }
   | { page: 'mission'; id: string };
 
-function parse(hash: string): Route {
-  const [path, query = ''] = hash.replace(/^#/, '').split('?');
-  const parts = path.split('/').filter(Boolean).map(decodeURIComponent);
-  const params = new URLSearchParams(query);
-  if (parts[0] === 'topics' && parts[1]) return { page: 'topic', slug: parts[1], concept: params.get('c') ?? undefined };
-  if (parts[0] === 'topics') return { page: 'topics' };
-  if (parts[0] === 'lesson' && parts[1]) return { page: 'lesson', slug: parts[1] };
-  if (parts[0] === 'roadmaps' && parts[1]) return { page: 'roadmap', slug: parts[1] };
-  if (parts[0] === 'roadmaps') return { page: 'roadmaps' };
-  if (parts[0] === 'log' && parts[1]) return { page: 'session', id: parts[1] };
-  if (parts[0] === 'log') return { page: 'log' };
-  if (parts[0] === 'praxis' && parts[1]) return { page: 'mission', id: parts[1] };
-  if (parts[0] === 'praxis') return { page: 'praxis' };
-  if (parts[0] === 'progress') return { page: 'progress' };
-  if (parts[0] === 'map') return { page: 'map' };
-  return { page: 'now' };
-}
-
 class Router {
   route = $state<Route>(parse(location.hash));
   readonly parse = parse;
@@ -61,3 +43,21 @@ export const link = {
   praxis: () => '#/praxis',
   mission: (id: string) => `#/praxis/${encodeURIComponent(id)}`,
 };
+
+function parse(hash: string): Route {
+  const [path, query = ''] = hash.replace(/^#/, '').split('?');
+  const parts = path.split('/').filter(Boolean).map(decodeURIComponent);
+  const params = new URLSearchParams(query);
+  if (parts[0] === 'topics' && parts[1]) return { page: 'topic', slug: parts[1], concept: params.get('c') ?? undefined };
+  if (parts[0] === 'topics') return { page: 'topics' };
+  if (parts[0] === 'lesson' && parts[1]) return { page: 'lesson', slug: parts[1] };
+  if (parts[0] === 'roadmaps' && parts[1]) return { page: 'roadmap', slug: parts[1] };
+  if (parts[0] === 'roadmaps') return { page: 'roadmaps' };
+  if (parts[0] === 'log' && parts[1]) return { page: 'session', id: parts[1] };
+  if (parts[0] === 'log') return { page: 'log' };
+  if (parts[0] === 'praxis' && parts[1]) return { page: 'mission', id: parts[1] };
+  if (parts[0] === 'praxis') return { page: 'praxis' };
+  if (parts[0] === 'progress') return { page: 'progress' };
+  if (parts[0] === 'map') return { page: 'map' };
+  return { page: 'now' };
+}

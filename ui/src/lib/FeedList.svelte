@@ -1,13 +1,13 @@
 <script lang="ts">
   // A lesson as one long note: each entry a block in the reading column. Teaching steps are numbered in
   // order; map changes are quiet one-line notes between them.
-  import type { PublicItem } from '../../../shared/types.ts';
-  import Block from './Block.svelte';
-  import Quiz from './Quiz.svelte';
   import Ask from './Ask.svelte';
+  import Block from './Block.svelte';
   import MapUpdate from './MapUpdate.svelte';
+  import Quiz from './Quiz.svelte';
   import type { Component } from 'svelte';
   import type { Explorable } from './explorables/index.ts';
+  import type { PublicItem } from '../../../shared/types.ts';
 
   let {
     items,
@@ -25,6 +25,7 @@
     firstStep?: number;
   } = $props();
 
+  /** Each item's step number, counted across the items (0 for anything that is not a teaching step). */
   const numbers = $derived.by(() => {
     let step = firstStep - 1;
     return items.map((item) => (item.type === 'block' && item.kind === 'step' ? ++step : 0));

@@ -24,6 +24,49 @@
 
   let { spec }: { spec: Spec } = $props();
 
+  // Layout, in viewBox units: labels on the left up to L, then the bars across RW; a ROW per lane below TOP.
+  const VIEW_W = 560;
+  const L = 178;
+  const RW = 362;
+  const ROW = 40;
+  const TOP = 24;
+  /** Room under the lanes for the axis and its marks. */
+  const FOOT = 46;
+  /** The playhead takes this long to sweep the whole axis. */
+  const SWEEP_MS = 7000;
+  const still = typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // The playhead, 0 to 1 across the axis. With reduced motion it starts at the end, everything shown.
+  const head = new Tween(still ? 1 : 0, { duration: 0, easing: linear });
+  let playing = $state(false);
+  let svg = $state<SVGSVGElement>();
+  let root = $state<HTMLElement>();
+
+  const log = $derived((spec.scale ?? 'log') === 'log');
+  // A log axis can't start at 0, so it starts at a millisecond at the earliest.
+  const t0 = $derived(Math.max(secs(spec.from), log ? 0.001 : 0));
+  const t1 = $derived(secs(spec.to));
+  const height = $derived(TOP + spec.lanes.length * ROW + FOOT);
+  const axisY = $derived(height - 34);
+  const now = $derived(timeAt(head.current));
+  const ended = $derived(head.current >= 0.999);
+
+  // Start once the figure scrolls into view.
+  $effect(() => {
+    if (!root || still) return;
+    const io = new IntersectionObserver(
+      ([e]) => {
+        if (e.isIntersecting) {
+          play();
+          io.disconnect();
+        }
+      },
+      { threshold: 0.5 },
+    );
+    io.observe(root);
+    return () => io.disconnect();
+  });
+
   /** "300ms", "2s", "5 min", "1.5h", "2d" -> seconds. */
   function secs(v: string): number {
     const m = /^\s*([\d.]+)\s*(ms|s|sec|min|m|h|hr|d)?\s*$/i.exec(v);
@@ -33,15 +76,23 @@
     return u === 'ms' ? n / 1000 : u === 'min' || u === 'm' ? n * 60 : u === 'h' || u === 'hr' ? n * 3600 : u === 'd' ? n * 86400 : n;
   }
 
-  const log = $derived((spec.scale ?? 'log') === 'log');
-  const t0 = $derived(Math.max(secs(spec.from), log ? 0.001 : 0));
-  const t1 = $derived(secs(spec.to));
-  const pos = (t: number) => {
+  /** A time (seconds) to its place on the axis, 0 to 1. */
+  function pos(t: number): number {
     const c = Math.min(t1, Math.max(t0, t));
     return log ? (Math.log(c) - Math.log(t0)) / (Math.log(t1) - Math.log(t0)) : (c - t0) / (t1 - t0);
-  };
-  const timeAt = (p: number) => (log ? Math.exp(Math.log(t0) + p * (Math.log(t1) - Math.log(t0))) : t0 + p * (t1 - t0));
+  }
 
+  /** The inverse of pos: a place on the axis back to seconds. */
+  function timeAt(p: number): number {
+    return log ? Math.exp(Math.log(t0) + p * (Math.log(t1) - Math.log(t0))) : t0 + p * (t1 - t0);
+  }
+
+  /** A place on the axis to x in the viewBox. */
+  function x(p: number): number {
+    return L + p * RW;
+  }
+
+  /** Seconds as read aloud: ms under a second, s under a minute, then min and h to one decimal. */
   function human(t: number): string {
     if (t < 1) return `${Math.round(t * 1000)} ms`;
     if (t < 60) return `${t < 10 ? Math.round(t * 10) / 10 : Math.round(t)} s`;
@@ -49,21 +100,11 @@
     return `${Math.round(t / 360) / 10} h`;
   }
 
-  const L = 178;
-  const RW = 362;
-  const ROW = 40;
-  const TOP = 24;
-  const height = $derived(TOP + spec.lanes.length * ROW + 46);
-  const x = (p: number) => L + p * RW;
-
-  const still = typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const head = new Tween(still ? 1 : 0, { duration: 0, easing: linear });
-  let playing = $state(false);
-
+  /** Play from where the playhead is (or from the start once it has ended), at the full sweep's speed. */
   function play() {
-    if (head.current >= 0.999) head.set(0, { duration: 0 });
+    if (ended) head.set(0, { duration: 0 });
     playing = true;
-    void head.set(1, { duration: 7000 * (1 - head.current) }).then(() => (playing = false));
+    void head.set(1, { duration: SWEEP_MS * (1 - head.current) }).then(() => (playing = false));
   }
 
   function pause() {
@@ -71,30 +112,14 @@
     head.set(head.current, { duration: 0 });
   }
 
-  let svg = $state<SVGSVGElement>();
+  /** Move the playhead to the pointer, on press or while dragging. */
   function scrub(e: PointerEvent) {
     if (!svg || (e.type === 'pointermove' && e.buttons !== 1)) return;
     const r = svg.getBoundingClientRect();
-    const px = ((e.clientX - r.left) / r.width) * 560;
+    const px = ((e.clientX - r.left) / r.width) * VIEW_W;
     playing = false;
     head.set(Math.min(1, Math.max(0, (px - L) / RW)), { duration: 0 });
   }
-
-  // Start once the figure scrolls into view.
-  let root = $state<HTMLElement>();
-  $effect(() => {
-    if (!root || still) return;
-    const io = new IntersectionObserver(([e]) => {
-      if (e.isIntersecting) {
-        play();
-        io.disconnect();
-      }
-    }, { threshold: 0.5 });
-    io.observe(root);
-    return () => io.disconnect();
-  });
-
-  const now = $derived(timeAt(head.current));
 </script>
 
 <figure class="kit kit-timeline" bind:this={root}>
@@ -102,7 +127,7 @@
   <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
   <svg
     bind:this={svg}
-    viewBox="0 0 560 {height}"
+    viewBox="0 0 {VIEW_W} {height}"
     role="img"
     aria-label="Timeline from {spec.from} to {spec.to}"
     onpointerdown={scrub}
@@ -110,10 +135,10 @@
   >
     {#each spec.marks ?? [] as m (m)}
       {@const mx = x(pos(secs(m)))}
-      <line class="grid" x1={mx} y1={TOP - 8} x2={mx} y2={height - 34} />
+      <line class="grid" x1={mx} y1={TOP - 8} x2={mx} y2={axisY} />
       <text class="mark" x={mx} y={height - 16} text-anchor="middle">{m}</text>
     {/each}
-    <line class="axis" x1={L} y1={height - 34} x2={L + RW} y2={height - 34} />
+    <line class="axis" x1={L} y1={axisY} x2={L + RW} y2={axisY} />
 
     {#each spec.lanes as lane, i (i)}
       {@const y = TOP + i * ROW}
@@ -123,20 +148,32 @@
       {@const active = head.current >= a}
       <text class="lane" class:active x={L - 14} y={y + 15} text-anchor="end">{lane.label}</text>
       <rect class="bar-bg" x={x(a)} y={y + 6} width={Math.max(4, (b - a) * RW)} height="12" rx="6" />
-      {#if active}<rect class="bar" class:alt={i % 2 === 1} x={x(a)} y={y + 6} width={Math.max(4, (reached - a) * RW)} height="12" rx="6" />{/if}
+      {#if active}<rect
+          class="bar"
+          class:alt={i % 2 === 1}
+          x={x(a)}
+          y={y + 6}
+          width={Math.max(4, (reached - a) * RW)}
+          height="12"
+          rx="6"
+        />{/if}
       {#if lane.peak}
         {@const pk = pos(secs(lane.peak))}
         <circle class="peak" class:on={head.current >= pk} cx={x(pk)} cy={y + 12} r="5" />
       {/if}
       <!-- A lane in the right half has its note end where the bar ends, so the note stays inside the figure. -->
-      {#if lane.note && active}<text class="lane-note" x={a > 0.5 ? x(b) : x(a)} text-anchor={a > 0.5 ? 'end' : 'start'} y={y + 33}>{lane.note}</text>{/if}
+      {#if lane.note && active}<text class="lane-note" x={a > 0.5 ? x(b) : x(a)} text-anchor={a > 0.5 ? 'end' : 'start'} y={y + 33}
+          >{lane.note}</text
+        >{/if}
     {/each}
 
-    <line class="head" x1={x(head.current)} y1={TOP - 10} x2={x(head.current)} y2={height - 34} />
+    <line class="head" x1={x(head.current)} y1={TOP - 10} x2={x(head.current)} y2={axisY} />
     <text class="now" x={Math.min(x(head.current), L + RW - 30)} y={TOP - 12} text-anchor="middle">{human(now)}</text>
   </svg>
   <div class="kit-states">
-    <button class="kit-play" onclick={() => (playing ? pause() : play())} aria-pressed={playing}>{playing ? 'Pause' : head.current >= 0.999 ? 'Replay' : 'Play'}</button>
+    <button class="kit-play" onclick={() => (playing ? pause() : play())} aria-pressed={playing}
+      >{playing ? 'Pause' : ended ? 'Replay' : 'Play'}</button
+    >
     <span class="kit-hint">Drag across the chart to move through time.</span>
   </div>
 </figure>

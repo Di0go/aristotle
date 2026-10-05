@@ -1,0 +1,9 @@
+{
+  "plugins": ["prettier-plugin-svelte"],
+  "printWidth": 140,
+  "singleQuote": true,
+  "arrowParens": "always",
+  "trailingComma": "all",
+  "svelteSortOrder": "options-scripts-markup-styles",
+  "overrides": [{ "files": "*.svelte", "options": { "parser": "svelte" } }]
+}

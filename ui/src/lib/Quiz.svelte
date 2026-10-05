@@ -1,26 +1,30 @@
 <script lang="ts">
   // A graded multiple-choice check: options, "I don't know", a note per question, and right or wrong once answered.
-  import type { PublicQuizItem } from '../../../shared/types.ts';
   import { feed } from './feed.svelte.ts';
   import Markdown from './Markdown.svelte';
+  import type { PublicQuizItem } from '../../../shared/types.ts';
 
   let { item, active, readonly = false }: { item: PublicQuizItem; active: boolean; readonly?: boolean } = $props();
 
-  // undefined = not picked yet, null = "I don't know".
+  // Per question. In picks, undefined = not picked yet, null = "I don't know".
   let picks = $state<(number | null | undefined)[]>([]);
   let notes = $state<string[]>([]);
   let noteOpen = $state<boolean[]>([]);
+  let showAll = $state<boolean[]>([]);
   let sending = $state(false);
   let error = $state<string | null>(null);
 
   const answered = $derived(Boolean(item.answeredAt));
   // Read back later, an answered question shows only his pick and the right one; the rest wait behind a link.
   const compact = $derived(answered && readonly);
-  let showAll = $state<boolean[]>([]);
-  const shown = (qi: number, oi: number | null) =>
-    !compact || showAll[qi] || item.responses?.[qi]?.choice === oi || (oi !== null && item.questions[qi].correct === oi);
   const ready = $derived(item.questions.every((_, i) => picks[i] !== undefined));
+  /** The first question without a pick: where the number keys go. */
   const current = $derived(item.questions.findIndex((_, i) => picks[i] === undefined));
+
+  /** Whether an option (null for "I don't know") is listed: always, unless the question is compact. */
+  function shown(qi: number, oi: number | null): boolean {
+    return !compact || showAll[qi] || item.responses?.[qi]?.choice === oi || (oi !== null && item.questions[qi].correct === oi);
+  }
 
   function pick(q: number, choice: number | null) {
     if (answered || sending || readonly) return;
@@ -37,6 +41,7 @@
     sending = false;
   }
 
+  /** Number keys pick for the current question (0 for "I don't know"), Enter checks; never while typing a note. */
   function onKey(e: KeyboardEvent) {
     if (!active || answered || e.ctrlKey || e.metaKey || e.altKey) return;
     const target = e.target as HTMLElement;
@@ -69,35 +74,38 @@
         {#each q.options as option, oi (oi)}
           {@const chosen = answered ? r?.choice === oi : picks[qi] === oi}
           {#if shown(qi, oi)}
-          <li>
-            <button
-              class="option"
-              class:chosen
-              class:right={answered && q.correct === oi}
-              class:wrong={answered && chosen && q.correct !== oi}
-              disabled={answered || readonly}
-              onclick={() => pick(qi, oi)}
-            >
-              <span class="cb" aria-hidden="true"></span>
-              <span class="option-text"><Markdown source={option} inline /></span>
-              {#if answered && q.correct === oi}<span class="verdict-mark" aria-label="right answer">✓</span>{:else if answered && chosen}<span class="verdict-mark" aria-label="your answer, wrong">✗</span>{:else}<kbd class="key">{oi + 1}</kbd>{/if}
-            </button>
-          </li>
+            <li>
+              <button
+                class="option"
+                class:chosen
+                class:right={answered && q.correct === oi}
+                class:wrong={answered && chosen && q.correct !== oi}
+                disabled={answered || readonly}
+                onclick={() => pick(qi, oi)}
+              >
+                <span class="cb" aria-hidden="true"></span>
+                <span class="option-text"><Markdown source={option} inline /></span>
+                {#if answered && q.correct === oi}<span class="verdict-mark" aria-label="right answer">✓</span
+                  >{:else if answered && chosen}<span class="verdict-mark" aria-label="your answer, wrong">✗</span>{:else}<kbd class="key"
+                    >{oi + 1}</kbd
+                  >{/if}
+              </button>
+            </li>
           {/if}
         {/each}
         {#if shown(qi, null)}
-        <li>
-          <button
-            class="option dont-know"
-            class:chosen={answered ? r?.choice === null : picks[qi] === null}
-            disabled={answered || readonly}
-            onclick={() => pick(qi, null)}
-          >
-            <span class="cb" aria-hidden="true"></span>
-            <span class="option-text">I don't know</span>
-            <kbd class="key">0</kbd>
-          </button>
-        </li>
+          <li>
+            <button
+              class="option dont-know"
+              class:chosen={answered ? r?.choice === null : picks[qi] === null}
+              disabled={answered || readonly}
+              onclick={() => pick(qi, null)}
+            >
+              <span class="cb" aria-hidden="true"></span>
+              <span class="option-text">I don't know</span>
+              <kbd class="key">0</kbd>
+            </button>
+          </li>
         {/if}
       </ol>
       {#if compact && !showAll[qi]}
@@ -115,7 +123,8 @@
       {:else if readonly}
         <p class="unanswered">Not answered.</p>
       {:else if noteOpen[qi]}
-        <textarea class="note" rows="2" placeholder="Your reasoning, or what you're unsure about (optional)" bind:value={notes[qi]}></textarea>
+        <textarea class="note" rows="2" placeholder="Your reasoning, or what you're unsure about (optional)" bind:value={notes[qi]}
+        ></textarea>
       {:else}
         <button class="link add-note" onclick={() => (noteOpen[qi] = true)}>Add a note on your reasoning</button>
       {/if}

@@ -12,7 +12,7 @@ const quick = process.argv.includes('--quick');
 
 const gates: { name: string; command: string[]; quick?: boolean }[] = [
   { name: 'docs are current', command: ['node', 'scripts/docs.ts', '--check'], quick: true },
-  { name: 'lint and format', command: ['pnpm', 'exec', 'biome', 'check', '.'], quick: true },
+  { name: 'lint and format', command: ['pnpm', 'run', '--silent', 'lint'], quick: true },
   { name: 'types', command: ['pnpm', 'run', '--silent', 'check'], quick: true },
   { name: 'build', command: ['pnpm', 'run', '--silent', 'build'] },
   { name: 'tests', command: ['pnpm', 'run', '--silent', 'test'] },

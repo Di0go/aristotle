@@ -2,7 +2,7 @@
   // A pathway: boxes and arrows laid out automatically, signals travelling along the arrows (fast or slow),
   // and optional steps that light up one part of it at a time. Written as a ```flow block of JSON.
   import dagre from '@dagrejs/dagre';
-  import { labelBox, smooth } from '../layout.ts';
+  import { LINE_H, labelBox, smooth } from '../layout.ts';
 
   interface FNode {
     id: string;
@@ -32,7 +32,24 @@
 
   let { spec }: { spec: Spec } = $props();
 
+  /** Ids for the arrowhead marker and the edge paths the pulses ride, unique per figure on the page. */
   const uid = `f${Math.random().toString(36).slice(2, 8)}`;
+  const still = typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // Estimated text widths (px per character) for the sub line and the edge labels, so boxes fit their text.
+  const SUB_CHAR_W = 6.2;
+  const EDGE_CHAR_W = 6.4;
+  /** How far apart arrows that join the same pair are fanned, in px. */
+  const FAN = 46;
+  // A pulse takes this long to travel its arrow; starts are staggered within PULSE_STAGGER_S so they don't march in step.
+  const PULSE_FAST = '1.6s';
+  const PULSE_SLOW = '4.5s';
+  const PULSE_STAGGER_S = 1.5;
+
+  let at = $state(-1);
+
+  const steps = $derived(spec.steps ?? []);
+  const lit = $derived(at >= 0 && steps[at] ? new Set(steps[at].on) : null);
 
   const layout = $derived.by(() => {
     // A multigraph: two arrows may join the same pair (the brake and the accelerator both reach the heart).
@@ -44,7 +61,7 @@
     for (const n of spec.nodes) {
       const b = labelBox(n.label);
       const h = b.h + (n.sub ? 16 : 0) + 6;
-      boxes.set(n.id, { ...b, w: Math.max(b.w + 16, n.sub ? n.sub.length * 6.2 + 28 : 0), h });
+      boxes.set(n.id, { ...b, w: Math.max(b.w + 16, n.sub ? n.sub.length * SUB_CHAR_W + 28 : 0), h });
       g.setNode(n.id, { width: boxes.get(n.id)!.w, height: h });
     }
     spec.edges.forEach((e, i) => g.setEdge(e.from, e.to, { i }, `e${i}`));
@@ -54,7 +71,9 @@
       const b = boxes.get(n.id)!;
       return { ...n, x: p.x - b.w / 2, y: p.y - b.h / 2, w: b.w, h: b.h, lines: b.lines };
     });
-    // Arrows that join the same pair would lie on top of each other: fan them out sideways.
+    // Arrows that join the same pair would lie on top of each other: fan them out sideways. Each is redrawn
+    // through a midpoint pushed along the normal to the straight line between its ends (k steps either side
+    // of centre), with its ends nudged a quarter as far so they leave the boxes apart too.
     const pairs = new Map<string, number[]>();
     spec.edges.forEach((e, i) => pairs.set(`${e.from}>${e.to}`, [...(pairs.get(`${e.from}>${e.to}`) ?? []), i]));
     const edges = spec.edges.map((e, i) => {
@@ -67,7 +86,7 @@
         const len = Math.hypot(b.x - a.x, b.y - a.y) || 1;
         const nx = -(b.y - a.y) / len;
         const ny = (b.x - a.x) / len;
-        const off = k * 46;
+        const off = k * FAN;
         const mid = { x: (a.x + b.x) / 2 + nx * off, y: (a.y + b.y) / 2 + ny * off };
         pts = [{ x: a.x + nx * off * 0.25, y: a.y + ny * off * 0.25 }, mid, { x: b.x + nx * off * 0.25, y: b.y + ny * off * 0.25 }];
       }
@@ -78,18 +97,26 @@
     return { nodes, edges, w: Math.ceil(gr.width ?? 400), h: Math.ceil(gr.height ?? 200) };
   });
 
-  let at = $state(-1);
-  const steps = $derived(spec.steps ?? []);
-  const lit = $derived(at >= 0 && steps[at] ? new Set(steps[at].on) : null);
-  const edgeLit = (e: FEdge) => !lit || (lit.has(e.from) && lit.has(e.to));
+  /** An arrow stays lit while a step lights both its ends (or no step is on). */
+  function edgeLit(e: FEdge): boolean {
+    return !lit || (lit.has(e.from) && lit.has(e.to));
+  }
 
-  const still = typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function pulseDur(e: FEdge): string {
+    return (e.speed ?? (e.kind === 'slow' ? 'slow' : 'fast')) === 'slow' ? PULSE_SLOW : PULSE_FAST;
+  }
 </script>
 
 <figure class="kit kit-flow">
   {#if spec.title}<p class="kit-title">{spec.title}</p>{/if}
   <div class="flow-scroll">
-    <svg viewBox="0 0 {layout.w} {layout.h}" style:max-width="{Math.max(layout.w, 320)}px" style:min-width="{Math.min(layout.w, 520)}px" role="img" aria-label={spec.title ?? 'Diagram'}>
+    <svg
+      viewBox="0 0 {layout.w} {layout.h}"
+      style:max-width="{Math.max(layout.w, 320)}px"
+      style:min-width="{Math.min(layout.w, 520)}px"
+      role="img"
+      aria-label={spec.title ?? 'Diagram'}
+    >
       <defs>
         <marker id="{uid}-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
           <path d="M0,1 L9,5 L0,9 z" class="arrowhead" />
@@ -100,7 +127,7 @@
       {/each}
       {#each layout.edges as e (e.i)}
         {#if e.label}
-          {@const w = e.label.length * 6.4 + 12}
+          {@const w = e.label.length * EDGE_CHAR_W + 12}
           <g class="elabel" class:dim={!edgeLit(e)}>
             <rect x={e.mid.x - w / 2} y={e.mid.y - 10} width={w} height="20" rx="10" />
             <text x={e.mid.x} y={e.mid.y + 4} text-anchor="middle">{e.label}</text>
@@ -108,7 +135,7 @@
         {/if}
         {#if !still && edgeLit(e)}
           <circle class="pulse {e.kind ?? 'a'}" r="4">
-            <animateMotion dur={(e.speed ?? (e.kind === 'slow' ? 'slow' : 'fast')) === 'slow' ? '4.5s' : '1.6s'} repeatCount="indefinite" begin="{(e.i * 0.37) % 1.5}s">
+            <animateMotion dur={pulseDur(e)} repeatCount="indefinite" begin="{(e.i * 0.37) % PULSE_STAGGER_S}s">
               <mpath href="#{uid}-e{e.i}" />
             </animateMotion>
           </circle>
@@ -117,8 +144,9 @@
       {#each layout.nodes as n (n.id)}
         <g class="node" class:dim={lit && !lit.has(n.id)} class:on={lit?.has(n.id)} transform="translate({n.x},{n.y})">
           <rect width={n.w} height={n.h} rx="10" />
-          <text x={n.w / 2} y={14 + (n.sub ? 0 : (n.h - 14 - n.lines.length * 17) / 2) + 12} text-anchor="middle">
-            {#each n.lines as line, i (i)}<tspan x={n.w / 2} dy={i === 0 ? 0 : 17}>{line}</tspan>{/each}
+          <!-- Without a sub line the label is centred vertically; with one it sits at the top. -->
+          <text x={n.w / 2} y={14 + (n.sub ? 0 : (n.h - 14 - n.lines.length * LINE_H) / 2) + 12} text-anchor="middle">
+            {#each n.lines as line, i (i)}<tspan x={n.w / 2} dy={i === 0 ? 0 : LINE_H}>{line}</tspan>{/each}
           </text>
           {#if n.sub}<text class="sub" x={n.w / 2} y={n.h - 10} text-anchor="middle">{n.sub}</text>{/if}
         </g>
@@ -131,7 +159,9 @@
       <div class="kit-ticks">
         {#each steps as _, i (i)}<button class:seen={i <= at} aria-label="Step {i + 1}" onclick={() => (at = i)}></button>{/each}
       </div>
-      <button class="primary small" onclick={() => (at = Math.min(steps.length - 1, at + 1))} disabled={at === steps.length - 1}>{at < 0 ? 'Walk through' : 'Next'}</button>
+      <button class="primary small" onclick={() => (at = Math.min(steps.length - 1, at + 1))} disabled={at === steps.length - 1}
+        >{at < 0 ? 'Walk through' : 'Next'}</button
+      >
     </div>
     <p class="kit-note" aria-live="polite">{at >= 0 ? steps[at].caption : 'The whole pathway. Walk through it one part at a time.'}</p>
   {/if}
@@ -194,11 +224,17 @@
     font: 500 11px var(--sans);
   }
 
+  .node {
+    transition: opacity 0.3s;
+  }
+
   .node rect {
     fill: var(--b1);
     stroke: var(--rule-strong);
     stroke-width: 1.2;
-    transition: stroke 0.3s, fill 0.3s;
+    transition:
+      stroke 0.3s,
+      fill 0.3s;
   }
 
   .node.on rect {
@@ -216,11 +252,8 @@
     font: 11px var(--sans);
   }
 
+  /* Whatever the current step leaves out. */
   .dim {
     opacity: 0.18;
-  }
-
-  .node {
-    transition: opacity 0.3s;
   }
 </style>

@@ -4,6 +4,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 
+/** The checkout this server runs from. */
 export const ROOT = path.resolve(import.meta.dirname, '..');
 
 /**
@@ -20,14 +21,16 @@ export const SESSIONS_DIR = path.join(DATA_DIR, 'sessions');
 export const TOPICS_DIR = path.join(DATA_DIR, 'topics');
 export const ROADMAPS_DIR = path.join(DATA_DIR, 'roadmaps');
 export const MISSIONS_DIR = path.join(DATA_DIR, 'missions');
+
 /** Where this install keeps what isn't learning: certificate, settings, pid files, log. Never in git. */
 export const STATE_DIR = process.env.ARISTOTLE_STATE_DIR ?? path.join(ROOT, DEV ? '.dev/state' : '.aristotle');
 export const UI_DIR = path.join(ROOT, 'dist', 'ui');
 
+/** The only address the server listens on: it is for this machine alone. */
 export const HOST = '127.0.0.1';
 /** The HTTP port: 4747 live, 4757 dev. */
 export const PORT = Number(process.env.ARISTOTLE_PORT ?? (DEV ? 4757 : 4747));
-/** The clean name: /etc/hosts maps it to 127.0.0.82, and nftables forwards its ports 80 and 443 here (scripts/setup-hostname.sh). */
+/** The clean name (the address it shows and tls.sh's certificate). scripts/setup-hostname.sh sets up aristotle.test only. */
 export const HOSTNAME = process.env.ARISTOTLE_HOSTNAME ?? 'aristotle.test';
 
 /** HTTPS for the clean name: a certificate from scripts/tls.sh, served on its own port that 443 is forwarded to. Off in dev. */
@@ -42,15 +45,9 @@ export const URL_CLEAN = DEV ? `http://localhost:${PORT}` : `${TLS_TRUSTED ? 'ht
 
 /** This install's own choices, kept out of git: settings.json in the state directory (for example {"accent": "red"}). */
 const SETTINGS_FILE = process.env.ARISTOTLE_SETTINGS ?? path.join(STATE_DIR, 'settings.json');
-function readSettings(): { accent?: string } {
-  try {
-    return JSON.parse(readFileSync(SETTINGS_FILE, 'utf8')) as { accent?: string };
-  } catch {
-    return {};
-  }
-}
+const settings = readSettings();
 /** The accent the interface starts with until a browser picks its own (blue when unset). */
-export const ACCENT = ['blue', 'red', 'violet', 'graphite'].includes(readSettings().accent ?? '') ? readSettings().accent : undefined;
+export const ACCENT = ['blue', 'red', 'violet', 'graphite'].includes(settings.accent ?? '') ? settings.accent : undefined;
 
 /** The Vite dev server's port (vite.config.ts), which proxies to this server in dev. */
 export const VITE_PORT = Number(process.env.ARISTOTLE_VITE_PORT ?? 5173);
@@ -67,3 +64,12 @@ export const CLAUDE_CMD = process.env.ARISTOTLE_CLAUDE_CMD ?? 'claude';
 export const WAIT_MS = Number(process.env.ARISTOTLE_WAIT_MS ?? 15 * 60_000);
 /** Interval of progress notifications while a tool waits, so the call doesn't look idle. */
 export const KEEPALIVE_MS = 15_000;
+
+/** settings.json, or nothing when it is missing or unreadable. */
+function readSettings(): { accent?: string } {
+  try {
+    return JSON.parse(readFileSync(SETTINGS_FILE, 'utf8')) as { accent?: string };
+  } catch {
+    return {};
+  }
+}

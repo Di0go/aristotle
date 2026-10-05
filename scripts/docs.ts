@@ -6,9 +6,9 @@
 //   ...
 //   <!-- /generated -->
 //
-//   pnpm docs              rewrite every generated block
-//   pnpm docs --check      fail if any block is out of date (a gate)
-//   pnpm docs --stage      rewrite them and add the changed docs to the commit (the pre-commit hook)
+//   pnpm docs:gen          rewrite every generated block
+//   pnpm docs:gen --check  fail if any block is out of date (a gate)
+//   pnpm docs:gen --stage  rewrite them and add the changed docs to the commit (the pre-commit hook)
 //
 // The prose around the blocks is written by hand; tests/docs.test.ts and the Stop hook keep it moving with the code.
 
@@ -18,6 +18,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
+
 const read = (rel: string) => readFileSync(path.join(ROOT, rel), 'utf8');
 const list = (dir: string, ext: RegExp) =>
   existsSync(path.join(ROOT, dir))
@@ -26,6 +27,7 @@ const list = (dir: string, ext: RegExp) =>
         .sort()
         .map((f) => `${dir}/${f}`)
     : [];
+/** Text made safe for one cell of a Markdown table. */
 const cell = (s: string) => s.replace(/\|/g, '\\|').replace(/\s+/g, ' ').trim();
 const firstSentence = (s: string) => {
   const m = /^(.+?[.!?])(\s|$)/.exec(s.replace(/\s+/g, ' ').trim());
@@ -70,6 +72,8 @@ export const MAPPED_DIRS: { dir: string; ext: RegExp; title: string }[] = [
 ];
 
 export const mappedFiles = () => MAPPED_DIRS.flatMap((d) => list(d.dir, d.ext));
+
+// The generators: each returns the Markdown for the blocks that carry its name.
 
 function files(): string {
   return MAPPED_DIRS.map(({ dir, ext, title }) => {
@@ -173,6 +177,8 @@ async function tools(): Promise<string> {
   }
 }
 
+// Writing the blocks.
+
 export const GENERATORS: Record<string, () => string | Promise<string>> = { files, routes, env, scripts, skills, kit, tools };
 
 const BLOCK = /(<!-- generated: (\w+) -->)[\s\S]*?(<!-- \/generated -->)/g;
@@ -185,14 +191,13 @@ export async function generate(write: boolean): Promise<string[]> {
   const changed: string[] = [];
   for (const doc of docs) {
     const before = read(doc);
-    let after = before;
     for (const [, , name] of before.matchAll(BLOCK)) {
       const gen = GENERATORS[name];
       if (!gen) throw new Error(`${doc}: no generator called "${name}" (scripts/docs.ts)`);
       used.add(name);
       if (!cache.has(name)) cache.set(name, await gen());
     }
-    after = before.replace(BLOCK, (_, open: string, name: string, close: string) => `${open}\n${cache.get(name)}\n${close}`);
+    const after = before.replace(BLOCK, (_, open: string, name: string, close: string) => `${open}\n${cache.get(name)}\n${close}`);
     if (after !== before) {
       changed.push(doc);
       if (write) writeFileSync(path.join(ROOT, doc), after);
@@ -208,7 +213,7 @@ if (import.meta.main) {
   try {
     const changed = await generate(mode !== '--check');
     if (mode === '--check' && changed.length) {
-      console.error(`Generated docs are out of date: ${changed.join(', ')}. Run: pnpm docs`);
+      console.error(`Generated docs are out of date: ${changed.join(', ')}. Run: pnpm docs:gen`);
       process.exit(1);
     }
     if (mode === '--stage' && changed.length) execFileSync('git', ['add', ...changed], { cwd: ROOT });

@@ -11,8 +11,8 @@ import {
   isFading,
   type Concept,
   type ConceptStatus,
-  type FadingConcept,
   type Evidence,
+  type FadingConcept,
   type Handoff,
   type MapChange,
   type Topic,
@@ -45,12 +45,55 @@ export class Topics {
     return store;
   }
 
+  /** By slug, or by a title that slugifies to one. */
   get(slugOrTitle: string): Topic | undefined {
     return this.topics.get(slugOrTitle) ?? this.topics.get(slugify(slugOrTitle));
   }
 
+  /** Every topic as a summary, most recently changed first. */
   list(): TopicSummary[] {
     return [...this.topics.values()].map(summarize).sort((a, b) => b.updated.localeCompare(a.updated));
+  }
+
+  all(): Topic[] {
+    return [...this.topics.values()];
+  }
+
+  /** Solid concepts past their review date, least likely to be recalled first. */
+  fading(topicSlug?: string, now = new Date()): FadingConcept[] {
+    const out: FadingConcept[] = [];
+    for (const topic of this.topics.values()) {
+      if (topicSlug && topic.slug !== topicSlug) continue;
+      for (const c of topic.concepts) {
+        if (!isFading(c, now.getTime())) continue;
+        const last = c.evidence.at(-1)?.at;
+        out.push({
+          topic: topic.slug,
+          topicTitle: topic.title,
+          id: c.id,
+          label: c.label,
+          ...(c.summary ? { summary: c.summary } : {}),
+          due: c.review!.due,
+          recall: retrievability(c.review!, now),
+          ...(last ? { lastPractised: last } : {}),
+        });
+      }
+    }
+    return out.sort((a, b) => a.recall - b.recall);
+  }
+
+  /** Solid concepts coming due within `days`. */
+  upcoming(days: number, now = new Date()): number {
+    const limit = now.getTime() + days * 86_400_000;
+    let n = 0;
+    for (const topic of this.topics.values()) {
+      for (const c of topic.concepts) {
+        if (c.status !== 'solid' || !c.review) continue;
+        const due = Date.parse(c.review.due);
+        if (due > now.getTime() && due <= limit) n++;
+      }
+    }
+    return n;
   }
 
   /** Finds a topic by slug or title, or creates it. */
@@ -68,14 +111,15 @@ export class Topics {
       sessions: [],
     };
     this.topics.set(topic.slug, topic);
-    await this.save(topic);
+    await this.write(topic);
     return { topic, created: true };
   }
 
+  /** Notes that a session belongs to this topic. */
   async addSession(slug: string, session: string) {
     const topic = this.require(slug);
     topic.sessions.push(session);
-    await this.save(topic);
+    await this.write(topic);
   }
 
   /** Adds or updates concepts and removes others. Returns what changed in ways worth showing. */
@@ -132,8 +176,28 @@ export class Topics {
 
     if (focus !== undefined) topic.focus = focus ? slugify(focus) : undefined;
     topic.updated = now;
-    await this.save(topic);
+    await this.write(topic);
     return changes;
+  }
+
+  /** Marks the concept being taught now, if it is on the map. */
+  async setFocus(slug: string, concept: string) {
+    const topic = this.require(slug);
+    const id = slugify(concept);
+    if (topic.focus === id || !topic.concepts.some((c) => c.id === id)) return;
+    topic.focus = id;
+    await this.write(topic);
+  }
+
+  /** Records evidence on a concept. Returns false if the concept isn't on the map. */
+  async recordEvidence(slug: string, concept: string, evidence: Evidence): Promise<boolean> {
+    const topic = this.require(slug);
+    const c = topic.concepts.find((x) => x.id === slugify(concept));
+    if (!c) return false;
+    c.evidence.push(evidence);
+    topic.updated = evidence.at;
+    await this.write(topic);
+    return true;
   }
 
   /**
@@ -163,7 +227,7 @@ export class Topics {
     }
     concept.updated = evidence.at;
     topic.updated = evidence.at;
-    await this.save(topic);
+    await this.write(topic);
     return { concept, ...(change ? { change } : {}), ...(recallBefore !== undefined ? { recallBefore } : {}) };
   }
 
@@ -173,76 +237,17 @@ export class Topics {
     const from = topic.training?.level ?? 1;
     const to = Math.min(10, Math.max(1, from + delta));
     topic.training = { level: to, updated: new Date().toISOString() };
-    await this.save(topic);
+    await this.write(topic);
     return { from, to };
   }
 
-  /** Solid concepts past their review date, least likely to be recalled first. */
-  fading(topicSlug?: string, now = new Date()): FadingConcept[] {
-    const out: FadingConcept[] = [];
-    for (const topic of this.topics.values()) {
-      if (topicSlug && topic.slug !== topicSlug) continue;
-      for (const c of topic.concepts) {
-        if (!isFading(c, now.getTime())) continue;
-        const last = c.evidence.at(-1)?.at;
-        out.push({
-          topic: topic.slug,
-          topicTitle: topic.title,
-          id: c.id,
-          label: c.label,
-          ...(c.summary ? { summary: c.summary } : {}),
-          due: c.review!.due,
-          recall: retrievability(c.review!, now),
-          ...(last ? { lastPractised: last } : {}),
-        });
-      }
-    }
-    return out.sort((a, b) => a.recall - b.recall);
-  }
-
-  /** Solid concepts coming due within `days`. */
-  upcoming(days: number, now = new Date()): number {
-    const limit = now.getTime() + days * 86_400_000;
-    let n = 0;
-    for (const topic of this.topics.values()) {
-      for (const c of topic.concepts) {
-        if (c.status !== 'solid' || !c.review) continue;
-        const due = Date.parse(c.review.due);
-        if (due > now.getTime() && due <= limit) n++;
-      }
-    }
-    return n;
-  }
-
-  all(): Topic[] {
-    return [...this.topics.values()];
-  }
-
-  async setFocus(slug: string, concept: string) {
-    const topic = this.require(slug);
-    const id = slugify(concept);
-    if (topic.focus === id || !topic.concepts.some((c) => c.id === id)) return;
-    topic.focus = id;
-    await this.save(topic);
-  }
-
-  /** Records evidence on a concept. Returns false if the concept isn't on the map. */
-  async recordEvidence(slug: string, concept: string, evidence: Evidence): Promise<boolean> {
-    const topic = this.require(slug);
-    const c = topic.concepts.find((x) => x.id === slugify(concept));
-    if (!c) return false;
-    c.evidence.push(evidence);
-    topic.updated = evidence.at;
-    await this.save(topic);
-    return true;
-  }
-
+  /** Saves a session's handoff; the focus ends with the session. */
   async setHandoff(slug: string, handoff: Handoff) {
     const topic = this.require(slug);
     topic.handoff = handoff;
     topic.focus = undefined;
     topic.updated = handoff.at;
-    await this.save(topic);
+    await this.write(topic);
   }
 
   private require(slug: string): Topic {
@@ -252,7 +257,7 @@ export class Topics {
   }
 
   /** Atomic write (temp file + rename), one write at a time per topic. */
-  private async save(topic: Topic) {
+  private async write(topic: Topic) {
     const file = path.join(TOPICS_DIR, `${topic.slug}.json`);
     const previous = this.saving.get(topic.slug) ?? Promise.resolve();
     const next = previous.then(async () => {
@@ -266,53 +271,15 @@ export class Topics {
   }
 }
 
-/** Changes a concept's status, keeping its review card in step: becoming solid counts as a successful
- * review (or starts the card), and falling from solid counts as a lapse. */
-function setStatus(concept: Concept, status: ConceptStatus, nowIso: string) {
-  const now = new Date(nowIso);
-  if (status === 'solid') {
-    concept.solidSince = nowIso;
-    concept.review = concept.review ? gradeReview(concept.review, 'right', now) : startReview(now);
-  } else if (concept.status === 'solid' && concept.review) {
-    concept.review = gradeReview(concept.review, 'wrong', now);
-  }
-  concept.status = status;
-}
-
-export function summarize(topic: Topic): TopicSummary {
-  const counts: Record<ConceptStatus, number> = { unknown: 0, shaky: 0, solid: 0 };
-  let fading = 0;
-  for (const c of topic.concepts) {
-    counts[c.status]++;
-    if (isFading(c)) fading++;
-  }
-  return {
-    slug: topic.slug,
-    title: topic.title,
-    goal: topic.goal,
-    updated: topic.updated,
-    counts,
-    fading,
-    sessions: topic.sessions.length,
-    ...(topic.handoff ? { handoff: topic.handoff } : {}),
-    ...(topic.training ? { trainingLevel: topic.training.level } : {}),
-  };
-}
-
-/** "Other Topic/Some Concept" -> "other-topic/some-concept"; plain ids are slugified. */
-function normalizeDep(dep: string): string {
-  const [a, b] = dep.split('/');
-  return b === undefined ? slugify(a) : `${slugify(a)}/${slugify(b)}`;
-}
-
 /** The map as Claude reads it: statuses, structure and a short evidence record per concept. */
 export function describeTopic(topic: Topic): string {
   const lines = topic.concepts.map((c) => {
     const ev = c.evidence;
-    const right = ev.filter((e) => e.result === 'right').length;
-    const wrong = ev.filter((e) => e.result === 'wrong').length;
-    const dk = ev.filter((e) => e.result === 'dont-know').length;
-    const asks = ev.filter((e) => e.kind === 'ask').length;
+    const count = (match: (e: Evidence) => boolean) => ev.filter(match).length;
+    const right = count((e) => e.result === 'right');
+    const wrong = count((e) => e.result === 'wrong');
+    const dk = count((e) => e.result === 'dont-know');
+    const asks = count((e) => e.kind === 'ask');
     const practice = ev.filter((e) => e.kind === 'practice' && e.practice !== 'mission');
     const applied = ev.filter((e) => e.practice === 'mission');
     const record =
@@ -343,4 +310,46 @@ export function describeTopic(topic: Topic): string {
   ]
     .filter((l) => l !== '')
     .join('\n');
+}
+
+/** The counts the topic list shows. */
+function summarize(topic: Topic): TopicSummary {
+  const counts: Record<ConceptStatus, number> = { unknown: 0, shaky: 0, solid: 0 };
+  let fading = 0;
+  for (const c of topic.concepts) {
+    counts[c.status]++;
+    if (isFading(c)) fading++;
+  }
+  return {
+    slug: topic.slug,
+    title: topic.title,
+    goal: topic.goal,
+    updated: topic.updated,
+    counts,
+    fading,
+    sessions: topic.sessions.length,
+    ...(topic.handoff ? { handoff: topic.handoff } : {}),
+    ...(topic.training ? { trainingLevel: topic.training.level } : {}),
+  };
+}
+
+/**
+ * Changes a concept's status, keeping its review card in step: becoming solid counts as a successful
+ * review (or starts the card), and falling from solid counts as a lapse.
+ */
+function setStatus(concept: Concept, status: ConceptStatus, nowIso: string) {
+  const now = new Date(nowIso);
+  if (status === 'solid') {
+    concept.solidSince = nowIso;
+    concept.review = concept.review ? gradeReview(concept.review, 'right', now) : startReview(now);
+  } else if (concept.status === 'solid' && concept.review) {
+    concept.review = gradeReview(concept.review, 'wrong', now);
+  }
+  concept.status = status;
+}
+
+/** "Other Topic/Some Concept" -> "other-topic/some-concept"; plain ids are slugified. */
+function normalizeDep(dep: string): string {
+  const [a, b] = dep.split('/');
+  return b === undefined ? slugify(a) : `${slugify(a)}/${slugify(b)}`;
 }

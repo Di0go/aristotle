@@ -2,11 +2,12 @@
   // The log: every session, grouped by day, each linking to its full record.
   import { feed } from '../lib/feed.svelte.ts';
   import { link } from '../lib/router.svelte.ts';
-  import { formatDay, formatTime, plural } from '../lib/format.ts';
+  import { formatDay, formatTime, sessionStats } from '../lib/format.ts';
   import type { SessionSummary } from '../../../shared/types.ts';
 
   let sessions = $state<SessionSummary[] | null>(null);
 
+  // Fetched again whenever the feed moves on (a new item, a topic saved), so today's numbers stay current.
   $effect(() => {
     void feed.topicVersion;
     void feed.items.length;
@@ -53,12 +54,7 @@
                   <span>{s.goal}</span>
                   {#if s.handoff}<span class="muted">Next: {s.handoff.next}</span>{/if}
                 </span>
-                <span class="stats muted">
-                  {s.activeMinutes ? `${s.activeMinutes} min` : 'under a minute'}
-                  {#if s.steps}<br />{plural(s.steps, 'step')}{/if}
-                  {#if s.quizTotal}<br />quizzes {s.quizRight}/{s.quizTotal}{/if}
-                  {#if s.asks}<br />{plural(s.asks, 'written answer')}{/if}
-                </span>
+                <span class="stats muted">{sessionStats(s, 'log')}</span>
               </a>
             </li>
           {/each}
@@ -76,7 +72,7 @@
   .log-day .section-title {
     font-size: 0.9rem;
     margin-bottom: 8px;
-    color: var(--graphite);
+    color: var(--muted);
   }
 
   .session-list {
@@ -92,7 +88,7 @@
     gap: 20px;
     padding: 18px 0;
     border-top: 1px solid var(--rule);
-    color: var(--ink);
+    color: var(--fg);
     text-decoration: none;
   }
 
@@ -102,7 +98,7 @@
 
   .when {
     font: 0.83rem var(--sans);
-    color: var(--graphite);
+    color: var(--muted);
     padding-top: 3px;
   }
 
@@ -130,6 +126,8 @@
     font-size: 0.78rem;
     line-height: 1.6;
     text-align: right;
+    /* One number per line. */
+    white-space: pre-line;
   }
 
   @media (max-width: 700px) {

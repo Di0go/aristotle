@@ -1,13 +1,13 @@
 <script lang="ts">
   // A topic's page: its knowledge map as a graph, the concept panel, the outline and its sessions.
-  import { feed } from '../lib/feed.svelte.ts';
-  import { link } from '../lib/router.svelte.ts';
-  import { ago, formatDay, formatTime, plural } from '../lib/format.ts';
+  import { actions } from '../lib/actions.ts';
+  import { feed, topicSessions } from '../lib/feed.svelte.ts';
+  import { ago, formatDay, formatTime, sessionStats } from '../lib/format.ts';
   import { countsOf, markOf, outline, placeOf } from '../lib/library.ts';
+  import { link } from '../lib/router.svelte.ts';
+  import ConceptPanel from '../lib/ConceptPanel.svelte';
   import MapGraph from '../lib/MapGraph.svelte';
   import StatusBar from '../lib/StatusBar.svelte';
-  import ConceptPanel from '../lib/ConceptPanel.svelte';
-  import { actions } from '../lib/actions.ts';
   import type { SessionSummary } from '../../../shared/types.ts';
 
   let { slug, concept = undefined }: { slug: string; concept?: string } = $props();
@@ -19,10 +19,13 @@
   const topic = $derived(feed.topics[slug] ?? null);
   const counts = $derived(countsOf(topic ?? undefined));
   const place = $derived(placeOf(slug, feed.roadmapList));
-  const missions = $derived(feed.missionList.filter((m) => m.topic === slug && m.scope !== 'capstone' && m.status !== 'dropped'));
   const step = $derived(place ? place.roadmap.steps[place.index] : null);
+  /** This topic's own live missions: capstones belong to the roadmap, dropped ones are left out. */
+  const missions = $derived(feed.missionList.filter((m) => m.topic === slug && m.scope !== 'capstone' && m.status !== 'dropped'));
   const chosen = $derived(topic?.concepts.find((c) => c.id === selected) ?? null);
   const ordered = $derived(topic ? outline(topic) : []);
+  /** What the handoff says is still shaky, unless it says nothing is. */
+  const shaky = $derived(topic?.handoff?.shaky && topic.handoff.shaky.toLowerCase() !== 'nothing' ? topic.handoff.shaky : '');
 
   $effect(() => {
     selected = concept ?? null;
@@ -34,21 +37,37 @@
     if (feed.loaded && !feed.topics[slug]) missing = true;
   });
 
+  // Only the latest request may write, so a slow older reply can't overwrite a newer one.
+  let request = 0;
   $effect(() => {
     void feed.topicVersion;
-    void fetch('/api/sessions')
-      .then((r) => r.json())
-      .then((all: SessionSummary[]) => (sessions = all.filter((s) => s.topicSlug === slug)));
+    const mine = ++request;
+    void topicSessions(slug).then((all) => {
+      if (mine === request) sessions = all;
+    });
   });
 
+  /** Selects a concept, keeping it in the address without adding a history entry. */
   function select(id: string | null) {
     selected = id;
     history.replaceState(null, '', link.topic(slug, id ?? undefined));
+  }
+
+  /** Clicking the selected concept again deselects it. */
+  function toggle(id: string) {
+    select(selected === id ? null : id);
+  }
+
+  /** A mission for this topic: the step's mission when it sits on a roadmap, a topic mission otherwise. */
+  function getMission() {
+    if (place) actions.stepMission(place.roadmap, place.index);
+    else actions.topicMission(slug);
   }
 </script>
 
 <div class="page topic-page">
   {#if topic}
+    <!-- Header -->
     <header class="page-head">
       <nav class="crumbs" aria-label="Where this is">
         {#if place}
@@ -70,7 +89,7 @@
           <a class="ghost" href={link.mission(m.id)}>Praxis: {m.title}</a>
         {:else}
           {#if counts.solid >= 2}
-            <button class="ghost" onclick={() => (place ? actions.stepMission(place.roadmap, place.index) : actions.topicMission(slug))}>Get a Praxis mission</button>
+            <button class="ghost" onclick={getMission}>Get a Praxis mission</button>
           {/if}
         {/each}
       </div>
@@ -80,15 +99,16 @@
       <section class="handoff">
         <p class="kicker">Next time</p>
         <p class="handoff-next">{topic.handoff.next}</p>
-        {#if topic.handoff.shaky && topic.handoff.shaky.toLowerCase() !== 'nothing'}
+        {#if shaky}
           <details>
             <summary>What's still shaky</summary>
-            <p class="muted handoff-shaky">{topic.handoff.shaky}</p>
+            <p class="muted handoff-shaky">{shaky}</p>
           </details>
         {/if}
       </section>
     {/if}
 
+    <!-- Outline and sessions beside the map -->
     <div class="topic-grid">
       <aside class="topic-side">
         <section>
@@ -96,12 +116,12 @@
             <h2 class="section-title">Outline</h2>
             {#if counts.total}<span class="muted">{counts.solid}/{counts.total} solid</span>{/if}
           </div>
-          {#if counts.total}<StatusBar counts={counts} fading={counts.fading} />{/if}
+          {#if counts.total}<StatusBar {counts} fading={counts.fading} />{/if}
           {#if ordered.length}
             <ol class="outline">
               {#each ordered as c (c.id)}
                 <li class:on={selected === c.id} class:focus={topic.focus === c.id}>
-                  <button class="link-button" onclick={() => select(selected === c.id ? null : c.id)} data-concept="{slug}/{c.id}">
+                  <button class="link-button" onclick={() => toggle(c.id)} data-concept="{slug}/{c.id}">
                     <i class="dot {markOf(c)}"></i>
                     <span class="outline-label" class:goal={c.goal}>{c.label}</span>
                   </button>
@@ -122,9 +142,7 @@
                   <a href={link.session(s.id)}>
                     <span class="when">{formatDay(s.startedAt)}, {formatTime(s.startedAt)}</span>
                     <span class="what">{s.goal}</span>
-                    <span class="muted stats">
-                      {s.kind === 'train' ? 'Training, ' : ''}{s.activeMinutes ? `${s.activeMinutes} min` : 'under a minute'}{s.quizTotal ? `, ${s.quizRight}/${s.quizTotal} on quizzes` : ''}{s.asks ? `, ${plural(s.asks, 'written answer')}` : ''}
-                    </span>
+                    <span class="muted stats">{sessionStats(s)}</span>
                   </a>
                 </li>
               {/each}
@@ -135,7 +153,7 @@
 
       <div class="topic-main">
         <section class="map-sheet graph-paper">
-          <MapGraph {topic} others={feed.topics} direction="TB" selected={selected} onselect={(id) => select(id === selected ? null : id)} />
+          <MapGraph {topic} others={feed.topics} direction="TB" {selected} onselect={toggle} />
           <div class="map-legend legend">
             <span><i class="dot solid"></i>Solid</span>
             <span><i class="dot fading"></i>Fading</span>
@@ -161,9 +179,14 @@
       </nav>
       <h1 class="page-title">{step.title}</h1>
       <dl class="props">
-        <dt>status</dt><dd>Not started</dd>
-        <dt>goal</dt><dd>{step.goal}</dd>
-        {#if before.length}<dt>builds on</dt><dd>{#each before as b, i (b.topic)}{#if i}{', '}{/if}<a href={link.topic(b.topic)}>{b.title}</a>{/each}</dd>{/if}
+        <dt>status</dt>
+        <dd>Not started</dd>
+        <dt>goal</dt>
+        <dd>{step.goal}</dd>
+        {#if before.length}<dt>builds on</dt>
+          <dd>
+            {#each before as b, i (b.topic)}{#if i}{', '}{/if}<a href={link.topic(b.topic)}>{b.title}</a>{/each}
+          </dd>{/if}
       </dl>
       {#if step.why}<p class="why muted">{step.why}</p>{/if}
       <div class="head-actions">
@@ -234,7 +257,7 @@
     margin: -12px 0 48px;
     padding: 18px 22px;
     border-left: 3px solid var(--marker-solid);
-    background: var(--sheet-2);
+    background: var(--b1);
     border-radius: 0 var(--radius) var(--radius) 0;
   }
 
@@ -259,7 +282,7 @@
   }
 
   summary {
-    color: var(--graphite);
+    color: var(--muted);
     cursor: pointer;
   }
 
@@ -289,17 +312,17 @@
     content: counter(outline);
     min-width: 1.4em;
     font: 0.7rem var(--sans);
-    color: var(--graphite);
+    color: var(--muted);
   }
 
   .outline button:hover {
-    background: var(--sheet-2);
-    color: var(--ink);
+    background: var(--b1);
+    color: var(--fg);
   }
 
   .outline li.on button {
     background: var(--cyan-soft);
-    color: var(--ink);
+    color: var(--fg);
   }
 
   .outline li.focus button {
@@ -307,7 +330,7 @@
   }
 
   .outline-label.goal {
-    text-decoration: underline double var(--cyan);
+    text-decoration: underline double var(--acc);
     text-underline-offset: 0.22em;
   }
 
@@ -322,7 +345,7 @@
     gap: 2px;
     padding: 12px 0;
     border-top: 1px solid var(--rule);
-    color: var(--ink);
+    color: var(--fg);
     text-decoration: none;
   }
 
@@ -332,7 +355,7 @@
 
   .sessions .when {
     font: 0.76rem var(--sans);
-    color: var(--graphite);
+    color: var(--muted);
   }
 
   .sessions .what {

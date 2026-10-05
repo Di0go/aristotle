@@ -21,6 +21,20 @@
     { id: 'transplant', label: 'No nerves at all', brake: 0, accel: 0 },
   ];
 
+  // The model's timings, in seconds (see the header).
+  const VAGAL_TAU = 0.6;
+  const SYMP_DELAY = 1.5;
+  const SYMP_TAU = 7;
+  /** The rate chart shows this many seconds back. */
+  const HISTORY_S = 30;
+  /** The trace shows this many seconds back. */
+  const TRACE_S = 6;
+  /** How long the heart stays swollen after a beat, in seconds. */
+  const PULSE_S = 0.25;
+  // The rate chart's range, in beats a minute.
+  const RATE_LO = 30;
+  const RATE_HI = 210;
+
   // Options set where the figure starts; after that the sliders are his.
   const initial = untrack(() => ({ ...spec }));
   let age = $state(initial.age ?? 24);
@@ -28,17 +42,29 @@
   let accel = $state(0.04);
   let denervated = $state(false);
   let preset = $state<string | null>('resting');
+  let rate = $state(0);
+  let pulse = $state(0);
+  let canvas = $state<HTMLCanvasElement>();
+
+  // Effects that lag their sliders, and what has happened lately. Plain variables: only the frame loop reads them.
+  let vEff = 0.72;
+  let sEff = 0.04;
+  let sQueue: { t: number; v: number }[] = [];
+  let history: { t: number; hr: number }[] = [];
 
   const ihr = $derived(118.1 - 0.57 * age);
   const hrMax = $derived(208 - 0.7 * age);
 
-  // Effects that lag their sliders.
-  let vEff = 0.72;
-  let sEff = 0.04;
-  let sQueue: { t: number; v: number }[] = [];
-  let rate = $state(0);
-  let history: { t: number; hr: number }[] = [];
+  const start = PRESETS.find((p) => p.id === initial.start);
+  if (start) {
+    brake = start.brake;
+    accel = start.accel;
+    preset = start.id;
+    vEff = start.brake;
+    sEff = start.accel;
+  }
 
+  /** The rate the nerves are asking for: the brake pulls down to half of IHR, the accelerator from there toward HRmax. */
   function target(v: number, s: number) {
     const base = ihr * (1 - 0.5 * v);
     return base + s * (hrMax - base);
@@ -52,18 +78,14 @@
     accel = p.accel;
   }
 
-  const start = PRESETS.find((p) => p.id === initial.start);
-  if (start) {
-    brake = start.brake;
-    accel = start.accel;
-    preset = start.id;
-    vEff = start.brake;
-    sEff = start.accel;
+  /** A stylised beat on the trace (P, QRS, T) as a function of seconds since the beat; flat in between. */
+  function ecg(s: number): number {
+    if (s < 0.04) return -0.12 * Math.sin((s / 0.04) * Math.PI);
+    if (s < 0.08) return Math.sin(((s - 0.04) / 0.04) * Math.PI);
+    if (s < 0.12) return -0.25 * Math.sin(((s - 0.08) / 0.04) * Math.PI);
+    if (s > 0.2 && s < 0.38) return 0.22 * Math.sin(((s - 0.2) / 0.18) * Math.PI);
+    return 0;
   }
-
-  let canvas = $state<HTMLCanvasElement>();
-  let beat = $state(0);
-  let pulse = $state(0);
 
   onMount(() => {
     const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -71,53 +93,46 @@
     let last = performance.now();
     let phase = 0;
     let since = 10;
-    const trace: number[] = [];
-    const TRACE_SECONDS = 6;
+    // One trace sample per frame, kept by time so the trace spans TRACE_S at any frame rate.
+    const trace: { t: number; y: number }[] = [];
     const css = getComputedStyle(document.documentElement);
 
     function frame(now: number) {
-      const dt = Math.min(0.05, (now - last) / 1000);
+      // Capped, so a frame after the tab was hidden doesn't jump the model; the cap lets through the 200 ms
+      // frames of reduced motion, so the model still runs in real time.
+      const dt = Math.min(still ? 0.25 : 0.05, (now - last) / 1000);
       last = now;
       const t = now / 1000;
       const vTarget = denervated ? 0 : brake;
       const sTarget = denervated ? 0 : accel;
-      // the accelerator's command arrives late
+      // The accelerator's command arrives late: queue it and act on what was asked SYMP_DELAY ago.
       sQueue.push({ t, v: sTarget });
-      while (sQueue.length > 1 && sQueue[1].t <= t - 1.5) sQueue.shift();
-      const sCmd = sQueue[0].t <= t - 1.5 ? sQueue[0].v : sEff;
-      vEff += (vTarget - vEff) * (1 - Math.exp(-dt / 0.6));
-      sEff += (sCmd - sEff) * (1 - Math.exp(-dt / 7));
+      while (sQueue.length > 1 && sQueue[1].t <= t - SYMP_DELAY) sQueue.shift();
+      const sCmd = sQueue[0].t <= t - SYMP_DELAY ? sQueue[0].v : sEff;
+      // Each effect closes the gap to its command exponentially, with its own time constant.
+      vEff += (vTarget - vEff) * (1 - Math.exp(-dt / VAGAL_TAU));
+      sEff += (sCmd - sEff) * (1 - Math.exp(-dt / SYMP_TAU));
       rate = target(vEff, sEff);
       history.push({ t, hr: rate });
-      while (history.length && history[0].t < t - 30) history.shift();
+      while (history.length && history[0].t < t - HISTORY_S) history.shift();
 
-      // beats
+      // Beats: the phase runs at the rate, and each time it wraps the heart beats.
       phase += (rate / 60) * dt;
       since += dt;
       if (phase >= 1) {
         phase -= 1;
         since = 0;
-        beat++;
       }
-      pulse = Math.max(0, 1 - since / 0.25);
+      pulse = Math.max(0, 1 - since / PULSE_S);
 
-      // trace: a stylised beat shape (P, QRS, T) as a function of time since the beat
-      const v = (() => {
-        const s = since;
-        if (s < 0.04) return -0.12 * Math.sin((s / 0.04) * Math.PI);
-        if (s < 0.08) return Math.sin(((s - 0.04) / 0.04) * Math.PI);
-        if (s < 0.12) return -0.25 * Math.sin(((s - 0.08) / 0.04) * Math.PI);
-        if (s > 0.2 && s < 0.38) return 0.22 * Math.sin(((s - 0.2) / 0.18) * Math.PI);
-        return 0;
-      })();
-      trace.push(v);
-      const keep = Math.round(TRACE_SECONDS * 60);
-      while (trace.length > keep) trace.shift();
+      trace.push({ t, y: ecg(since) });
+      while (trace.length && trace[0].t < t - TRACE_S) trace.shift();
 
       if (canvas) {
         const ctx = canvas.getContext('2d')!;
         const w = canvas.clientWidth;
         const h = canvas.clientHeight;
+        // Draw at the screen's pixel density, so lines stay sharp.
         const dpr = devicePixelRatio || 1;
         if (canvas.width !== w * dpr) {
           canvas.width = w * dpr;
@@ -125,35 +140,37 @@
         }
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         ctx.clearRect(0, 0, w, h);
-        // trace (top two thirds)
+
+        // The trace, in the top half, around a baseline 62% of the way down it.
         const th = h * 0.5;
+        const baseline = th * 0.62;
         ctx.strokeStyle = css.getPropertyValue('--rule').trim();
         ctx.lineWidth = 1;
         ctx.beginPath();
-        ctx.moveTo(0, th * 0.62);
-        ctx.lineTo(w, th * 0.62);
+        ctx.moveTo(0, baseline);
+        ctx.lineTo(w, baseline);
         ctx.stroke();
         const heart = css.getPropertyValue('--heart').trim();
         ctx.strokeStyle = heart;
         ctx.lineWidth = 2;
         ctx.beginPath();
-        trace.forEach((y, i) => {
-          const x = (i / keep) * w;
-          const yy = th * 0.62 - y * th * 0.5;
+        trace.forEach(({ t: ts, y }, i) => {
+          const x = ((ts - (t - TRACE_S)) / TRACE_S) * w;
+          const yy = baseline - y * th * 0.5;
           if (i === 0) ctx.moveTo(x, yy);
           else ctx.lineTo(x, yy);
         });
         ctx.stroke();
-        // rate over the last 30 s (bottom)
+
+        // The rate over the last HISTORY_S seconds, along the bottom, with room on the right for the labels.
         const top = h * 0.6;
         const bh = h - top - 14;
-        const lo = 30;
-        const hi = 210;
         const faint = css.getPropertyValue('--faint').trim();
         ctx.fillStyle = faint;
         ctx.font = `11px ${css.getPropertyValue('--sans')}`;
         ctx.fillText('heart rate, last 30 s', 0, top - 2);
-        const yOf = (hr: number) => top + 6 + bh - ((hr - lo) / (hi - lo)) * bh;
+        const yOf = (hr: number) => top + 6 + bh - ((hr - RATE_LO) / (RATE_HI - RATE_LO)) * bh;
+        const xOf = (p: { t: number }) => ((p.t - (t - HISTORY_S)) / HISTORY_S) * (w - 32);
         // Reference lines, labelled in beats a minute, so the curve can be read.
         ctx.strokeStyle = css.getPropertyValue('--rule').trim();
         ctx.lineWidth = 1;
@@ -166,7 +183,6 @@
           ctx.fillText(String(ref), w, yOf(ref) + 4);
         }
         ctx.textAlign = 'left';
-        const xOf = (p: { t: number }) => ((p.t - (t - 30)) / 30) * (w - 32);
         if (history.length > 1) {
           // The area under the curve, then the curve.
           ctx.beginPath();
@@ -187,9 +203,10 @@
       }
       if (!still) raf = requestAnimationFrame(frame);
     }
+
     raf = requestAnimationFrame(frame);
     if (still) {
-      // One frame is enough to show the state; sliders re-render on input.
+      // No animation loop: a frame every 200 ms is enough to follow the sliders.
       const t = setInterval(() => frame(performance.now()), 200);
       return () => clearInterval(t);
     }
@@ -230,9 +247,13 @@
     </label>
   </div>
   <p class="kit-note">
-    Try it: from Resting, drop the brake and the rate jumps within a beat or two. Push the accelerator instead and it climbs over several seconds. That difference is why your heart jumps the moment your name is called, long before adrenaline arrives.
+    Try it: from Resting, drop the brake and the rate jumps within a beat or two. Push the accelerator instead and it climbs over several
+    seconds. That difference is why your heart jumps the moment your name is called, long before adrenaline arrives.
   </p>
-  <p class="model">A simplified model. Intrinsic rate 118.1 − 0.57 × age (Jose and Collison); maximum 208 − 0.7 × age (Tanaka, 2001); both are averages that vary by person.</p>
+  <p class="model">
+    A simplified model. Intrinsic rate 118.1 − 0.57 × age (Jose and Collison); maximum 208 − 0.7 × age (Tanaka, 2001); both are averages
+    that vary by person.
+  </p>
 </figure>
 
 <style>

@@ -9,8 +9,7 @@ interface ServerMessage {
   replay?: boolean;
 }
 
-// Strips ANSI escape sequences, for reading what is on screen.
-// eslint-disable-next-line no-control-regex
+/** ANSI escape sequences, stripped out to read what is on screen. */
 const ANSI = /\x1b\[[0-9;?]*[ -/]*[@-~]|\x1b\][^\x07]*(?:\x07|\x1b\\)|\x1b[@-Z\\-_]/g;
 /** Claude Code's status line while it works ("✻ Pondering… (12s · esc to interrupt)"). */
 const WORKING = /esc to interrupt/i;
@@ -26,8 +25,6 @@ class Claude {
   open = $state(false);
   /** The drawer has been opened at least once (it stays mounted afterwards). */
   mounted = $state(false);
-  /** Output arrived while the drawer was closed. */
-  activity = $state(false);
   /** Claude Code seems to be waiting on a prompt in the terminal. */
   asking = $state(false);
   /** Claude is working (its status line says so). Cleared a moment after the status line stops. */
@@ -38,13 +35,15 @@ class Claude {
   doing = $state('');
   /** The last thing Claude said in the terminal, best effort: what to answer when it is waiting on him. */
   lastSaid = $state('');
-  private idleTimer: ReturnType<typeof setTimeout> | undefined;
 
   private ws: WebSocket | null = null;
   private listeners = new Set<Listener>();
+  /** Everything shown so far (the last 256 KB), replayed to a terminal that opens late. */
   private screen = '';
+  /** The last stretch of output as plain text, watched for a prompt that needs him. */
   private recent = '';
   private retry: ReturnType<typeof setTimeout> | undefined;
+  private idleTimer: ReturnType<typeof setTimeout> | undefined;
 
   connect() {
     if (this.ws) return;
@@ -71,16 +70,16 @@ class Claude {
     for (const l of this.listeners) l(msg.data, Boolean(msg.replay));
     if (msg.replay) return;
     // Claude Code moves the cursor between words instead of printing spaces, so each escape becomes a space.
-    this.recent = (this.recent + msg.data.replace(ANSI, ' ').replace(/\s+/g, ' ')).slice(-1500);
-    if (ASKING.test(this.recent)) this.asking = true;
-    if (!this.open) this.activity = true;
     const chunk = msg.data.replace(ANSI, ' ').replace(/\s+/g, ' ');
+    this.recent = (this.recent + chunk).slice(-1500);
+    if (ASKING.test(this.recent)) this.asking = true;
     if (WORKING.test(chunk)) {
       if (!this.busy) this.busySince = Date.now();
       this.busy = true;
       const words = [...chunk.matchAll(STATUS_WORD)];
       if (words.length) this.doing = words[words.length - 1][1];
       clearTimeout(this.idleTimer);
+      // The status line keeps redrawing while Claude works; once it has been quiet for a moment, the work is over.
       this.idleTimer = setTimeout(() => {
         this.busy = false;
         this.doing = '';
@@ -152,10 +151,7 @@ class Claude {
 
   toggle(force?: boolean) {
     this.open = force ?? !this.open;
-    if (this.open) {
-      this.mounted = true;
-      this.activity = false;
-    }
+    if (this.open) this.mounted = true;
   }
 }
 

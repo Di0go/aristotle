@@ -1,8 +1,9 @@
 /* Zen: a quiet vault. Soft greys that step from the page to the panes, one accent chosen in settings,
    Inter for everything read, JetBrains Mono only for code and keys. Dark and light are set on <html>
-   (data-theme), the accent too (data-accent). Older token names (--sheet, --cyan, --serif…) are aliases,
+   (data-theme), the accent too (data-accent). Older token names (--paper, --link, --serif…) are aliases,
    so every component reads from the same few values. */
 
+/* Tokens: colours for each theme and accent */
 :root {
   /* light */
   --b0: #ffffff;
@@ -27,10 +28,18 @@
   color-scheme: light;
 }
 
-:root[data-accent='red'] { --acc: #d1343c; }
-:root[data-accent='violet'] { --acc: #7c5cdb; }
-:root[data-accent='blue'] { --acc: #2f6fde; }
-:root[data-accent='graphite'] { --acc: #3c3c3c; }
+:root[data-accent='red'] {
+  --acc: #d1343c;
+}
+:root[data-accent='violet'] {
+  --acc: #7c5cdb;
+}
+:root[data-accent='blue'] {
+  --acc: #2f6fde;
+}
+:root[data-accent='graphite'] {
+  --acc: #3c3c3c;
+}
 
 :root[data-theme='dark'] {
   --b0: #1e1e1e;
@@ -54,11 +63,21 @@
   color-scheme: dark;
 }
 
-:root[data-theme='dark'][data-accent='red'] { --acc: #f2636a; }
-:root[data-theme='dark'][data-accent='violet'] { --acc: #9a82ff; }
-:root[data-theme='dark'][data-accent='blue'] { --acc: #6ea8ff; }
-:root[data-theme='dark'][data-accent='graphite'] { --acc: #e6e6e6; }
+:root[data-theme='dark'][data-accent='red'] {
+  --acc: #f2636a;
+}
+:root[data-theme='dark'][data-accent='violet'] {
+  --acc: #9a82ff;
+}
+:root[data-theme='dark'][data-accent='blue'] {
+  --acc: #6ea8ff;
+}
+:root[data-theme='dark'][data-accent='graphite'] {
+  --acc: #e6e6e6;
+  --on-acc: #1e1e1e;
+}
 
+/* Tokens: derived colours, aliases, type and sizes. Set once, so they follow the theme above. */
 :root {
   --acc-soft: color-mix(in srgb, var(--acc) 13%, transparent);
   --acc-line: color-mix(in srgb, var(--acc) 35%, transparent);
@@ -67,13 +86,8 @@
 
   /* aliases the components already use */
   --paper: var(--b1);
-  --sheet: var(--b0);
-  --sheet-2: var(--b1);
-  --ink: var(--fg);
   --ink-2: var(--fg-2);
-  --graphite: var(--muted);
   --unknown: var(--faint);
-  --cyan: var(--acc);
   --cyan-ink: var(--acc);
   --cyan-soft: var(--acc-soft);
   --link: var(--acc);
@@ -83,14 +97,10 @@
   --shaky-soft: color-mix(in srgb, var(--shaky) 15%, transparent);
   --wrong-soft: color-mix(in srgb, var(--wrong) 13%, transparent);
   --bg: var(--b0);
-  --surface: var(--b0);
-  --line: var(--rule);
   --line-strong: var(--rule-strong);
-  --accent: var(--acc);
   --accent-soft: var(--acc-soft);
   --right: var(--solid);
   --right-soft: var(--solid-soft);
-  --grid: var(--rule);
   --series-1: var(--acc);
   --series-2: var(--shaky);
   --series-3: var(--solid);
@@ -98,7 +108,6 @@
   --sans: 'Inter Variable', 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --mono: 'JetBrains Mono Variable', 'JetBrains Mono', ui-monospace, monospace;
   --serif: var(--sans);
-  --font: var(--sans);
 
   --radius: 6px;
   --radius-lg: 10px;
@@ -110,8 +119,7 @@
   --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
 }
 
-:root[data-theme='dark'][data-accent='graphite'] { --on-acc: #1e1e1e; }
-
+/* Reset and base */
 *,
 *::before,
 *::after {
@@ -128,7 +136,7 @@ body {
   min-height: 100vh;
   background: var(--b0);
   color: var(--fg);
-  font: 400 15px/1.6 var(--sans);
+  font: 400 15px / 1.6 var(--sans);
   font-feature-settings: 'cv11', 'ss01', 'ss03';
   -webkit-font-smoothing: antialiased;
 }
@@ -158,6 +166,7 @@ button {
   background: var(--acc-soft);
 }
 
+/* Type */
 h1,
 h2,
 h3 {
@@ -200,7 +209,7 @@ h3 {
   align-items: center;
   gap: 6px;
   padding: 0 7px;
-  font: 500 0.75rem/1.7 var(--sans);
+  font: 500 0.75rem / 1.7 var(--sans);
   color: var(--muted);
   background: var(--b2);
   border-radius: 4px;
@@ -261,10 +270,14 @@ h3 {
   gap: 8px;
   min-height: 34px;
   padding: 6px 14px;
-  font: 500 0.9rem/1.2 var(--sans);
+  font: 500 0.9rem / 1.2 var(--sans);
   border-radius: var(--radius);
   cursor: pointer;
-  transition: background-color 0.15s, border-color 0.15s, color 0.15s, filter 0.15s;
+  transition:
+    background-color 0.15s,
+    border-color 0.15s,
+    color 0.15s,
+    filter 0.15s;
 }
 
 .primary {
@@ -349,10 +362,11 @@ h3 {
   color: var(--fg);
 }
 
+/* Keys and inputs */
 kbd {
   display: inline-block;
   padding: 0 0.45em;
-  font: 500 0.72rem/1.6 var(--mono);
+  font: 500 0.72rem / 1.6 var(--mono);
   color: var(--muted);
   background: var(--b2);
   border: 1px solid var(--rule);
@@ -374,7 +388,9 @@ textarea,
   border: 1px solid var(--rule-strong);
   border-radius: var(--radius);
   line-height: 1.55;
-  transition: border-color 0.15s, box-shadow 0.15s;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
 }
 
 textarea {
@@ -393,6 +409,8 @@ textarea:focus,
   font-size: 0.9rem;
 }
 
+/* Shared pieces */
+
 /* A card: content set apart from the page. Used sparingly. */
 .sheet {
   background: var(--b0);
@@ -404,6 +422,7 @@ textarea:focus,
   background: var(--b0);
 }
 
+/* How much of a topic is solid, fading, shaky or not yet, as one segmented bar. */
 .status-bar {
   display: flex;
   gap: 2px;
@@ -463,6 +482,7 @@ textarea:focus,
   line-height: 1.6;
 }
 
+/* Motion: off when the system asks for less. */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

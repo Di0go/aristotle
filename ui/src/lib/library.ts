@@ -7,6 +7,8 @@ import {
   type Concept,
   type ConceptStatus,
   type Mission,
+  type MissionStatus,
+  type MissionVerdict,
   type Roadmap,
   type StepState,
   type Topic,
@@ -26,6 +28,7 @@ export function placeOf(slug: string, roadmaps: Roadmap[]): Place | null {
   return null;
 }
 
+/** Topics on no roadmap, most recently studied first. */
 export function looseTopics(topics: Record<string, Topic>, roadmaps: Roadmap[]): Topic[] {
   const onRoadmap = new Set(roadmaps.flatMap((r) => r.steps.map((s) => s.topic)));
   return Object.values(topics)
@@ -35,6 +38,7 @@ export function looseTopics(topics: Record<string, Topic>, roadmaps: Roadmap[]):
 
 export type Counts = Record<ConceptStatus, number> & { fading: number; total: number };
 
+/** How many of a topic's concepts are solid, shaky, not yet and fading (fading ones also count as solid). */
 export function countsOf(topic: Topic | undefined): Counts {
   const c: Counts = { unknown: 0, shaky: 0, solid: 0, fading: 0, total: 0 };
   for (const x of topic?.concepts ?? []) {
@@ -86,6 +90,7 @@ export interface StepView {
   counts: Counts;
 }
 
+/** A roadmap's steps with their topics (when started), state and counts. */
 export function stepsOf(roadmap: Roadmap, topics: Record<string, Topic>): StepView[] {
   return roadmap.steps.map((s, index) => {
     const topic = topics[s.topic];
@@ -98,6 +103,16 @@ export function stepsOf(roadmap: Roadmap, topics: Record<string, Topic>): StepVi
 export const SCOPE_LABEL = { step: 'Step mission', capstone: 'Capstone', topic: 'Topic mission' } as const;
 export const STATUS_LABEL = { open: 'To do', debriefed: 'Waiting for review', reviewed: 'Reviewed', dropped: 'Dropped' } as const;
 export const VERDICT_LABEL = { achieved: 'Achieved', partly: 'Partly', missed: 'Missed' } as const;
+/** The tag colour for each status: reviewed reads solid, waiting for review shaky, still to do accent. */
+export const STATUS_TONE: Record<MissionStatus, string> = { reviewed: 'solid', debriefed: 'shaky', open: 'cyan', dropped: '' };
+/** The tag colour for a review's verdict: solid when achieved, shaky when partly, plain when missed. */
+export const VERDICT_TONE: Record<MissionVerdict, string> = { achieved: 'solid', partly: 'shaky', missed: '' };
+
+/** Splits a concept reference, "topic/concept" or just "concept" (whose topic the context supplies). */
+export function splitRef(ref: string): { topic?: string; concept: string } {
+  const i = ref.indexOf('/');
+  return i === -1 ? { concept: ref } : { topic: ref.slice(0, i), concept: ref.slice(i + 1) };
+}
 
 /** Where a mission comes from, in words: "The fighting mind · step 2: Performance under pressure". */
 export function missionSource(m: Mission, roadmaps: Record<string, Roadmap>, topics: Record<string, Topic>): string {

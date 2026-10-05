@@ -5,67 +5,94 @@
   // Each session is split into parts (sections.ts) that fold to one line, with a contents list at the top,
   // so a long class reads as an outline: only where to pick up and the last summary start open.
   import { setContext, tick } from 'svelte';
-  import { placeFigures } from '../lib/explorables/index.ts';
-  import { feed } from '../lib/feed.svelte.ts';
-  import { link } from '../lib/router.svelte.ts';
   import { actions } from '../lib/actions.ts';
   import { claude } from '../lib/claude.svelte.ts';
-  import { countsOf, placeOf } from '../lib/library.ts';
+  import { placeFigures } from '../lib/explorables/index.ts';
+  import { feed, topicSessions } from '../lib/feed.svelte.ts';
   import { formatDay, formatTime } from '../lib/format.ts';
-  import LessonPart from '../lib/LessonPart.svelte';
+  import { countsOf, placeOf } from '../lib/library.ts';
+  import { link } from '../lib/router.svelte.ts';
   import { openByDefault, sectionsOf } from '../lib/sections.ts';
-  import LessonBench from '../lib/LessonBench.svelte';
   import Grip from '../lib/Grip.svelte';
+  import LessonBench from '../lib/LessonBench.svelte';
+  import LessonPart from '../lib/LessonPart.svelte';
   import Now from './Now.svelte';
-  import type { PublicItem, Session, SessionSummary } from '../../../shared/types.ts';
+  import type { PublicItem, Session } from '../../../shared/types.ts';
 
   let { slug }: { slug: string } = $props();
-
-  setContext('topic-slug', () => slug);
 
   let sessions = $state<{ session: Session; items: PublicItem[] }[] | null>(null);
   let text = $state('');
   let benchOpen = $state(false);
+  /** Which parts are open; set once the class loads, then only by him. */
+  let opened = $state<Set<string> | null>(null);
+  /** Counts session fetches, so only the latest may write and a slow older reply can't overwrite a newer one. */
+  let request = 0;
 
-  const live = $derived(Boolean(feed.session && !feed.session.endedAt && feed.session.topicSlug === slug));
+  const live = $derived(feed.liveSlug === slug);
   const topic = $derived(feed.topics[slug] ?? null);
   const place = $derived(placeOf(slug, feed.roadmapList));
   const step = $derived(place ? place.roadmap.steps[place.index] : null);
   const title = $derived(topic?.title ?? step?.title ?? slug);
   const counts = $derived(countsOf(topic ?? undefined));
   const started = $derived(Boolean(topic));
-
-  // Every session on this topic, oldest first.
-  $effect(() => {
-    void feed.topicVersion;
-    if (live) return;
-    void (async () => {
-      const all = ((await (await fetch('/api/sessions')).json()) as SessionSummary[]).filter((s) => s.topicSlug === slug).reverse();
-      const records = await Promise.all(
-        all.map(async (s) => (await (await fetch(`/api/sessions/${encodeURIComponent(s.id)}`)).json()) as { session: Session; items: PublicItem[] }),
-      );
-      sessions = records.filter((r) => r.session);
-    })();
-  });
-
+  /** The "class" line under the title. */
+  const classNote = $derived(
+    started
+      ? `${sessions?.length ?? '…'} ${sessions?.length === 1 ? 'session' : 'sessions'} so far. Reading it starts nothing.`
+      : 'Not started yet.',
+  );
   /** Each figure placed once, after the first step (in any session) on a concept it explains. */
-  const figures = $derived(placeFigures(slug, (sessions ?? []).flatMap((s) => s.items as { id: string; type: string }[])));
-
+  const figures = $derived(
+    placeFigures(
+      slug,
+      (sessions ?? []).flatMap((s) => s.items as { id: string; type: string }[]),
+    ),
+  );
   const parts = $derived((sessions ?? []).map((s) => ({ session: s.session, sections: sectionsOf(s.items) })));
   const allSections = $derived(parts.flatMap((p) => p.sections));
 
-  /** Which parts are open; set once the class loads, then only by him. */
-  let opened = $state<Set<string> | null>(null);
+  setContext('topic-slug', () => slug);
+
+  // Every session on this topic in full, oldest first.
+  $effect(() => {
+    void feed.topicVersion;
+    if (live) return;
+    const mine = ++request;
+    void (async () => {
+      const all = (await topicSessions(slug)).reverse();
+      const records = await Promise.all(
+        all.map(
+          async (s) =>
+            (await (await fetch(`/api/sessions/${encodeURIComponent(s.id)}`)).json()) as { session: Session; items: PublicItem[] },
+        ),
+      );
+      if (mine === request) sessions = records.filter((r) => r.session);
+    })();
+  });
+
   $effect(() => {
     if (opened === null && sessions) opened = openByDefault(allSections);
   });
-  const isOpen = (key: string) => opened?.has(key) ?? false;
+
+  function isOpen(key: string): boolean {
+    return opened?.has(key) ?? false;
+  }
+
   function toggle(key: string) {
     const next = new Set(opened);
     if (!next.delete(key)) next.add(key);
     opened = next;
   }
-  const setAll = (open: boolean) => (opened = new Set(open ? allSections.map((s) => s.key) : []));
+
+  function setAll(open: boolean) {
+    opened = new Set(open ? allSections.map((s) => s.key) : []);
+  }
+
+  /** What a session's divider adds after its date: what kind of sitting it was, unless a plain lesson. */
+  function kindNote(kind: Session['kind']): string {
+    return kind === 'train' ? ' · training' : kind === 'review' ? ' · review' : '';
+  }
 
   /** From the contents: open the part and bring it into view. */
   async function jump(key: string) {
@@ -78,6 +105,8 @@
   function begin(said = '') {
     if (started) actions.continueTopic(slug, said);
     else if (place) actions.startStep(place.roadmap, place.index, said);
+    // Neither a topic nor a roadmap step (an old link, or a step since removed): start a lesson on it anyway.
+    else actions.learn(title, said);
     text = '';
   }
 
@@ -94,6 +123,7 @@
 {:else}
   <div class="lesson" class:with-bench={topic}>
     <div class="lesson-main">
+      <!-- Header -->
       <header class="lesson-head">
         <nav class="crumbs" aria-label="Where this is">
           {#if place}
@@ -106,9 +136,12 @@
         </nav>
         <h1 class="page-title">{title}</h1>
         <dl class="props">
-          <dt>class</dt><dd>{started ? `${sessions?.length ?? '…'} ${sessions?.length === 1 ? 'session' : 'sessions'} so far. Reading it starts nothing.` : 'Not started yet.'}</dd>
-          {#if topic?.goal || step?.goal}<dt>goal</dt><dd>{topic?.goal ?? step?.goal}</dd>{/if}
-          {#if counts.total}<dt>progress</dt><dd>{counts.solid} of {counts.total} concepts solid</dd>{/if}
+          <dt>class</dt>
+          <dd>{classNote}</dd>
+          {#if topic?.goal || step?.goal}<dt>goal</dt>
+            <dd>{topic?.goal ?? step?.goal}</dd>{/if}
+          {#if counts.total}<dt>progress</dt>
+            <dd>{counts.solid} of {counts.total} concepts solid</dd>{/if}
         </dl>
         {#if topic}<button class="ghost small bench-toggle" onclick={() => (benchOpen = true)}>Outline and graph</button>{/if}
       </header>
@@ -116,11 +149,15 @@
       {#if !started}
         <div class="not-begun">
           {#if step?.why}<p>{step.why}</p>{/if}
-          <p class="muted">This class hasn't begun. When it does, it opens with the big picture, then finds out what you already know before teaching anything.</p>
+          <p class="muted">
+            This class hasn't begun. When it does, it opens with the big picture, then finds out what you already know before teaching
+            anything.
+          </p>
         </div>
       {:else if sessions === null}
         <p class="muted center">Loading the class…</p>
       {:else}
+        <!-- Contents -->
         <nav class="contents" aria-label="Contents">
           <div class="contents-head">
             <span>Contents</span>
@@ -141,10 +178,11 @@
           {/each}
         </nav>
 
+        <!-- The class, session by session -->
         {#each parts as p, i (p.session.id)}
           <div class="session-divider">
             <span>Session {i + 1}</span>
-            <span class="muted">{formatDay(p.session.startedAt)}, {formatTime(p.session.startedAt)}{p.session.kind === 'train' ? ' · training' : p.session.kind === 'review' ? ' · review' : ''}</span>
+            <span class="muted">{formatDay(p.session.startedAt)}, {formatTime(p.session.startedAt)}{kindNote(p.session.kind)}</span>
           </div>
           {#each p.sections as sec (sec.key)}
             <LessonPart section={sec} open={isOpen(sec.key)} ontoggle={() => toggle(sec.key)} {figures} />
@@ -152,6 +190,7 @@
         {/each}
       {/if}
 
+      <!-- Where he starts or picks it up -->
       <div class="composer resume">
         <p class="resume-h">{started ? 'Pick up the class' : 'Begin the class'}</p>
         {#if topic?.handoff}<p class="resume-next"><span class="muted">Next time:</span> {topic.handoff.next}</p>{/if}
@@ -161,14 +200,14 @@
             onkeydown={onKey}
             rows="1"
             placeholder={started ? 'Ask about anything above, or just say “go”…' : 'Say what you want from it, or just “go”…'}
-            aria-label="Your first words to Claude"
-          ></textarea>
+            aria-label="Your first words to Claude"></textarea>
           <button class="primary" onclick={() => begin(text)}>{started ? 'Continue' : 'Start'}</button>
         </div>
         <p class="composer-off">{claude.running ? 'Claude picks it up from here.' : 'This starts Claude here in Aristotle.'}</p>
       </div>
     </div>
 
+    <!-- Bench -->
     {#if topic}
       <aside class="bench" class:open={benchOpen} aria-label="Where this class sits">
         <LessonBench {topic} onclose={() => (benchOpen = false)} />

@@ -2,6 +2,7 @@
   // A real image (an anatomical plate, a photo) with numbered markers: point at one, or at its line in the
   // key, and both light up with its label. Written as a ```plate block of JSON.
   interface Marker {
+    /** Where it points, in percent of the image's width and height. */
     x: number;
     y: number;
     label: string;
@@ -20,6 +21,7 @@
 
   let { spec }: { spec: Spec } = $props();
 
+  /** The marker pointed at, on the image or in the key. */
   let on = $state<number | null>(null);
   let failed = $state(false);
   const markers = $derived(spec.markers ?? []);
@@ -42,8 +44,8 @@
           onpointerleave={() => (on = null)}
           onfocus={() => (on = i)}
           onblur={() => (on = null)}
-          aria-label="{i + 1}: {m.label}"
-        >{i + 1}</button>
+          aria-label="{i + 1}: {m.label}">{i + 1}</button
+        >
         {#if on === i}
           <span class="pin-label" style:left="{m.x}%" style:top="{m.y}%">{m.label}</span>
         {/if}
@@ -55,7 +57,9 @@
       {#each markers as m, i (i)}
         <li class:on={on === i} onpointerenter={() => (on = i)} onpointerleave={() => (on = null)}>
           <span class="n">{i + 1}</span>
-          <span><b>{m.label}</b>{#if m.detail}<span class="d"> {m.detail}</span>{/if}</span>
+          <span
+            ><b>{m.label}</b>{#if m.detail}<span class="d"> {m.detail}</span>{/if}</span
+          >
         </li>
       {/each}
     </ol>
@@ -100,7 +104,9 @@
     font: 700 11px var(--sans);
     cursor: pointer;
     box-shadow: 0 2px 6px rgb(0 0 0 / 0.3);
-    transition: transform 0.15s var(--ease), background-color 0.15s;
+    transition:
+      transform 0.15s var(--ease),
+      background-color 0.15s;
   }
 
   .pin.on,
@@ -110,6 +116,7 @@
     transform: translate(-50%, -50%) scale(1.15);
   }
 
+  /* Beside the marker, to its right, centred on it vertically. */
   .pin-label {
     position: absolute;
     transform: translate(16px, -50%);

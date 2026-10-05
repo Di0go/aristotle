@@ -1,5 +1,6 @@
 /* Charts on the Progress page: cards, axes, bars and their tables (ui/src/lib/charts). */
 
+/* Layout: two charts side by side, one above the other on a narrow screen */
 .chart-pair {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(420px, 100%), 1fr));
@@ -14,6 +15,13 @@
   padding: 16px 18px 12px;
 }
 
+@media (max-width: 640px) {
+  .chart-pair {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* The plot: axes, marks and the hover target */
 .chart {
   position: relative;
 }
@@ -29,23 +37,23 @@
 }
 
 .chart .grid {
-  stroke: var(--grid);
+  stroke: var(--rule);
   stroke-width: 1;
 }
 
 .chart .tick {
-  font: 11px var(--font);
+  font: 11px var(--sans);
   fill: var(--muted);
   font-variant-numeric: tabular-nums;
 }
 
 .chart .end-label {
-  font: 600 12px var(--font);
-  fill: var(--ink);
+  font: 600 12px var(--sans);
+  fill: var(--fg);
 }
 
 .chart .ring {
-  stroke: var(--surface);
+  stroke: var(--b0);
   stroke-width: 2;
 }
 
@@ -66,16 +74,17 @@
 }
 
 .chart .hit:focus-visible {
-  stroke: var(--accent);
+  stroke: var(--acc);
   stroke-width: 1.5;
 }
 
 .chart svg:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--acc);
   outline-offset: 4px;
   border-radius: 4px;
 }
 
+/* Legend and tooltip */
 .chart-legend {
   margin: 0 0 8px;
 }
@@ -99,8 +108,8 @@
   min-width: 140px;
   padding: 8px 12px;
   border-radius: 8px;
-  background: var(--surface);
-  border: 1px solid var(--line);
+  background: var(--b0);
+  border: 1px solid var(--rule);
   box-shadow: 0 4px 16px rgb(0 0 0 / 0.12);
   font-size: 0.82em;
   white-space: nowrap;
@@ -119,6 +128,7 @@
   vertical-align: 0.25em;
 }
 
+/* Every chart's values as a table (TableView.svelte) */
 .table-view {
   margin-top: 8px;
   font-size: 0.85em;
@@ -138,10 +148,11 @@
 .table-view th,
 .table-view td {
   padding: 4px 14px 4px 0;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--rule);
   text-align: left;
 }
 
+/* Training levels: a meter per topic */
 .levels {
   list-style: none;
   margin: 12px 0 0;
@@ -175,14 +186,6 @@
 .meter span {
   display: block;
   height: 100%;
-  background: var(--accent);
+  background: var(--acc);
   border-radius: 99px;
 }
-
-@media (max-width: 640px) {
-  .chart-pair {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
-
-/* Map of everything */

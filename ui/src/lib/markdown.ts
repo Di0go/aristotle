@@ -6,99 +6,8 @@ import { Marked, type TokenizerAndRendererExtension } from 'marked';
 import katex from 'katex';
 import DOMPurify from 'dompurify';
 
-function tex(source: string, displayMode: boolean): string {
-  return katex.renderToString(source, { displayMode, throwOnError: false, output: 'htmlAndMathml' });
-}
-
-const blockMath: TokenizerAndRendererExtension = {
-  name: 'blockMath',
-  level: 'block',
-  start: (src) => {
-    const i = src.search(/\$\$|\\\[/);
-    return i === -1 ? undefined : i;
-  },
-  tokenizer(src) {
-    const m = /^\$\$([\s\S]+?)\$\$[^\S\n]*(?:\n|$)/.exec(src) ?? /^\\\[([\s\S]+?)\\\][^\S\n]*(?:\n|$)/.exec(src);
-    if (m) return { type: 'blockMath', raw: m[0], text: m[1].trim() };
-  },
-  renderer: (token) => `<div class="math-display">${tex(token.text as string, true)}</div>`,
-};
-
-const inlineMath: TokenizerAndRendererExtension = {
-  name: 'inlineMath',
-  level: 'inline',
-  start: (src) => {
-    const i = src.search(/\$|\\\(/);
-    return i === -1 ? undefined : i;
-  },
-  tokenizer(src) {
-    let m = /^\$\$([\s\S]+?)\$\$/.exec(src);
-    if (m) return { type: 'inlineMath', raw: m[0], text: m[1], display: true };
-    // $...$ that doesn't start or end with a space and isn't followed by a digit (so "$5 and $10" stays text).
-    m = /^\$(?!\s)((?:\\.|[^\\$\n])+?)(?<!\s)\$(?!\d)/.exec(src) ?? /^\\\(([\s\S]+?)\\\)/.exec(src);
-    if (m) return { type: 'inlineMath', raw: m[0], text: m[1], display: false };
-  },
-  renderer: (token) => tex(token.text as string, Boolean(token.display)),
-};
-
-const highlight: TokenizerAndRendererExtension = {
-  name: 'highlight',
-  level: 'inline',
-  start: (src) => {
-    const i = src.indexOf('==');
-    return i === -1 ? undefined : i;
-  },
-  tokenizer(src) {
-    const m = /^==(?!\s)([^=\n]+?)(?<!\s)==/.exec(src);
-    if (m) return { type: 'highlight', raw: m[0], text: m[1], tokens: this.lexer.inlineTokens(m[1]) };
-  },
-  renderer(token) {
-    return `<mark>${this.parser.parseInline(token.tokens ?? [])}</mark>`;
-  },
-};
-
-const escapeAttr = (v: string) => v.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-
-/** {{term|definition}}: a term with a short definition, shown in a hover card. */
-const term: TokenizerAndRendererExtension = {
-  name: 'term',
-  level: 'inline',
-  start: (src) => {
-    const i = src.indexOf('{{');
-    return i === -1 ? undefined : i;
-  },
-  tokenizer(src) {
-    const m = /^\{\{([^{}|]+?)\|([^{}]+?)\}\}/.exec(src);
-    if (m) return { type: 'term', raw: m[0], text: m[1].trim(), def: m[2].trim(), tokens: this.lexer.inlineTokens(m[1].trim()) };
-  },
-  renderer(token) {
-    return `<span class="term" tabindex="0" data-def="${escapeAttr(token.def as string)}">${this.parser.parseInline(token.tokens ?? [])}</span>`;
-  },
-};
-
-/** [[concept-id]], [[topic/concept-id]] or [[...|label]]: a link to a concept, with a hover preview. */
-const conceptLink: TokenizerAndRendererExtension = {
-  name: 'conceptLink',
-  level: 'inline',
-  start: (src) => {
-    const i = src.indexOf('[[');
-    return i === -1 ? undefined : i;
-  },
-  tokenizer(src) {
-    const m = /^\[\[([^[\]|]+?)(?:\|([^[\]]+?))?\]\]/.exec(src);
-    if (m) return { type: 'conceptLink', raw: m[0], ref: m[1].trim(), label: (m[2] ?? '').trim() };
-  },
-  renderer(token) {
-    const label = (token.label as string) || '';
-    return `<a class="concept-link" data-concept="${escapeAttr(token.ref as string)}" data-label="${escapeAttr(label)}">${escapeAttr(label || (token.ref as string))}</a>`;
-  },
-};
-
-const marked = new Marked({ gfm: true, breaks: false, extensions: [blockMath, inlineMath, highlight, term, conceptLink] });
-
+/** SVG animation (SMIL), which DOMPurify drops unless told otherwise. */
 const ANIMATION_TAGS = ['animate', 'animateTransform', 'animateMotion', 'set', 'mpath'];
-/** Elements that point at another element by href: allowed only to point inside the same drawing. */
-const REFERENCING = ['use', 'mpath'];
 const ANIMATION_ATTRS = [
   'attributeName',
   'attributeType',
@@ -122,23 +31,10 @@ const ANIMATION_ATTRS = [
   'keyPoints',
   'type',
 ];
+/** Elements that point at another element by href: allowed only to point inside the same drawing. */
+const REFERENCING = ['use', 'mpath'];
 
-// <use> and <mpath> may only reference something in the page ("#id"), never an outside file.
-DOMPurify.addHook('uponSanitizeAttribute', (node, data) => {
-  if (!REFERENCING.includes(node.nodeName.toLowerCase())) return;
-  const name = data.attrName.toLowerCase();
-  if ((name === 'href' || name === 'xlink:href') && !data.attrValue.trim().startsWith('#')) data.keepAttr = false;
-  else if (name === 'href' || name === 'xlink:href') data.forceKeepAttr = true;
-});
-
-// An animation may change how a shape looks, never where a link points.
-DOMPurify.addHook('uponSanitizeAttribute', (node, data) => {
-  if (!ANIMATION_TAGS.includes(node.nodeName.toLowerCase()) && !ANIMATION_TAGS.includes(node.nodeName)) return;
-  if (data.attrName.toLowerCase() !== 'attributename') return;
-  const target = data.attrValue.toLowerCase();
-  if (target.includes('href') || target.startsWith('on')) data.keepAttr = false;
-});
-
+/** Callout kinds: the title used when none is given, and a 16×16 stroked icon. */
 const CALLOUTS: Record<string, { label: string; icon: string }> = {
   idea: { label: 'The idea', icon: '<circle cx="8" cy="7" r="4.5"/><path d="M6 13h4M6.5 15h3"/>' },
   key: { label: 'Key point', icon: '<path d="M2 8h8M10 8l-3-3M10 8l-3 3"/><circle cx="12.5" cy="8" r="1.5"/>' },
@@ -153,6 +49,7 @@ const CALLOUTS: Record<string, { label: string; icon: string }> = {
   term: { label: 'Term', icon: '<path d="M3 3h10M8 3v10"/>' },
   note: { label: 'Note', icon: '<path d="M3 2.5h7l3 3v8H3z"/><path d="M5.5 7h5M5.5 9.5h5"/>' },
 };
+/** Other names for the same kinds, as GitHub and Obsidian spell them. */
 const ALIASES: Record<string, string> = {
   tip: 'idea',
   important: 'key',
@@ -163,7 +60,112 @@ const ALIASES: Record<string, string> = {
   question: 'why',
 };
 
+/** Drawings rendered so far: each gets its own id prefix. */
 let drawings = 0;
+
+const blockMath: TokenizerAndRendererExtension = {
+  name: 'blockMath',
+  level: 'block',
+  start: (src) => startAt(src.search(/\$\$|\\\[/)),
+  tokenizer(src) {
+    const m = /^\$\$([\s\S]+?)\$\$[^\S\n]*(?:\n|$)/.exec(src) ?? /^\\\[([\s\S]+?)\\\][^\S\n]*(?:\n|$)/.exec(src);
+    if (m) return { type: 'blockMath', raw: m[0], text: m[1].trim() };
+  },
+  renderer: (token) => `<div class="math-display">${tex(token.text as string, true)}</div>`,
+};
+
+const inlineMath: TokenizerAndRendererExtension = {
+  name: 'inlineMath',
+  level: 'inline',
+  start: (src) => startAt(src.search(/\$|\\\(/)),
+  tokenizer(src) {
+    let m = /^\$\$([\s\S]+?)\$\$/.exec(src);
+    if (m) return { type: 'inlineMath', raw: m[0], text: m[1], display: true };
+    // $...$ that doesn't start or end with a space and isn't followed by a digit (so "$5 and $10" stays text).
+    m = /^\$(?!\s)((?:\\.|[^\\$\n])+?)(?<!\s)\$(?!\d)/.exec(src) ?? /^\\\(([\s\S]+?)\\\)/.exec(src);
+    if (m) return { type: 'inlineMath', raw: m[0], text: m[1], display: false };
+  },
+  renderer: (token) => tex(token.text as string, Boolean(token.display)),
+};
+
+const highlight: TokenizerAndRendererExtension = {
+  name: 'highlight',
+  level: 'inline',
+  start: (src) => startAt(src.indexOf('==')),
+  tokenizer(src) {
+    const m = /^==(?!\s)([^=\n]+?)(?<!\s)==/.exec(src);
+    if (m) return { type: 'highlight', raw: m[0], text: m[1], tokens: this.lexer.inlineTokens(m[1]) };
+  },
+  renderer(token) {
+    return `<mark>${this.parser.parseInline(token.tokens ?? [])}</mark>`;
+  },
+};
+
+/** {{term|definition}}: a term with a short definition, shown in a hover card. */
+const term: TokenizerAndRendererExtension = {
+  name: 'term',
+  level: 'inline',
+  start: (src) => startAt(src.indexOf('{{')),
+  tokenizer(src) {
+    const m = /^\{\{([^{}|]+?)\|([^{}]+?)\}\}/.exec(src);
+    if (m) return { type: 'term', raw: m[0], text: m[1].trim(), def: m[2].trim(), tokens: this.lexer.inlineTokens(m[1].trim()) };
+  },
+  renderer(token) {
+    return `<span class="term" tabindex="0" data-def="${escapeAttr(token.def as string)}">${this.parser.parseInline(token.tokens ?? [])}</span>`;
+  },
+};
+
+/** [[concept-id]], [[topic/concept-id]] or [[...|label]]: a link to a concept, with a hover preview. */
+const conceptLink: TokenizerAndRendererExtension = {
+  name: 'conceptLink',
+  level: 'inline',
+  start: (src) => startAt(src.indexOf('[[')),
+  tokenizer(src) {
+    const m = /^\[\[([^[\]|]+?)(?:\|([^[\]]+?))?\]\]/.exec(src);
+    if (m) return { type: 'conceptLink', raw: m[0], ref: m[1].trim(), label: (m[2] ?? '').trim() };
+  },
+  renderer(token) {
+    const label = (token.label as string) || '';
+    return `<a class="concept-link" data-concept="${escapeAttr(token.ref as string)}" data-label="${escapeAttr(label)}">${escapeAttr(label || (token.ref as string))}</a>`;
+  },
+};
+
+const marked = new Marked({ gfm: true, breaks: false, extensions: [blockMath, inlineMath, highlight, term, conceptLink] });
+
+// <use> and <mpath> may only reference something in the page ("#id"), never an outside file.
+DOMPurify.addHook('uponSanitizeAttribute', (node, data) => {
+  if (!REFERENCING.includes(node.nodeName.toLowerCase())) return;
+  const name = data.attrName.toLowerCase();
+  if (name !== 'href' && name !== 'xlink:href') return;
+  if (data.attrValue.trim().startsWith('#')) data.forceKeepAttr = true;
+  else data.keepAttr = false;
+});
+
+// An animation may change how a shape looks, never where a link points. Tag names are checked as written and
+// lower-cased, since the parser may have lower-cased "animateTransform".
+DOMPurify.addHook('uponSanitizeAttribute', (node, data) => {
+  if (!ANIMATION_TAGS.includes(node.nodeName.toLowerCase()) && !ANIMATION_TAGS.includes(node.nodeName)) return;
+  if (data.attrName.toLowerCase() !== 'attributename') return;
+  const target = data.attrValue.toLowerCase();
+  if (target.includes('href') || target.startsWith('on')) data.keepAttr = false;
+});
+
+/** A whole piece of lesson Markdown, as safe HTML. */
+export function renderMarkdown(source: string): string {
+  const html = marked.parse(source, { async: false });
+  const clean = DOMPurify.sanitize(html, {
+    USE_PROFILES: { html: true, svg: true, svgFilters: true, mathMl: true },
+    ADD_TAGS: [...ANIMATION_TAGS, 'use'],
+    ADD_ATTR: ['target', ...ANIMATION_ATTRS],
+  });
+  return enrich(clean);
+}
+
+/** Inline rendering for short strings such as quiz options (no wrapping paragraph). */
+export function renderInline(source: string): string {
+  const html = marked.parseInline(source, { async: false });
+  return DOMPurify.sanitize(html, { USE_PROFILES: { html: true, svg: true, mathMl: true } });
+}
 
 /**
  * Gives every id inside each drawing a prefix of its own, and points its references (href="#id", url(#id))
@@ -191,7 +193,7 @@ function scopeIds(root: DocumentFragment) {
   }
 }
 
-/** Turns blockquotes that open with [!kind] into callouts, and titled images into captioned figures. */
+/** Scopes drawing ids, turns blockquotes that open with [!kind] into callouts, and titled images into captioned figures. */
 function enrich(html: string): string {
   if (!html.includes('[!') && !html.includes('<img') && !html.includes(' id=')) return html;
   const doc = document.createElement('template');
@@ -228,18 +230,15 @@ function enrich(html: string): string {
   return doc.innerHTML;
 }
 
-export function renderMarkdown(source: string): string {
-  const html = marked.parse(source, { async: false });
-  const clean = DOMPurify.sanitize(html, {
-    USE_PROFILES: { html: true, svg: true, svgFilters: true, mathMl: true },
-    ADD_TAGS: [...ANIMATION_TAGS, 'use'],
-    ADD_ATTR: ['target', ...ANIMATION_ATTRS],
-  });
-  return enrich(clean);
+/** A Marked extension's start(): where in the source its syntax might begin, or nowhere. */
+function startAt(i: number): number | undefined {
+  return i === -1 ? undefined : i;
 }
 
-/** Inline rendering for short strings such as quiz options (no wrapping paragraph). */
-export function renderInline(source: string): string {
-  const html = marked.parseInline(source, { async: false });
-  return DOMPurify.sanitize(html, { USE_PROFILES: { html: true, svg: true, mathMl: true } });
+function tex(source: string, displayMode: boolean): string {
+  return katex.renderToString(source, { displayMode, throwOnError: false, output: 'htmlAndMathml' });
+}
+
+function escapeAttr(v: string): string {
+  return v.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }

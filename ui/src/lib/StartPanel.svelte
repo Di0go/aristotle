@@ -25,8 +25,20 @@
 
 <form class="start-form" onsubmit={start}>
   <label class="start-label" for="new-topic">One topic, straight away</label>
-  <input id="new-topic" class="field big" bind:this={input} bind:value={topic} autocomplete="off" placeholder="e.g. how sleep consolidates memory" />
-  <textarea class="field" bind:value={goal} rows="2" placeholder="What do you want to be able to do or explain? (optional)" aria-label="What you want from it"></textarea>
+  <input
+    id="new-topic"
+    class="field big"
+    bind:this={input}
+    bind:value={topic}
+    autocomplete="off"
+    placeholder="e.g. how sleep consolidates memory"
+  />
+  <textarea
+    class="field"
+    bind:value={goal}
+    rows="2"
+    placeholder="What do you want to be able to do or explain? (optional)"
+    aria-label="What you want from it"></textarea>
   <div class="start-row">
     <span class="muted">
       {claude.running ? 'Claude switches to it.' : 'Starts Claude here.'} For a whole field, <a href={link.roadmaps()}>plan a roadmap</a> instead.
@@ -43,7 +55,7 @@
 
   .start-label {
     font: 500 0.83rem var(--sans);
-    color: var(--graphite);
+    color: var(--muted);
   }
 
   .big {

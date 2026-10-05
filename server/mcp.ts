@@ -1,6 +1,6 @@
-// The tools Claude Code uses to teach through the interface.
+// The tools Claude Code uses to teach through the interface: one MCP server per request (server/index.ts),
+// over the stores in Gym. The descriptions are all Claude knows of each tool, so they carry the teaching rules too.
 
-import { execFile } from 'node:child_process';
 import { randomInt } from 'node:crypto';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
@@ -8,9 +8,9 @@ import type { CallToolResult, ServerNotification, ServerRequest } from '@modelco
 import * as z from 'zod';
 import { KEEPALIVE_MS, URL_CLEAN, WAIT_MS } from './config.ts';
 import type { Gym } from './gym.ts';
+import { findImages, rsvgConvert, viewImage } from './images.ts';
 import { describeMission, summarizeMission } from './missions.ts';
 import { describeRoadmap } from './roadmaps.ts';
-import { findImages, viewImage } from './images.ts';
 import { describeTopic } from './topics.ts';
 import {
   stepState,
@@ -26,6 +26,14 @@ type Extra = RequestHandlerExtra<ServerRequest, ServerNotification>;
 
 const text = (t: string): CallToolResult => ({ content: [{ type: 'text', text: t }] });
 const error = (t: string): CallToolResult => ({ ...text(t), isError: true });
+const image = (png: Buffer): CallToolResult => ({ content: [{ type: 'image', data: png.toString('base64'), mimeType: 'image/png' }] });
+const noSession = () => error('No session: call start_session first.');
+
+/** Aristotle's card colours, so a previewed SVG looks as it will in the lesson. */
+const THEME = {
+  light: { background: '#f6f5ef', ink: '#1d211e' },
+  dark: { background: '#121513', ink: '#d5dbd3' },
+};
 
 /** Everything a lesson's Markdown can hold. Written out once, in `show`; quiz and ask point here. */
 const MATH_AND_DIAGRAMS =
@@ -44,6 +52,13 @@ const MATH_AND_DIAGRAMS =
   '```explorable {"id":"stress-hormones","minutes":10,"second":false} (heart rate, adrenaline and cortisol over two hours after a stressor, with a second-round option).';
 const SAME_MARKDOWN = 'Markdown is rendered as in `show` (maths, hover terms, callouts, figures, kit blocks).';
 
+/** What each concept status means, for update_map. */
+const STATUSES =
+  'Statuses: "unknown" = he has not shown he holds it; "shaky" = partly (needed help, inconsistent, or holds a misconception: say which in `note`); ' +
+  '"solid" = he got a check on it right without help, ideally by producing or applying it rather than recognising it.';
+
+// Parameters several tools share.
+const conceptParam = z.string().optional().describe('Id of the map concept this is about; "topic/id" for a concept in another topic');
 const leadParam = z
   .object({
     markdown: z.string().min(1),
@@ -53,12 +68,7 @@ const leadParam = z
   .optional()
   .describe('A teaching step to show just before the question, in the same call (saves a round trip): the step and its check together');
 
-const STATUSES =
-  'Statuses: "unknown" = he has not shown he holds it; "shaky" = partly (needed help, inconsistent, or holds a misconception: say which in `note`); ' +
-  '"solid" = he got a check on it right without help, ideally by producing or applying it rather than recognising it.';
-
-const conceptParam = z.string().optional().describe('Id of the map concept this is about; "topic/id" for a concept in another topic');
-
+/** The MCP server with every tool, bound to this server's stores. */
 export function createMcpServer(gym: Gym): McpServer {
   const mcp = new McpServer(
     { name: 'aristotle', version: '0.3.0' },
@@ -69,6 +79,8 @@ export function createMcpServer(gym: Gym): McpServer {
         '(Aristotle draws the map). Keep terminal replies to a line or two.',
     },
   );
+
+  // Topics and roadmaps: reading them, and planning a roadmap with him
 
   mcp.registerTool(
     'list_topics',
@@ -94,15 +106,10 @@ export function createMcpServer(gym: Gym): McpServer {
     },
     async ({ topic }) => {
       const t = gym.topics.get(topic);
-      if (!t)
-        return error(
-          `No topic "${topic}". Topics: ${
-            gym.topics
-              .list()
-              .map((x) => x.slug)
-              .join(', ') || 'none'
-          }.`,
-        );
+      if (!t) {
+        const slugs = gym.topics.list().map((x) => x.slug);
+        return error(`No topic "${topic}". Topics: ${slugs.join(', ') || 'none'}.`);
+      }
       const sessions = (await gym.listSessions(t.slug)).slice(0, 5);
       const recent = sessions.map(
         (s) =>
@@ -145,15 +152,10 @@ export function createMcpServer(gym: Gym): McpServer {
     },
     async ({ roadmap }) => {
       const r = gym.roadmaps.get(roadmap);
-      if (!r)
-        return error(
-          `No roadmap "${roadmap}". Roadmaps: ${
-            gym.roadmaps
-              .all()
-              .map((x) => x.slug)
-              .join(', ') || 'none'
-          }.`,
-        );
+      if (!r) {
+        const slugs = gym.roadmaps.all().map((x) => x.slug);
+        return error(`No roadmap "${roadmap}". Roadmaps: ${slugs.join(', ') || 'none'}.`);
+      }
       const missions = gym.missions.of({ roadmap: r.slug });
       return text(
         describeRoadmap(r, (slug) => gym.topics.get(slug)) +
@@ -198,6 +200,8 @@ export function createMcpServer(gym: Gym): McpServer {
       );
     },
   );
+
+  // Praxis missions
 
   mcp.registerTool(
     'save_mission',
@@ -311,6 +315,8 @@ export function createMcpServer(gym: Gym): McpServer {
       }
     },
   );
+
+  // Sessions, spaced review, training and the map
 
   mcp.registerTool(
     'start_session',
@@ -447,6 +453,8 @@ export function createMcpServer(gym: Gym): McpServer {
     },
   );
 
+  // Teaching: what he reads, and the questions he answers
+
   mcp.registerTool(
     'show',
     {
@@ -470,7 +478,7 @@ export function createMcpServer(gym: Gym): McpServer {
       },
     },
     async ({ markdown, title, kind, concept }) => {
-      if (!gym.feed.session) return error('No session: call start_session first.');
+      if (!gym.feed.session) return noSession();
       await gym.feed.add({ type: 'block', kind, markdown, ...(title ? { title } : {}), ...(concept ? { concept } : {}) });
       if (concept) await gym.focus(concept);
       return text('Shown.');
@@ -506,7 +514,7 @@ export function createMcpServer(gym: Gym): McpServer {
       },
     },
     async ({ questions, lead }, extra) => {
-      if (!gym.feed.session) return error('No session: call start_session first.');
+      if (!gym.feed.session) return noSession();
       for (const [i, q] of questions.entries()) {
         if (q.correct >= q.options.length) {
           return error(`Question ${i + 1}: correct is ${q.correct} but there are ${q.options.length} options.`);
@@ -542,7 +550,7 @@ export function createMcpServer(gym: Gym): McpServer {
       },
     },
     async ({ prompt, kind, concept, placeholder, lead }, extra) => {
-      if (!gym.feed.session) return error('No session: call start_session first.');
+      if (!gym.feed.session) return noSession();
       await showLead(gym, lead);
       const item = await gym.feed.add({
         type: 'ask',
@@ -578,6 +586,8 @@ export function createMcpServer(gym: Gym): McpServer {
     },
   );
 
+  // Pictures: checking a drawing, finding and reading real images
+
   mcp.registerTool(
     'preview_svg',
     {
@@ -593,8 +603,7 @@ export function createMcpServer(gym: Gym): McpServer {
     },
     async ({ svg, dark }) => {
       try {
-        const png = await renderSvg(svg, dark);
-        return { content: [{ type: 'image', data: png.toString('base64'), mimeType: 'image/png' }] };
+        return image(await renderSvg(svg, dark));
       } catch (err) {
         return error(`Could not render the SVG: ${(err as Error).message}`);
       }
@@ -651,13 +660,14 @@ export function createMcpServer(gym: Gym): McpServer {
     },
     async ({ src, width, height }) => {
       try {
-        const png = await viewImage(src, width ?? 0, height ?? 0);
-        return { content: [{ type: 'image', data: png.toString('base64'), mimeType: 'image/png' }] };
+        return image(await viewImage(src, width ?? 0, height ?? 0));
       } catch (err) {
         return error(`Could not show the image: ${(err as Error).message}`);
       }
     },
   );
+
+  // Closing a session
 
   mcp.registerTool(
     'end_session',
@@ -686,28 +696,7 @@ export function createMcpServer(gym: Gym): McpServer {
   return mcp;
 }
 
-const THEME = {
-  light: { background: '#f6f5ef', ink: '#1d211e' },
-  dark: { background: '#121513', ink: '#d5dbd3' },
-};
-
-/** SVG to PNG with rsvg-convert, on Aristotle's card colours, so currentColor renders as it would in Aristotle. */
-function renderSvg(svg: string, dark: boolean): Promise<Buffer> {
-  const theme = dark ? THEME.dark : THEME.light;
-  const themed = svg.replace(/<svg\b/, `<svg color="${theme.ink}"`);
-  return new Promise((resolve, reject) => {
-    const child = execFile(
-      'rsvg-convert',
-      ['--background-color', theme.background, '--zoom', '2', '--format', 'png'],
-      { encoding: 'buffer', maxBuffer: 20 * 1024 * 1024, timeout: 15_000 },
-      (err, stdout, stderr) => {
-        if (err) reject(new Error(String(stderr || err.message).trim()));
-        else resolve(stdout);
-      },
-    );
-    child.stdin?.end(themed);
-  });
-}
+// Helpers for the tools
 
 /** The step that leads into a question, when it comes in the same call. */
 async function showLead(gym: Gym, lead?: { markdown: string; title?: string; concept?: string }) {
@@ -744,6 +733,7 @@ async function waitForLearner(gym: Gym, id: string, extra: Extra) {
   }
 }
 
+/** What Claude gets when he doesn't answer in time: stop and wait for him. */
 function notAnswered(): CallToolResult {
   const minutes = Math.round(WAIT_MS / 60_000);
   return text(
@@ -753,6 +743,7 @@ function notAnswered(): CallToolResult {
   );
 }
 
+/** The options in a random order, with `correct` following the right one. */
 function shuffle(q: QuizQuestion): QuizQuestion {
   const order = q.options.map((_, i) => i);
   for (let i = order.length - 1; i > 0; i--) {
@@ -762,31 +753,19 @@ function shuffle(q: QuizQuestion): QuizQuestion {
   return { ...q, options: order.map((i) => q.options[i]), correct: order.indexOf(q.correct) };
 }
 
-function formatQuiz(item: QuizItem, gym: Gym): string {
-  const missing = new Set<string>();
-  const lines = item.questions.map((q, i) => {
-    const r = item.responses?.[i];
-    const tag = q.concept ?? q.strand;
-    if (q.concept && !gym.resolve(q.concept)) missing.add(q.concept);
-    const label = `Q${i + 1}${tag ? ` [${tag}]` : ''}`;
-    const right = `"${q.options[q.correct]}"`;
-    let line: string;
-    if (!r || r.choice === null) line = `${label}: said "I don't know". Right answer: ${right}.`;
-    else if (r.correct) line = `${label}: right (${right}).`;
-    else line = `${label}: wrong. Chose "${q.options[r.choice]}". Right answer: ${right}.`;
-    return r?.note ? `${line}\n  His note: "${r.note}"` : line;
+/** SVG to PNG with rsvg-convert, on Aristotle's card colours, so currentColor renders as it would in Aristotle. */
+function renderSvg(svg: string, dark: boolean): Promise<Buffer> {
+  const theme = dark ? THEME.dark : THEME.light;
+  const themed = svg.replace(/<svg\b/, `<svg color="${theme.ink}"`);
+  return rsvgConvert(themed, ['--background-color', theme.background, '--zoom', '2', '--format', 'png'], {
+    maxBuffer: 20 * 1024 * 1024,
+    timeout: 15_000,
   });
-  const score = item.responses?.filter((r) => r.correct).length ?? 0;
-  return (
-    `Quiz answered: ${score}/${item.questions.length} right. He has already seen the right answers and your explanations.\n${lines.join('\n')}` +
-    (missing.size ? `\n(Not recorded on the map, no such concept: ${[...missing].join(', ')}.)` : '')
-  );
 }
 
-function formatAsk(item: AskItem): string {
-  return `He answered (${item.kind}${item.concept ? `, concept ${item.concept}` : ''}):\n\n${item.response ?? ''}`;
-}
+// How results read to Claude
 
+/** One line per topic, for list_topics and start_session. */
 function formatSummary(t: TopicSummary): string {
   const { solid, shaky, unknown } = t.counts;
   const next = t.handoff ? ` | next: ${t.handoff.next}` : '';
@@ -810,13 +789,42 @@ function roadmapContext(gym: Gym, slug: string): string {
     .join('');
 }
 
+/** One fading concept, with his estimated chance of recalling it. */
 function formatFading(f: FadingConcept): string {
   const last = f.lastPractised ? `, last practised ${f.lastPractised.slice(0, 10)}` : '';
   return `- ${f.topic}/${f.id} "${f.label}" (${f.topicTitle}): recall ~${Math.round(f.recall * 100)}%, due since ${f.due.slice(0, 10)}${last}${f.summary ? `\n    ${f.summary}` : ''}`;
 }
 
+/** One map change, short: "added x (shaky)", "x unknown → solid". */
 function formatChange(c: MapChange): string {
   if (c.removed) return `removed ${c.id}`;
   if (c.added) return `added ${c.id} (${c.to})`;
   return `${c.id} ${c.from} → ${c.to}`;
+}
+
+/** His quiz answers as Claude reads them, with any concept tags the map doesn't know. */
+function formatQuiz(item: QuizItem, gym: Gym): string {
+  const missing = new Set<string>();
+  const lines = item.questions.map((q, i) => {
+    const r = item.responses?.[i];
+    const tag = q.concept ?? q.strand;
+    if (q.concept && !gym.resolve(q.concept)) missing.add(q.concept);
+    const label = `Q${i + 1}${tag ? ` [${tag}]` : ''}`;
+    const right = `"${q.options[q.correct]}"`;
+    let line: string;
+    if (!r || r.choice === null) line = `${label}: said "I don't know". Right answer: ${right}.`;
+    else if (r.correct) line = `${label}: right (${right}).`;
+    else line = `${label}: wrong. Chose "${q.options[r.choice]}". Right answer: ${right}.`;
+    return r?.note ? `${line}\n  His note: "${r.note}"` : line;
+  });
+  const score = item.responses?.filter((r) => r.correct).length ?? 0;
+  return (
+    `Quiz answered: ${score}/${item.questions.length} right. He has already seen the right answers and your explanations.\n${lines.join('\n')}` +
+    (missing.size ? `\n(Not recorded on the map, no such concept: ${[...missing].join(', ')}.)` : '')
+  );
+}
+
+/** His written answer as Claude reads it. */
+function formatAsk(item: AskItem): string {
+  return `He answered (${item.kind}${item.concept ? `, concept ${item.concept}` : ''}):\n\n${item.response ?? ''}`;
 }

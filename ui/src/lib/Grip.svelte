@@ -1,6 +1,7 @@
 <script lang="ts">
   // A drag handle on a pane's edge. It sets a width (a CSS variable on <html>) and remembers it here.
   import { onMount } from 'svelte';
+  import { migrateKey } from './storage.ts';
 
   let {
     name,
@@ -20,10 +21,25 @@
     label: string;
   } = $props();
 
-  const key = $derived(`mind-gym.width${name}`);
   let width = $state(0);
   let dragging = $state(false);
 
+  const key = $derived(`aristotle.width${name}`);
+
+  // The saved width, if any, applied once on load (not saved again: nothing changed).
+  onMount(() => {
+    let saved = NaN;
+    try {
+      // Moved over from the name it had before the app was renamed.
+      migrateKey(`mind-gym.width${name}`, key);
+      saved = Number(localStorage.getItem(key));
+    } catch {
+      // Use the default.
+    }
+    set(Number.isFinite(saved) && saved > 0 ? saved : initial, false);
+  });
+
+  /** Sets the width, kept within its limits, and remembers it unless told not to. */
   function set(w: number, save = true) {
     width = Math.round(Math.min(max, Math.max(min, w)));
     document.documentElement.style.setProperty(name, `${width}px`);
@@ -35,16 +51,7 @@
     }
   }
 
-  onMount(() => {
-    let saved = NaN;
-    try {
-      saved = Number(localStorage.getItem(key));
-    } catch {
-      // Use the default.
-    }
-    set(Number.isFinite(saved) && saved > 0 ? saved : initial, false);
-  });
-
+  // Pointer capture keeps the moves coming to the handle even when the pointer outruns it.
   function down(e: PointerEvent) {
     e.preventDefault();
     const el = e.currentTarget as HTMLElement;
@@ -64,7 +71,8 @@
     el.addEventListener('pointerup', up);
   }
 
-  function key_(e: KeyboardEvent) {
+  /** Arrow keys move the edge 16px at a time, in the direction of the arrow. */
+  function onKey(e: KeyboardEvent) {
     const d = e.key === 'ArrowLeft' ? -16 : e.key === 'ArrowRight' ? 16 : 0;
     if (!d) return;
     e.preventDefault();
@@ -86,7 +94,7 @@
   tabindex="0"
   onpointerdown={down}
   ondblclick={() => set(initial)}
-  onkeydown={key_}
+  onkeydown={onKey}
 ></div>
 
 <style>

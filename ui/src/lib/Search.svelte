@@ -6,15 +6,6 @@
   import { searchBox } from './search.svelte.ts';
   import type { SearchHit, SearchKind } from '../../../shared/types.ts';
 
-  let q = $state('');
-  let hits = $state<SearchHit[]>([]);
-  let selected = $state(0);
-  let loading = $state(false);
-  let input = $state<HTMLInputElement>();
-  let list = $state<HTMLElement>();
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  let asked = 0;
-
   const KIND: Record<SearchKind, string> = {
     roadmap: 'Roadmap',
     step: 'Step',
@@ -24,27 +15,22 @@
     session: 'Session',
   };
 
-  function href(h: SearchHit): string {
-    switch (h.kind) {
-      case 'roadmap':
-        return link.roadmap(h.slug!);
-      case 'step':
-        return feed.topics[h.slug!] ? link.topic(h.slug!) : link.lesson(h.slug!);
-      case 'topic':
-        return link.topic(h.slug!);
-      case 'concept':
-        return link.topic(h.slug!, h.concept);
-      case 'mission':
-        return link.mission(h.id!);
-      case 'session':
-        return link.session(h.slug!);
-    }
-  }
+  let q = $state('');
+  let hits = $state<SearchHit[]>([]);
+  let selected = $state(0);
+  let loading = $state(false);
+  let input = $state<HTMLInputElement>();
+  let list = $state<HTMLElement>();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  /** Counts the searches sent, so a slow answer to an older one never replaces a newer one's. */
+  let asked = 0;
 
+  // On opening, select what was typed last time, so typing replaces it.
   $effect(() => {
     if (searchBox.open) queueMicrotask(() => input?.select());
   });
 
+  // Search as he types, once he pauses for 120 ms.
   $effect(() => {
     const query = q.trim();
     clearTimeout(timer);
@@ -66,6 +52,24 @@
       }
     }, 120);
   });
+
+  /** Where a hit leads. A step already studied opens its topic; one not started yet, its class. */
+  function href(h: SearchHit): string {
+    switch (h.kind) {
+      case 'roadmap':
+        return link.roadmap(h.slug!);
+      case 'step':
+        return feed.topics[h.slug!] ? link.topic(h.slug!) : link.lesson(h.slug!);
+      case 'topic':
+        return link.topic(h.slug!);
+      case 'concept':
+        return link.topic(h.slug!, h.concept);
+      case 'mission':
+        return link.mission(h.id!);
+      case 'session':
+        return link.session(h.slug!);
+    }
+  }
 
   function close() {
     searchBox.toggle(false);
@@ -94,7 +98,7 @@
 
   /** Ctrl+K anywhere, or / when not typing in a field. */
   function onWindowKey(e: KeyboardEvent) {
-    const typing = e.target instanceof HTMLElement && (e.target.closest('input, textarea, [contenteditable], .xterm') !== null);
+    const typing = e.target instanceof HTMLElement && e.target.closest('input, textarea, [contenteditable], .xterm') !== null;
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
       e.preventDefault();
       searchBox.toggle();
@@ -162,11 +166,16 @@
         </a>
       {:else}
         <p class="none">
-          {#if !q.trim()}Type to search everything you have learned, planned and written.{:else if loading}Searching…{:else}Nothing matches "{q.trim()}".{/if}
+          {#if !q.trim()}Type to search everything you have learned, planned and written.{:else if loading}Searching…{:else}Nothing matches
+            "{q.trim()}".{/if}
         </p>
       {/each}
     </div>
-    <footer><span><kbd>↑</kbd><kbd>↓</kbd> move</span><span><kbd>Enter</kbd> open</span><span><kbd>Ctrl</kbd><kbd>K</kbd> or <kbd>/</kbd> search</span></footer>
+    <footer>
+      <span><kbd>↑</kbd><kbd>↓</kbd> move</span><span><kbd>Enter</kbd> open</span><span
+        ><kbd>Ctrl</kbd><kbd>K</kbd> or <kbd>/</kbd> search</span
+      >
+    </footer>
   </div>
 {/if}
 

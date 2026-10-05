@@ -16,18 +16,75 @@
 
   let { spec = {} }: { spec?: { minutes?: number; second?: boolean } } = $props();
 
+  // Time, in minutes: the chart spans T, sampled every DT; a second stressor starts at SECOND_AT.
+  const T = 120;
+  const DT = 0.25;
+  const SECOND_AT = 45;
+  const MARKS = [0, 15, 30, 45, 60, 75, 90, 105, 120];
+  /** The playhead takes this long to sweep the whole two hours. */
+  const SWEEP_MS = 14000;
+
+  // Layout, in viewBox units: L on the left for the axis, B at the bottom for the minute labels.
+  const W = 540;
+  const H = 230;
+  const L = 34;
+  const B = 26;
+  /** The tallest value drawn, as a multiple of one stressor's peak: room for a longer or repeated one to show higher. */
+  const Y_MAX = 1.45;
+
+  type Stress = (t: number) => number;
+  /** 1 while a stressor is on (2 where two overlap), 0 otherwise. */
+  const stressOf =
+    (len: number, twice: boolean): Stress =>
+    (t) =>
+      (t >= 0 && t < len ? 1 : 0) + (twice && t >= SECOND_AT && t < SECOND_AT + len ? 1 : 0);
+
+  // Each response's shape (its kernel, minutes since the stress) and how far it reaches, in minutes.
+  const K = {
+    // follows within seconds and fades as fast
+    hr: [(tau: number) => Math.exp(-tau / 0.4), 4],
+    // rises within seconds, clears with a half-life of two minutes
+    adr: [(tau: number) => (1 - Math.exp(-tau / 0.15)) * Math.exp((-tau * Math.LN2) / 2), 20],
+    // nothing for three minutes, then a slow rise and a slower fall (a gamma-like shape)
+    cort: [(tau: number) => (tau < 3 ? 0 : (tau - 3) ** 2 * Math.exp(-(tau - 3) / 7)), 110],
+  } as const;
+
+  // One scale per hormone, from a single 10-minute stressor, so longer or repeated stressors can go higher.
+  const one = stressOf(10, false);
+  const REF = {
+    hr: Math.max(...convolve(K.hr[0], K.hr[1], one)),
+    adr: Math.max(...convolve(K.adr[0], K.adr[1], one)),
+    cort: Math.max(...convolve(K.cort[0], K.cort[1], one)),
+  };
+
+  const still = typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+
   // Options set where the figure starts; after that the controls are his.
   const initial = untrack(() => ({ ...spec }));
   let minutes = $state(initial.minutes ?? 10);
   let second = $state(initial.second ?? false);
-  const SECOND_AT = 45;
-  const T = 120;
-  const DT = 0.25;
+  let playing = $state(false);
+  let svg = $state<SVGSVGElement>();
+  // The playhead, in minutes. With reduced motion it rests at 22 min, about where cortisol peaks.
+  const head = new Tween(still ? 22 : 0, { duration: 0, easing: linear });
 
-  type Stress = (t: number) => number;
-  const stressOf = (len: number, twice: boolean): Stress => (t) =>
-    (t >= 0 && t < len ? 1 : 0) + (twice && t >= SECOND_AT && t < SECOND_AT + len ? 1 : 0);
+  const series = $derived.by(() => {
+    const st = stressOf(minutes, second);
+    return {
+      hr: convolve(K.hr[0], K.hr[1], st).map((v) => v / REF.hr),
+      adr: convolve(K.adr[0], K.adr[1], st).map((v) => v / REF.adr),
+      cort: convolve(K.cort[0], K.cort[1], st).map((v) => v / REF.cort),
+    };
+  });
+  /** When cortisol peaks, in minutes, before any second stressor. */
+  const cortPeak = $derived.by(() => {
+    const c = series.cort.slice(0, Math.round((second ? SECOND_AT : T) / DT));
+    const i = c.indexOf(Math.max(...c));
+    return i * DT;
+  });
+  const ended = $derived(head.current >= T - 0.5);
 
+  /** The response over T: the stress convolved with the kernel (a sum over the last `span` minutes, step DT). */
   function convolve(kernel: (tau: number) => number, span: number, stress: Stress): number[] {
     const n = Math.round(T / DT);
     const k = Array.from({ length: Math.round(span / DT) }, (_, i) => kernel(i * DT));
@@ -40,49 +97,49 @@
     return out;
   }
 
-  const LN2 = Math.LN2;
-  const K = {
-    hr: [(tau: number) => Math.exp(-tau / 0.4), 4],
-    adr: [(tau: number) => (1 - Math.exp(-tau / 0.15)) * Math.exp((-tau * LN2) / 2), 20],
-    cort: [(tau: number) => (tau < 3 ? 0 : (tau - 3) ** 2 * Math.exp(-(tau - 3) / 7)), 110],
-  } as const;
-  // One scale per hormone, from a single 10-minute stressor, so longer or repeated stressors can go higher.
-  const one = stressOf(10, false);
-  const REF = {
-    hr: Math.max(...convolve(K.hr[0], K.hr[1], one)),
-    adr: Math.max(...convolve(K.adr[0], K.adr[1], one)),
-    cort: Math.max(...convolve(K.cort[0], K.cort[1], one)),
-  };
-  const series = $derived.by(() => {
-    const st = stressOf(minutes, second);
-    return {
-      hr: convolve(K.hr[0], K.hr[1], st).map((v) => v / REF.hr),
-      adr: convolve(K.adr[0], K.adr[1], st).map((v) => v / REF.adr),
-      cort: convolve(K.cort[0], K.cort[1], st).map((v) => v / REF.cort),
-    };
-  });
-
-  const W = 540;
-  const H = 230;
-  const L = 34;
-  const B = 26;
-  const x = (t: number) => L + (t / T) * (W - L - 8);
-  const y = (v: number) => H - B - Math.min(1.45, v) * ((H - B - 14) / 1.45);
-  const path = (vals: number[]) => vals.map((v, i) => `${i ? 'L' : 'M'}${x(i * DT).toFixed(1)},${y(v).toFixed(1)}`).join('');
-
-  const still = typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const head = new Tween(still ? 22 : 0, { duration: 0, easing: linear });
-  let playing = $state(false);
-  function play() {
-    if (head.current >= T - 0.5) head.set(0, { duration: 0 });
-    playing = true;
-    void head.set(T, { duration: 14000 * (1 - head.current / T) }).then(() => (playing = false));
+  function x(t: number): number {
+    return L + (t / T) * (W - L - 8);
   }
+
+  function y(v: number): number {
+    return H - B - Math.min(Y_MAX, v) * ((H - B - 14) / Y_MAX);
+  }
+
+  function path(vals: number[]): string {
+    return vals.map((v, i) => `${i ? 'L' : 'M'}${x(i * DT).toFixed(1)},${y(v).toFixed(1)}`).join('');
+  }
+
+  /** A series' value under the playhead. */
+  function at(vals: number[]): number {
+    return vals[Math.min(vals.length - 1, Math.round(head.current / DT))] ?? 0;
+  }
+
+  /** A level in words, against one stressor's peak (1). */
+  function level(v: number): string {
+    return v < 0.08
+      ? 'at baseline'
+      : v < 0.35
+        ? 'slightly up'
+        : v < 0.75
+          ? 'up'
+          : v < 1.1
+            ? 'near its peak'
+            : 'higher than one stressor alone';
+  }
+
+  /** Play from where the playhead is (or from the start once it has ended), at the full sweep's speed. */
+  function play() {
+    if (ended) head.set(0, { duration: 0 });
+    playing = true;
+    void head.set(T, { duration: SWEEP_MS * (1 - head.current / T) }).then(() => (playing = false));
+  }
+
   function pause() {
     playing = false;
     head.set(head.current, { duration: 0 });
   }
-  let svg = $state<SVGSVGElement>();
+
+  /** Move the playhead to the pointer, on press or while dragging. */
   function scrub(e: PointerEvent) {
     if (!svg || (e.type === 'pointermove' && e.buttons !== 1)) return;
     const r = svg.getBoundingClientRect();
@@ -90,25 +147,24 @@
     playing = false;
     head.set(Math.min(T, Math.max(0, ((px - L) / (W - L - 8)) * T)), { duration: 0 });
   }
-
-  const at = (vals: number[]) => vals[Math.min(vals.length - 1, Math.round(head.current / DT))] ?? 0;
-  const level = (v: number) => (v < 0.08 ? 'at baseline' : v < 0.35 ? 'slightly up' : v < 0.75 ? 'up' : v < 1.1 ? 'near its peak' : 'higher than one stressor alone');
-  const cortPeak = $derived.by(() => {
-    const c = series.cort.slice(0, Math.round((second ? SECOND_AT : T) / DT));
-    const i = c.indexOf(Math.max(...c));
-    return i * DT;
-  });
 </script>
 
 <figure class="kit explorable hormones">
   <p class="kit-title">Two hours after a stressor</p>
   <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-  <svg bind:this={svg} viewBox="0 0 {W} {H}" role="img" aria-label="Heart rate, adrenaline and cortisol over two hours" onpointerdown={scrub} onpointermove={scrub}>
+  <svg
+    bind:this={svg}
+    viewBox="0 0 {W} {H}"
+    role="img"
+    aria-label="Heart rate, adrenaline and cortisol over two hours"
+    onpointerdown={scrub}
+    onpointermove={scrub}
+  >
     <rect class="band" x={x(0)} y="8" width={x(minutes) - x(0)} height={H - B - 8} />
     {#if second}<rect class="band" x={x(SECOND_AT)} y="8" width={x(SECOND_AT + minutes) - x(SECOND_AT)} height={H - B - 8} />{/if}
-    {#each [0, 15, 30, 45, 60, 75, 90, 105, 120] as m (m)}
+    {#each MARKS as m (m)}
       <line class="grid" x1={x(m)} y1="8" x2={x(m)} y2={H - B} />
-      <text class="tick" x={x(m)} y={H - 8} text-anchor={m === 120 ? 'end' : 'middle'}>{m === 120 ? '120 min' : m}</text>
+      <text class="tick" x={x(m)} y={H - 8} text-anchor={m === T ? 'end' : 'middle'}>{m === T ? `${T} min` : m}</text>
     {/each}
     <line class="axis" x1={L} y1={H - B} x2={W - 8} y2={H - B} />
     <path class="c hr" d={path(series.hr)} />
@@ -126,14 +182,21 @@
   </div>
 
   <div class="kit-states">
-    <button class="kit-play" onclick={() => (playing ? pause() : play())} aria-pressed={playing}>{playing ? 'Pause' : head.current >= T - 0.5 ? 'Replay' : 'Play'}</button>
+    <button class="kit-play" onclick={() => (playing ? pause() : play())} aria-pressed={playing}
+      >{playing ? 'Pause' : ended ? 'Replay' : 'Play'}</button
+    >
     <label class="opt">Stressor <input type="range" min="2" max="25" step="1" bind:value={minutes} /> <span>{minutes} min</span></label>
     <label class="opt"><input type="checkbox" bind:checked={second} /> A second one at 45 min</label>
   </div>
   <p class="kit-note">
-    Cortisol peaks about {Math.round(cortPeak)} minutes in, after the stressor is over, and is still up an hour later. {second ? 'The second stressor starts while cortisol from the first is still well above baseline, so it stays up for well over an hour in all: likely part of why you can feel tired but wired after a hard session.' : 'Tick “a second one” to see what a second round does.'}
+    Cortisol peaks about {Math.round(cortPeak)} minutes in, after the stressor is over, and is still up an hour later. {second
+      ? 'The second stressor starts while cortisol from the first is still well above baseline, so it stays up for well over an hour in all: likely part of why you can feel tired but wired after a hard session.'
+      : 'Tick “a second one” to see what a second round does.'}
   </p>
-  <p class="model">Illustrative curves, each scaled to its response to one 10-minute stressor. Shapes follow published time courses: adrenaline’s plasma half-life of about 2 minutes; cortisol peaking about 15 to 25 minutes after the start of a stressor (Trier Social Stress Test studies).</p>
+  <p class="model">
+    Illustrative curves, each scaled to its response to one 10-minute stressor. Shapes follow published time courses: adrenaline’s plasma
+    half-life of about 2 minutes; cortisol peaking about 15 to 25 minutes after the start of a stressor (Trier Social Stress Test studies).
+  </p>
 </figure>
 
 <style>

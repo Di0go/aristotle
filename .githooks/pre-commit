@@ -3,6 +3,9 @@
 # reference blocks first and adds them to the commit, so they never fall behind the code.
 # Installed by `pnpm install` (core.hooksPath). `git commit --no-verify` skips it; the pre-push hook still runs.
 set -eu
+
+# Nothing staged (an amend of the message only, say): nothing to check.
 git diff --cached --quiet && exit 0
+
 node scripts/docs.ts --stage
 pnpm gates --quick

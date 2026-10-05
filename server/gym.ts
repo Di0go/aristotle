@@ -1,15 +1,14 @@
 // Ties the live feed to the knowledge maps: answers become evidence on concepts, map changes show up
 // in the feed, practice moves review schedules and training levels, and data/ is backed up.
 
-import { stat } from 'node:fs/promises';
 import path from 'node:path';
 import { Backup } from './backup.ts';
 import { SESSIONS_DIR } from './config.ts';
-import { Feed, readSession, sessionFiles, summarizeSession } from './feed.ts';
+import { Feed, readSession, SessionCache, summarizeSession, type SessionRecord } from './feed.ts';
 import { Missions } from './missions.ts';
 import type { Outcome } from './reviews.ts';
-import { slugify } from './slug.ts';
 import { Roadmaps } from './roadmaps.ts';
+import { slugify } from './slug.ts';
 import { Topics, type ConceptInput } from './topics.ts';
 import type {
   AskItem,
@@ -32,15 +31,23 @@ export interface PracticeResult {
   kind: 'recall' | 'problem';
 }
 
+/** A concept's status change in a session log, keyed "topic/concept". */
+interface StatusChange {
+  at: string;
+  key: string;
+  to?: string;
+  removed?: boolean;
+}
+
+/** The stores, wired together: every store's changes reach the feed's live events, and any event schedules a backup. */
 export class Gym {
   readonly feed: Feed;
   readonly topics: Topics;
   readonly roadmaps: Roadmaps;
   readonly missions: Missions;
   readonly backup = new Backup();
-  private summaries = new Map<string, { mtime: number; summary: SessionSummary | null }>();
-  /** The map changes in each session log, cached by modification time like the summaries. */
-  private mapChanges = new Map<string, { mtime: number; changes: { at: string; key: string; to?: string; removed?: boolean }[] }>();
+  private summaries = new SessionCache((record) => summarizeSession(record));
+  private statusChanges = new SessionCache((record) => statusChanges(record));
 
   constructor(feed: Feed, topics: Topics, roadmaps: Roadmaps, missions: Missions) {
     this.feed = feed;
@@ -73,6 +80,7 @@ export class Gym {
     return topic && concept ? { topic, concept } : null;
   }
 
+  /** Starts a session: on a topic (found or created), or a review across all of them. */
   async startSession(topicName: string, goal: string, topicGoal?: string, kind: SessionKind = 'learn') {
     if (kind === 'review') {
       const session = await this.feed.startSession('Review', '', goal, kind);
@@ -84,6 +92,24 @@ export class Gym {
     return { session, topic, created };
   }
 
+  /** Shows the handoff, closes the session, and keeps the handoff on its topic for next time. */
+  async endSession(locked: string, shaky: string, next: string): Promise<Handoff> {
+    const session = this.feed.session;
+    if (!session) throw new Error('No session to end.');
+    const handoff: Handoff = { at: new Date().toISOString(), session: session.id, locked, shaky, next };
+    await this.feed.add({
+      type: 'block',
+      kind: 'summary',
+      title: 'Done for now',
+      markdown: `**Locked in:** ${locked}\n\n**Still shaky:** ${shaky}\n\n**Next time:** ${next}`,
+    });
+    await this.feed.endSession(handoff);
+    if (session.topicSlug && this.topics.get(session.topicSlug)) await this.topics.setHandoff(session.topicSlug, handoff);
+    this.backup.schedule(5_000);
+    return handoff;
+  }
+
+  /** Changes a map (the session's topic by default); status changes also show in the feed. */
   async updateMap(inputs: ConceptInput[], remove: string[], focus?: string, topicSlug?: string): Promise<MapChange[]> {
     const topic = topicSlug ? this.topics.get(topicSlug) : this.currentTopic();
     if (!topic) {
@@ -94,11 +120,13 @@ export class Gym {
     return changes;
   }
 
+  /** Highlights the concept being taught, when it belongs to the session's topic. */
   async focus(ref: string) {
     const found = this.resolve(ref);
     if (found && found.topic.slug === this.feed.session?.topicSlug) await this.topics.setFocus(found.topic.slug, found.concept.id);
   }
 
+  /** Saves his quiz answers; each question tagged with a concept becomes evidence on it. */
   async answerQuiz(id: string, picks: { choice: number | null; note?: string }[]): Promise<QuizItem> {
     const item = await this.feed.answerQuiz(id, picks);
     const session = this.feed.session;
@@ -118,6 +146,7 @@ export class Gym {
     return item;
   }
 
+  /** Saves his written answer, as evidence on its concept if it has one. */
   async answerAsk(id: string, text: string): Promise<AskItem> {
     const item = await this.feed.answerAsk(id, text);
     const session = this.feed.session;
@@ -159,8 +188,8 @@ export class Gym {
         ...(r.kind === 'problem' && difficulty ? { difficulty } : {}),
       });
       if (!res) continue;
-      if (res.change) changes.set(topic.slug, [...(changes.get(topic.slug) ?? []), res.change]);
-      if (r.kind === 'problem' && difficulty) problems.set(topic.slug, [...(problems.get(topic.slug) ?? []), r.outcome]);
+      if (res.change) append(changes, topic.slug, res.change);
+      if (r.kind === 'problem' && difficulty) append(problems, topic.slug, r.outcome);
       const before = res.recallBefore === undefined ? '' : `, recall was ~${Math.round(res.recallBefore * 100)}%`;
       const next =
         res.concept.review && res.concept.status === 'solid'
@@ -200,22 +229,15 @@ export class Gym {
       }
       const res = await this.topics.recordPractice(found.topic.slug, found.concept.id, r.outcome, { at, session, practice: 'mission' });
       if (!res) continue;
-      if (res.change) changes.set(found.topic.slug, [...(changes.get(found.topic.slug) ?? []), res.change]);
+      if (res.change) append(changes, found.topic.slug, res.change);
       lines.push(`${found.topic.slug}/${found.concept.id}: ${r.outcome}${res.change ? ', now shaky' : ''}`);
     }
+    // Checked again: the session may have ended while the results were being recorded.
     if (this.feed.session && !this.feed.session.endedAt) {
       for (const [slug, list] of changes) await this.feed.add({ type: 'map', topic: slug, changes: list });
     }
     const reviewed: Mission = await this.missions.review(mission.id, verdict, markdown);
     return { mission: reviewed, lines };
-  }
-
-  /** A concept named in a mission review: "topic/id", or a bare id in the mission's topic. */
-  private resolveIn(ref: string, mission: Mission) {
-    if (ref.includes('/')) return this.resolve(ref);
-    const topic = this.topics.get(mission.topic ?? '') ?? this.currentTopic();
-    const concept = topic?.concepts.find((c) => c.id === slugify(ref));
-    return topic && concept ? { topic, concept } : null;
   }
 
   /** What's fading, and what has been practised in the current session. */
@@ -234,38 +256,13 @@ export class Gym {
     return { fading: this.topics.fading(), practised, upcoming: this.topics.upcoming(7) };
   }
 
-  async endSession(locked: string, shaky: string, next: string): Promise<Handoff> {
-    const session = this.feed.session;
-    if (!session) throw new Error('No session to end.');
-    const handoff: Handoff = { at: new Date().toISOString(), session: session.id, locked, shaky, next };
-    await this.feed.add({
-      type: 'block',
-      kind: 'summary',
-      title: 'Done for now',
-      markdown: `**Locked in:** ${locked}\n\n**Still shaky:** ${shaky}\n\n**Next time:** ${next}`,
-    });
-    await this.feed.endSession(handoff);
-    if (session.topicSlug && this.topics.get(session.topicSlug)) await this.topics.setHandoff(session.topicSlug, handoff);
-    this.backup.schedule(5_000);
-    return handoff;
-  }
-
-  /** Every session, newest first. Summaries are cached by file modification time. */
+  /** Every session (or a topic's), newest first. */
   async listSessions(topicSlug?: string): Promise<SessionSummary[]> {
-    const out: SessionSummary[] = [];
-    for (const name of await sessionFiles()) {
-      const file = path.join(SESSIONS_DIR, name);
-      const mtime = (await stat(file)).mtimeMs;
-      let cached = this.summaries.get(file);
-      if (!cached || cached.mtime !== mtime) {
-        cached = { mtime, summary: summarizeSession(await readSession(file)) };
-        this.summaries.set(file, cached);
-      }
-      if (cached.summary && (!topicSlug || cached.summary.topicSlug === topicSlug)) out.push(cached.summary);
-    }
-    return out.reverse();
+    const summaries = await this.summaries.values();
+    return summaries.filter((s): s is SessionSummary => s !== null && (!topicSlug || s.topicSlug === topicSlug)).reverse();
   }
 
+  /** A whole session by id; null for an unknown or malformed id. */
   async readSession(id: string) {
     if (!/^[\w-]+$/.test(id)) return null;
     try {
@@ -275,26 +272,29 @@ export class Gym {
     }
   }
 
+  /** The charts on the Progress page. */
   async progress(): Promise<Progress> {
-    // Solid concepts over time, replayed from the map changes in every session log.
+    const solid = await this.solidOverTime();
+    const answers = answersPerWeek(this.topics.all());
+    const minutes = minutesPerWeek(await this.listSessions());
+    return {
+      solid,
+      answers,
+      minutes,
+      fading: this.topics.fading(),
+      upcoming: this.topics.upcoming(7),
+      training: this.topics
+        .all()
+        .filter((t) => t.training)
+        .map((t) => ({ topic: t.slug, title: t.title, level: t.training!.level })),
+    };
+  }
+
+  /** Solid concepts at the end of each day, replayed from the map changes in every session log. */
+  private async solidOverTime(): Promise<Progress['solid']> {
     const status = new Map<string, string>();
     const byDay = new Map<string, number>();
-    const changes: { at: string; key: string; to?: string; removed?: boolean }[] = [];
-    for (const name of await sessionFiles()) {
-      const file = path.join(SESSIONS_DIR, name);
-      const mtime = (await stat(file)).mtimeMs;
-      let cached = this.mapChanges.get(file);
-      if (!cached || cached.mtime !== mtime) {
-        const found: { at: string; key: string; to?: string; removed?: boolean }[] = [];
-        for (const item of (await readSession(file)).items) {
-          if (item.type !== 'map') continue;
-          for (const c of item.changes) found.push({ at: item.at, key: `${item.topic}/${c.id}`, to: c.to, removed: c.removed });
-        }
-        cached = { mtime, changes: found };
-        this.mapChanges.set(file, cached);
-      }
-      changes.push(...cached.changes);
-    }
+    const changes = (await this.statusChanges.values()).flat();
     changes.sort((a, b) => a.at.localeCompare(b.at));
     for (const c of changes) {
       if (c.removed) status.delete(c.key);
@@ -306,46 +306,65 @@ export class Gym {
       localDay(new Date().toISOString()),
       this.topics.all().reduce((n, t) => n + t.concepts.filter((c) => c.status === 'solid').length, 0),
     );
-    const solid = [...byDay].sort(([a], [b]) => a.localeCompare(b)).map(([day, count]) => ({ day, count }));
+    return [...byDay].sort(([a], [b]) => a.localeCompare(b)).map(([day, count]) => ({ day, count }));
+  }
 
-    // Answers per week, from the evidence on every concept.
-    const answers = new Map<string, { right: number; partial: number; wrong: number }>();
-    for (const topic of this.topics.all()) {
-      for (const c of topic.concepts) {
-        for (const e of c.evidence) {
-          if (!e.result) continue;
-          const week = weekOf(e.at);
-          const row = answers.get(week) ?? { right: 0, partial: 0, wrong: 0 };
-          if (e.result === 'right') row.right++;
-          else if (e.result === 'partial') row.partial++;
-          else row.wrong++;
-          answers.set(week, row);
-        }
-      }
-    }
-
-    const minutes = new Map<string, { learn: number; review: number; train: number }>();
-    for (const s of await this.listSessions()) {
-      const week = weekOf(s.startedAt);
-      const row = minutes.get(week) ?? { learn: 0, review: 0, train: 0 };
-      row[s.kind] += s.activeMinutes;
-      minutes.set(week, row);
-    }
-
-    return {
-      solid,
-      answers: [...answers].sort(([a], [b]) => a.localeCompare(b)).map(([week, r]) => ({ week, ...r })),
-      minutes: [...minutes].sort(([a], [b]) => a.localeCompare(b)).map(([week, r]) => ({ week, ...r })),
-      fading: this.topics.fading(),
-      upcoming: this.topics.upcoming(7),
-      training: this.topics
-        .all()
-        .filter((t) => t.training)
-        .map((t) => ({ topic: t.slug, title: t.title, level: t.training!.level })),
-    };
+  /** A concept named in a mission review: "topic/id", or a bare id in the mission's topic. */
+  private resolveIn(ref: string, mission: Mission) {
+    if (ref.includes('/')) return this.resolve(ref);
+    const topic = this.topics.get(mission.topic ?? '') ?? this.currentTopic();
+    const concept = topic?.concepts.find((c) => c.id === slugify(ref));
+    return topic && concept ? { topic, concept } : null;
   }
 }
 
+/** The status changes recorded in one session log. */
+function statusChanges(record: SessionRecord): StatusChange[] {
+  const found: StatusChange[] = [];
+  for (const item of record.items) {
+    if (item.type !== 'map') continue;
+    for (const c of item.changes) found.push({ at: item.at, key: `${item.topic}/${c.id}`, to: c.to, removed: c.removed });
+  }
+  return found;
+}
+
+/** Answers per week, from the evidence on every concept. */
+function answersPerWeek(topics: Topic[]): Progress['answers'] {
+  const answers = new Map<string, { right: number; partial: number; wrong: number }>();
+  for (const topic of topics) {
+    for (const c of topic.concepts) {
+      for (const e of c.evidence) {
+        if (!e.result) continue;
+        const week = weekOf(e.at);
+        const row = answers.get(week) ?? { right: 0, partial: 0, wrong: 0 };
+        if (e.result === 'right') row.right++;
+        else if (e.result === 'partial') row.partial++;
+        else row.wrong++;
+        answers.set(week, row);
+      }
+    }
+  }
+  return [...answers].sort(([a], [b]) => a.localeCompare(b)).map(([week, r]) => ({ week, ...r }));
+}
+
+/** Active minutes per week, by session kind. */
+function minutesPerWeek(sessions: SessionSummary[]): Progress['minutes'] {
+  const minutes = new Map<string, { learn: number; review: number; train: number }>();
+  for (const s of sessions) {
+    const week = weekOf(s.startedAt);
+    const row = minutes.get(week) ?? { learn: 0, review: 0, train: 0 };
+    row[s.kind] += s.activeMinutes;
+    minutes.set(week, row);
+  }
+  return [...minutes].sort(([a], [b]) => a.localeCompare(b)).map(([week, r]) => ({ week, ...r }));
+}
+
+/** Adds `value` to the list kept under `key`. */
+function append<T>(map: Map<string, T[]>, key: string, value: T) {
+  map.set(key, [...(map.get(key) ?? []), value]);
+}
+
+/** YYYY-MM-DD in local time. */
 function localDay(iso: string): string {
   const d = new Date(iso);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;

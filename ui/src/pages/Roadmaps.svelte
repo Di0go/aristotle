@@ -1,26 +1,58 @@
 <script lang="ts">
   // The library: what you have, at a glance. Roadmaps as compact cards (progress per step, the next step),
   // then every topic in one table you can filter and sort. New roadmaps and topics start from the header.
-  import { feed } from '../lib/feed.svelte.ts';
-  import { link } from '../lib/router.svelte.ts';
   import { actions } from '../lib/actions.ts';
   import { claude } from '../lib/claude.svelte.ts';
+  import { feed } from '../lib/feed.svelte.ts';
   import { ago, plural } from '../lib/format.ts';
   import { countsOf, placeOf, stepsOf } from '../lib/library.ts';
+  import { link } from '../lib/router.svelte.ts';
   import StatusBar from '../lib/StatusBar.svelte';
   import type { Topic } from '../../../shared/types.ts';
+
+  type Sort = 'recent' | 'name' | 'progress';
+  const SORTS: [Sort, string][] = [
+    ['recent', 'Recent'],
+    ['name', 'Name'],
+    ['progress', 'Progress'],
+  ];
+
+  /** The words on the form for each thing he can start. */
+  const MAKER = {
+    roadmap: {
+      title: 'Plan a roadmap',
+      help: 'Name a field or a big goal. Claude asks what you want from it, checks the field, and drafts the steps on the roadmap page for you to change. Nothing is taught until you approve it.',
+      what: 'e.g. sports psychology',
+      whatLabel: 'Field or goal',
+      goal: 'Where you want to end up (optional)',
+      submit: 'Plan it',
+    },
+    topic: {
+      title: 'Start a topic',
+      help: 'One topic, taught straight away. It starts with the big picture, then finds where your knowledge ends.',
+      what: 'e.g. how sleep consolidates memory',
+      whatLabel: 'Topic',
+      goal: 'What you want to be able to do (optional)',
+      submit: 'Start',
+    },
+  } as const;
 
   let making = $state<'roadmap' | 'topic' | null>(null);
   let what = $state('');
   let goal = $state('');
   let filter = $state('');
-  let sort = $state<'recent' | 'name' | 'progress'>('recent');
+  let sort = $state<Sort>('recent');
   let input = $state<HTMLInputElement>();
 
   const q = $derived(filter.trim().toLowerCase());
-  const roadmaps = $derived(feed.roadmapList.filter((r) => !q || r.title.toLowerCase().includes(q) || r.steps.some((s) => s.title.toLowerCase().includes(q))));
+  /** The topic of the lesson running right now, if any. */
+  const roadmaps = $derived(
+    feed.roadmapList.filter((r) => !q || r.title.toLowerCase().includes(q) || r.steps.some((s) => s.title.toLowerCase().includes(q))),
+  );
   const topics = $derived.by(() => {
-    const list = Object.values(feed.topics).filter((t) => !q || t.title.toLowerCase().includes(q) || t.concepts.some((c) => c.label.toLowerCase().includes(q)));
+    const list = Object.values(feed.topics).filter(
+      (t) => !q || t.title.toLowerCase().includes(q) || t.concepts.some((c) => c.label.toLowerCase().includes(q)),
+    );
     const share = (t: Topic) => {
       const c = countsOf(t);
       return c.total ? c.solid / c.total : 0;
@@ -58,36 +90,48 @@
     making = null;
   }
 
+  /** The tooltip on one step of a card's strip. */
+  function stepTip(s: ReturnType<typeof stepsOf>[number]): string {
+    const state = s.state === 'not-started' ? 'not started' : s.state === 'started' ? `${s.counts.solid}/${s.counts.total} solid` : 'done';
+    return `${s.index + 1}. ${s.title}: ${state}`;
+  }
 </script>
 
 <div class="page library">
+  <!-- Header, and the form for a new roadmap or topic -->
   <header class="lib-head">
     <div>
       <h1 class="page-title">Library</h1>
       <p class="lib-count">
-        {plural(feed.roadmapList.length, 'roadmap')} · {plural(Object.keys(feed.topics).length, 'topic')} started · {totals.solid} of {plural(totals.concepts, 'concept')} solid
+        {plural(feed.roadmapList.length, 'roadmap')} · {plural(Object.keys(feed.topics).length, 'topic')} started · {totals.solid} of {plural(
+          totals.concepts,
+          'concept',
+        )} solid
       </p>
     </div>
     <div class="lib-actions">
-      <button class="ghost" class:on={making === 'topic'} onclick={() => open('topic')} aria-expanded={making === 'topic'}>New topic</button>
-      <button class="primary" class:on={making === 'roadmap'} onclick={() => open('roadmap')} aria-expanded={making === 'roadmap'}>Plan a roadmap</button>
+      <button class="ghost" class:on={making === 'topic'} onclick={() => open('topic')} aria-expanded={making === 'topic'}>New topic</button
+      >
+      <button class="primary" class:on={making === 'roadmap'} onclick={() => open('roadmap')} aria-expanded={making === 'roadmap'}
+        >Plan a roadmap</button
+      >
     </div>
   </header>
 
   {#if making}
+    {@const m = MAKER[making]}
     <form class="maker" onsubmit={submit}>
-      <p class="maker-h">{making === 'roadmap' ? 'Plan a roadmap' : 'Start a topic'}</p>
-      <p class="maker-help muted">
-        {making === 'roadmap'
-          ? 'Name a field or a big goal. Claude asks what you want from it, checks the field, and drafts the steps on the roadmap page for you to change. Nothing is taught until you approve it.'
-          : 'One topic, taught straight away. It starts with the big picture, then finds where your knowledge ends.'}
-      </p>
+      <p class="maker-h">{m.title}</p>
+      <p class="maker-help muted">{m.help}</p>
       <div class="maker-row">
-        <input class="field" bind:this={input} bind:value={what} autocomplete="off" placeholder={making === 'roadmap' ? 'e.g. sports psychology' : 'e.g. how sleep consolidates memory'} aria-label={making === 'roadmap' ? 'Field or goal' : 'Topic'} />
-        <input class="field" bind:value={goal} autocomplete="off" placeholder={making === 'roadmap' ? 'Where you want to end up (optional)' : 'What you want to be able to do (optional)'} aria-label="Goal" />
-        <button class="primary" type="submit">{making === 'roadmap' ? 'Plan it' : 'Start'}</button>
+        <input class="field" bind:this={input} bind:value={what} autocomplete="off" placeholder={m.what} aria-label={m.whatLabel} />
+        <input class="field" bind:value={goal} autocomplete="off" placeholder={m.goal} aria-label="Goal" />
+        <button class="primary" type="submit">{m.submit}</button>
       </div>
-      <p class="maker-foot muted">{claude.running ? 'Claude switches to it.' : 'Starts Claude here.'} <button type="button" class="link" onclick={() => (making = null)}>Cancel</button></p>
+      <p class="maker-foot muted">
+        {claude.running ? 'Claude switches to it.' : 'Starts Claude here.'}
+        <button type="button" class="link" onclick={() => (making = null)}>Cancel</button>
+      </p>
     </form>
   {/if}
 
@@ -95,6 +139,7 @@
     <input class="field filter" type="search" bind:value={filter} placeholder="Filter roadmaps, topics and concepts" aria-label="Filter" />
   </div>
 
+  <!-- Roadmaps -->
   <section class="lib-section">
     <div class="sec-head">
       <h2 class="section-title">Roadmaps</h2>
@@ -116,7 +161,7 @@
             <p class="card-goal">{r.goal}</p>
             <ol class="strip" aria-label="Steps">
               {#each steps as s (s.index)}
-                <li class={s.state} title="{s.index + 1}. {s.title}: {s.state === 'not-started' ? 'not started' : s.state === 'started' ? `${s.counts.solid}/${s.counts.total} solid` : 'done'}">
+                <li class={s.state} title={stepTip(s)}>
                   {#if s.state === 'started' && s.counts.total}<i style:width="{(s.counts.solid / s.counts.total) * 100}%"></i>{/if}
                 </li>
               {/each}
@@ -138,17 +183,21 @@
     {:else if q}
       <p class="muted">No roadmap matches “{filter}”.</p>
     {:else}
-      <p class="muted empty-line">No roadmaps yet. <button class="link" onclick={() => open('roadmap')}>Plan your first</button>: tell Claude what you want to get good at and plan the path together.</p>
+      <p class="muted empty-line">
+        No roadmaps yet. <button class="link" onclick={() => open('roadmap')}>Plan your first</button>: tell Claude what you want to get
+        good at and plan the path together.
+      </p>
     {/if}
   </section>
 
+  <!-- Topics -->
   <section class="lib-section">
     <div class="sec-head">
       <h2 class="section-title">Topics</h2>
       <span class="muted">{topics.length}</span>
       <div class="sort" role="group" aria-label="Sort topics">
-        {#each [['recent', 'Recent'], ['name', 'Name'], ['progress', 'Progress']] as [k, label] (k)}
-          <button class:on={sort === k} onclick={() => (sort = k as typeof sort)}>{label}</button>
+        {#each SORTS as [k, label] (k)}
+          <button class:on={sort === k} onclick={() => (sort = k)}>{label}</button>
         {/each}
       </div>
     </div>
@@ -165,9 +214,11 @@
               <tr>
                 <td>
                   <a class="t-name" href={link.lesson(t.slug)}>{t.title}</a>
-                  {#if feed.session && !feed.session.endedAt && feed.session.topicSlug === t.slug}<span class="live">in a lesson now</span>{/if}
+                  {#if feed.liveSlug === t.slug}<span class="live">in a lesson now</span>{/if}
                 </td>
-                <td class="muted">{#if place}<a href={link.roadmap(place.roadmap.slug)}>{place.roadmap.title}</a>, step {place.index + 1}{:else}—{/if}</td>
+                <td class="muted"
+                  >{#if place}<a href={link.roadmap(place.roadmap.slug)}>{place.roadmap.title}</a>, step {place.index + 1}{:else}—{/if}</td
+                >
                 <td>
                   <div class="t-prog">
                     <StatusBar counts={c} fading={c.fading} />
@@ -183,7 +234,9 @@
     {:else if q}
       <p class="muted">No topic matches “{filter}”.</p>
     {:else}
-      <p class="muted empty-line">No topics yet. Start one from a roadmap step, or <button class="link" onclick={() => open('topic')}>start a topic</button> on its own.</p>
+      <p class="muted empty-line">
+        No topics yet. Start one from a roadmap step, or <button class="link" onclick={() => open('topic')}>start a topic</button> on its own.
+      </p>
     {/if}
   </section>
 </div>

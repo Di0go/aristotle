@@ -26,6 +26,7 @@ export class Backup {
   readonly enabled: boolean;
   private timer: NodeJS.Timeout | undefined;
   private running = false;
+  /** A run was asked for while one was going: run once more when it ends. */
   private again = false;
   private status: BackupStatus;
 
@@ -43,10 +44,12 @@ export class Backup {
     this.timer.unref();
   }
 
+  /** A copy of the status, for /api/backup. */
   state(): BackupStatus {
     return { ...this.status };
   }
 
+  /** Commits whatever changed and pushes it if there is a remote; never two runs at once. */
   private async run() {
     if (this.running) {
       this.again = true;
@@ -82,23 +85,18 @@ export class Backup {
 
 /** "differential-forms, 2 sessions, roadmap fighting-mind, mission x" from `git status --porcelain` output. */
 function describe(porcelain: string): string {
-  const topics = new Set<string>();
-  const roadmaps = new Set<string>();
-  const missions = new Set<string>();
+  const named = { topics: new Set<string>(), roadmaps: new Set<string>(), missions: new Set<string>() };
   let sessions = 0;
   for (const line of porcelain.split('\n')) {
+    // Each line is a two-letter status and a space, then the path.
     const file = line.slice(3).trim();
-    const topic = /^topics\/([^/]+)\.json$/.exec(file);
-    if (topic) topics.add(topic[1]);
-    const roadmap = /^roadmaps\/([^/]+)\.json$/.exec(file);
-    if (roadmap) roadmaps.add(roadmap[1]);
-    const mission = /^missions\/([^/]+)\.json$/.exec(file);
-    if (mission) missions.add(mission[1]);
+    const [, dir, name] = /^(topics|roadmaps|missions)\/([^/]+)\.json$/.exec(file) ?? [];
+    if (dir) named[dir as keyof typeof named].add(name);
     if (/^sessions\//.test(file)) sessions++;
   }
-  const parts = [...topics];
+  const parts = [...named.topics];
   if (sessions) parts.push(`${sessions} session${sessions === 1 ? '' : 's'}`);
-  for (const r of roadmaps) parts.push(`roadmap ${r}`);
-  for (const m of missions) parts.push(`mission ${m}`);
+  for (const r of named.roadmaps) parts.push(`roadmap ${r}`);
+  for (const m of named.missions) parts.push(`mission ${m}`);
   return parts.length ? parts.join(', ') : 'backup';
 }

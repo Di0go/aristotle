@@ -2,33 +2,35 @@
   // One Praxis mission: why it matters, what to do, when it's done, the concepts it uses; then his debrief
   // and Claude's review. He writes the debrief here; the review comes back here.
   import { setContext } from 'svelte';
-  import { feed } from '../lib/feed.svelte.ts';
-  import { link } from '../lib/router.svelte.ts';
   import { actions } from '../lib/actions.ts';
+  import { feed } from '../lib/feed.svelte.ts';
   import { formatDay } from '../lib/format.ts';
-  import { markOf, missionSource, SCOPE_LABEL, STATUS_LABEL, VERDICT_LABEL } from '../lib/library.ts';
+  import { markOf, missionSource, SCOPE_LABEL, STATUS_LABEL, STATUS_TONE, splitRef, VERDICT_LABEL } from '../lib/library.ts';
+  import { link } from '../lib/router.svelte.ts';
   import Markdown from '../lib/Markdown.svelte';
 
   let { id }: { id: string } = $props();
-
-  const mission = $derived(feed.missions?.[id] ?? null);
-  setContext('topic-slug', () => mission?.topic);
 
   let text = $state('');
   let writing = $state(false);
   let sending = $state(false);
   let error = $state<string | null>(null);
 
+  const mission = $derived(feed.missions?.[id] ?? null);
+  /** The roadmap it came from, when it came from one that still exists. */
+  const roadmap = $derived(mission?.roadmap ? (feed.roadmaps?.[mission.roadmap] ?? null) : null);
   /** The box is open for a first debrief, or when he chose to write a new one. */
   const boxOpen = $derived(Boolean(mission && mission.status !== 'dropped' && (mission.status === 'open' || writing)));
-
+  /** Its concepts, written "topic/concept" or just "concept" for the mission's own topic, with his mark on each. */
   const concepts = $derived(
     (mission?.concepts ?? []).map((ref) => {
-      const [a, b] = ref.includes('/') ? ref.split('/') : [mission?.topic ?? '', ref];
-      const concept = feed.topics[a]?.concepts.find((c) => c.id === b);
-      return { topic: a, id: b, label: concept?.label ?? b, mark: concept ? markOf(concept) : 'unknown' };
+      const { topic = mission?.topic ?? '', concept: id } = splitRef(ref);
+      const concept = feed.topics[topic]?.concepts.find((c) => c.id === id);
+      return { topic, id, label: concept?.label ?? id, mark: concept ? markOf(concept) : 'unknown' };
     }),
   );
+
+  setContext('topic-slug', () => mission?.topic);
 
   function rewrite() {
     text = mission?.debrief?.text ?? '';
@@ -63,15 +65,15 @@
     <header class="page-head">
       <nav class="crumbs">
         <a href={link.praxis()}>Praxis</a><span class="sep">/</span>
-        {#if mission.roadmap && feed.roadmaps?.[mission.roadmap]}
-          <a href={link.roadmap(mission.roadmap)}>{feed.roadmaps[mission.roadmap].title}</a><span class="sep">/</span>
+        {#if roadmap}
+          <a href={link.roadmap(roadmap.slug)}>{roadmap.title}</a><span class="sep">/</span>
         {/if}
         <span>{SCOPE_LABEL[mission.scope]}</span>
       </nav>
       <h1 class="page-title">{mission.title}</h1>
       <p class="page-lede">{mission.why}</p>
       <div class="facts">
-        <span class="tag {mission.status === 'reviewed' ? 'solid' : mission.status === 'debriefed' ? 'shaky' : mission.status === 'open' ? 'cyan' : ''}">{STATUS_LABEL[mission.status]}</span>
+        <span class="tag {STATUS_TONE[mission.status]}">{STATUS_LABEL[mission.status]}</span>
         <span><span class="muted">Where</span> {mission.arena}</span>
         <span><span class="muted">From</span> {missionSource(mission, feed.roadmaps ?? {}, feed.topics)}</span>
         <span class="muted">Set {formatDay(mission.created)}</span>
@@ -121,8 +123,8 @@
 
       {#if boxOpen}
         <p class="muted prompt">
-          What did you do, what happened, and against each "done when", where did you land? Numbers, links, file paths and commits help Claude check it. What surprised
-          you?
+          What did you do, what happened, and against each "done when", where did you land? Numbers, links, file paths and commits help
+          Claude check it. What surprised you?
         </p>
         <textarea bind:value={text} onkeydown={onKey} rows="9" placeholder="What happened…"></textarea>
         <footer class="foot">

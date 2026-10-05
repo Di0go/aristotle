@@ -1,10 +1,12 @@
 <script lang="ts">
   // Renders lesson Markdown and brings it to life: mermaid diagrams, sequences, explorables and the visual kit's figures.
   import { getContext, mount, unmount } from 'svelte';
-  import { feed } from './feed.svelte.ts';
-  import { link } from './router.svelte.ts';
   import { EXPLORABLES, explorable } from './explorables/index.ts';
-  import { renderMarkdown, renderInline } from './markdown.ts';
+  import { feed } from './feed.svelte.ts';
+  import { splitRef } from './library.ts';
+  import { renderInline, renderMarkdown } from './markdown.ts';
+  import { link } from './router.svelte.ts';
+
   // Figures load on first use, so a lesson without them never downloads them.
   type Loader = () => Promise<{ default: unknown }>;
   const Sequence: Loader = () => import('./Sequence.svelte');
@@ -18,11 +20,11 @@
 
   let { source, inline = false }: { source: string; inline?: boolean } = $props();
 
-  const html = $derived(inline ? renderInline(source) : renderMarkdown(source));
   let el = $state<HTMLElement>();
-
+  /** Diagrams drawn by this component, for ids Mermaid needs to be unique. */
   let diagramCount = 0;
 
+  const html = $derived(inline ? renderInline(source) : renderMarkdown(source));
   /** The topic a lesson's text belongs to, so a bare [[concept]] can be found. */
   const topicOf = getContext<(() => string | undefined) | undefined>('topic-slug');
 
@@ -33,7 +35,7 @@
     for (const a of el?.querySelectorAll<HTMLAnchorElement>('a.concept-link') ?? []) {
       const ref = a.dataset.ref ?? a.dataset.concept ?? '';
       a.dataset.ref = ref;
-      const [slug, id] = ref.includes('/') ? ref.split('/') : [topicOf?.() ?? feed.session?.topicSlug ?? '', ref];
+      const { topic: slug = topicOf?.() ?? feed.session?.topicSlug ?? '', concept: id } = splitRef(ref);
       const concept = topics[slug]?.concepts.find((c) => c.id === id);
       a.dataset.concept = `${slug}/${id}`;
       a.href = link.topic(slug, id);
@@ -42,7 +44,8 @@
     }
   });
 
-  // Step-through sequences, explorables and the visual kit's figures become live components.
+  // Step-through sequences, explorables and the visual kit's figures become live components. Each replaces its
+  // code block with a placeholder at once, and mounts there when its code arrives (unless the HTML has moved on).
   $effect(() => {
     void html;
     const mounted: ReturnType<typeof mount>[] = [];
@@ -54,7 +57,7 @@
       void load().then((m) => {
         if (gone) return;
         host.className = '';
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        // Picked by name at run time, so the component's props can't be typed here.
         mounted.push(mount(m.default as any, { target: host, props }));
       });
     };
@@ -141,12 +144,6 @@
       const dark = document.documentElement.dataset.theme === 'dark';
       const css = getComputedStyle(document.documentElement);
       const v = (name: string) => css.getPropertyValue(name).trim();
-      /** a blended toward b by t (0-1), for hex colours: Mermaid needs plain colours, not color-mix(). */
-      const mix = (a: string, b: string, t: number) => {
-        const p = (h: string) => (h.length === 4 ? [...h.slice(1)].map((c) => parseInt(c + c, 16)) : [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16)));
-        const [x, y] = [p(a), p(b)];
-        return `#${x.map((c, i) => Math.round(c + (y[i] - c) * t).toString(16).padStart(2, '0')).join('')}`;
-      };
       const soft = mix(v('--acc'), v('--b0'), dark ? 0.72 : 0.84);
       // Timelines colour their sections from cScale0…11: the accent, softened, with plain text on it.
       const scale = Object.fromEntries(
@@ -207,6 +204,23 @@
       }
     })();
   });
+
+  /** a blended toward b by t (0-1), for hex colours: Mermaid needs plain colours, not color-mix(). */
+  function mix(a: string, b: string, t: number): string {
+    const [x, y] = [rgb(a), rgb(b)];
+    const channels = x.map((c, i) =>
+      Math.round(c + (y[i] - c) * t)
+        .toString(16)
+        .padStart(2, '0'),
+    );
+    return `#${channels.join('')}`;
+  }
+
+  /** "#abc" or "#aabbcc" as [r, g, b]. */
+  function rgb(hex: string): number[] {
+    if (hex.length === 4) return [...hex.slice(1)].map((c) => parseInt(c + c, 16));
+    return [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+  }
 </script>
 
 {#if inline}

@@ -1,10 +1,11 @@
 <script lang="ts">
   // A topic's knowledge map as a graph: concepts are nodes, arrows run from a prerequisite to what builds on it.
   // Prerequisites borrowed from other topics appear as outlined external nodes.
-  import type { Topic } from '../../../shared/types.ts';
-  import ConceptNode from './ConceptNode.svelte';
   import { layoutTopic } from './layout.ts';
   import { link } from './router.svelte.ts';
+  import ConceptNode from './ConceptNode.svelte';
+  import type { PlacedEdge, PlacedNode } from './layout.ts';
+  import type { Topic } from '../../../shared/types.ts';
 
   let {
     topic,
@@ -24,20 +25,32 @@
     onselect?: (id: string) => void;
   } = $props();
 
-  const layout = $derived(layoutTopic(topic, direction, others));
-
-  // Focus and context: pointing at a concept lights it, what it builds on, and what builds on it.
   let hovered = $state<string | null>(null);
+
+  const layout = $derived(layoutTopic(topic, direction, others));
+  const active = $derived(hovered ?? selected);
+  // Focus and context: pointing at a concept (or selecting it) lights it, what it builds on, and what builds on it.
   const lit = $derived.by(() => {
-    const key = hovered ?? selected;
-    if (!key) return null;
-    const set = new Set([key]);
+    if (!active) return null;
+    const set = new Set([active]);
     for (const e of layout.edges) {
-      if (e.from === key) set.add(e.to);
-      if (e.to === key) set.add(e.from);
+      if (e.from === active) set.add(e.to);
+      if (e.to === active) set.add(e.from);
     }
     return set;
   });
+
+  /** While something is lit, only the edges touching it stay at full strength. */
+  function edgeDim(edge: PlacedEdge): boolean {
+    if (!lit) return false;
+    return !(lit.has(edge.from) && lit.has(edge.to) && (edge.from === active || edge.to === active));
+  }
+
+  /** A borrowed concept opens its own topic; one of this topic's is selected here, if the page allows it. */
+  function clickOf(node: PlacedNode): (() => void) | undefined {
+    if (node.external) return () => (location.hash = link.topic(node.external!.topic, node.concept.id));
+    return onselect ? () => onselect(node.key) : undefined;
+  }
 </script>
 
 {#if topic.concepts.length === 0}
@@ -63,7 +76,7 @@
           class="edge"
           class:cross={edge.from.includes('/')}
           class:to-selected={edge.to === selected}
-          class:dim={lit && !(lit.has(edge.from) && lit.has(edge.to) && (edge.from === (hovered ?? selected) || edge.to === (hovered ?? selected)))}
+          class:dim={edgeDim(edge)}
           marker-end="url(#arrow-{topic.slug})"
         />
       {/each}
@@ -75,11 +88,7 @@
           ref={node.external ? node.key : `${topic.slug}/${node.key}`}
           dim={lit ? !lit.has(node.key) : false}
           onhover={(on) => (hovered = on ? node.key : hovered === node.key ? null : hovered)}
-          onclick={node.external
-            ? () => (location.hash = link.topic(node.external!.topic, node.concept.id))
-            : onselect
-              ? () => onselect(node.key)
-              : undefined}
+          onclick={clickOf(node)}
         />
       {/each}
     </svg>

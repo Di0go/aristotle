@@ -4,12 +4,30 @@
 import { createEmptyCard, fsrs, Rating, type State, type Card, type Grade } from 'ts-fsrs';
 import type { ReviewState } from '../shared/types.ts';
 
+export type Outcome = 'right' | 'partial' | 'wrong';
+
 // Days, not minutes: concepts are reviewed across sessions, not drilled within one.
 const scheduler = fsrs({ request_retention: 0.9, enable_fuzz: true, enable_short_term: false });
 
-export type Outcome = 'right' | 'partial' | 'wrong';
-
 const GRADE: Record<Outcome, Grade> = { right: Rating.Good, partial: Rating.Hard, wrong: Rating.Again };
+
+/** A new card, reviewed once at the moment the concept became solid. */
+export function startReview(now: Date): ReviewState {
+  return fromCard(scheduler.next(createEmptyCard(now), now, Rating.Good).card);
+}
+
+/** The card after one more review with this outcome. */
+export function gradeReview(state: ReviewState, outcome: Outcome, now: Date): ReviewState {
+  return fromCard(scheduler.next(toCard(state), now, GRADE[outcome]).card);
+}
+
+/** Probability he would recall it now, 0 to 1. */
+export function retrievability(state: ReviewState, now: Date): number {
+  return scheduler.get_retrievability(toCard(state), now, false);
+}
+
+// The stored card keeps only what FSRS needs to schedule the next review, with ISO dates so it reads well
+// in JSON; these convert it to and from ts-fsrs's own shape.
 
 function toCard(r: ReviewState): Card {
   return {
@@ -37,18 +55,4 @@ function fromCard(c: Card): ReviewState {
     state: c.state,
     ...(c.last_review ? { last: c.last_review.toISOString() } : {}),
   };
-}
-
-/** A new card, reviewed once at the moment the concept became solid. */
-export function startReview(now: Date): ReviewState {
-  return fromCard(scheduler.next(createEmptyCard(now), now, Rating.Good).card);
-}
-
-export function gradeReview(state: ReviewState, outcome: Outcome, now: Date): ReviewState {
-  return fromCard(scheduler.next(toCard(state), now, GRADE[outcome]).card);
-}
-
-/** Probability he would recall it now, 0 to 1. */
-export function retrievability(state: ReviewState, now: Date): number {
-  return scheduler.get_retrievability(toCard(state), now, false);
 }

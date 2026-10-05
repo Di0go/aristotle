@@ -1,5 +1,6 @@
 /* Knowledge maps: concepts as labelled specimens, prerequisites as arrows. */
 
+/* A topic's map */
 .map-scroll {
   overflow-x: auto;
 }
@@ -13,10 +14,11 @@
 .map-empty {
   margin: 0;
   padding: 24px;
-  color: var(--graphite);
+  color: var(--muted);
   font-family: var(--sans);
 }
 
+/* Prerequisites: arrows, dashed when they come from another topic */
 .map .edge {
   fill: none;
   stroke: var(--rule-strong);
@@ -25,13 +27,13 @@
 }
 
 .map .edge.cross {
-  stroke: var(--cyan);
+  stroke: var(--acc);
   stroke-dasharray: 5 4;
   opacity: 0.6;
 }
 
 .map .edge.to-selected {
-  stroke: var(--cyan);
+  stroke: var(--acc);
   stroke-width: 1.8;
 }
 
@@ -44,9 +46,10 @@
 }
 
 .map .arrow.cross {
-  fill: var(--cyan);
+  fill: var(--acc);
 }
 
+/* Concepts: dashed while unknown, tinted when shaky or solid, dotted when solid but fading */
 .map .node {
   transition: opacity 0.15s;
 }
@@ -56,7 +59,7 @@
 }
 
 .map .node .box {
-  fill: var(--sheet);
+  fill: var(--b0);
   stroke: var(--unknown);
   stroke-width: 1.2;
   stroke-dasharray: 4 3;
@@ -80,24 +83,24 @@
 }
 
 .map .node.solid.fading .box {
-  fill: var(--sheet);
+  fill: var(--b0);
   stroke-dasharray: 2 2.5;
 }
 
 .map .node.external .box {
-  fill: var(--sheet-2);
-  stroke: var(--graphite);
+  fill: var(--b1);
+  stroke: var(--muted);
   stroke-dasharray: none;
   stroke-width: 1;
 }
 
 .map .node.external text {
-  fill: var(--graphite);
+  fill: var(--muted);
 }
 
 .map .node .goal-ring {
   fill: none;
-  stroke: var(--cyan);
+  stroke: var(--acc);
   stroke-width: 1;
 }
 
@@ -108,7 +111,7 @@
 }
 
 .map .node.selected .box {
-  stroke: var(--cyan);
+  stroke: var(--acc);
   stroke-width: 2;
 }
 
@@ -117,7 +120,7 @@
 }
 
 .map .node.clickable:hover .box {
-  stroke: var(--cyan);
+  stroke: var(--acc);
 }
 
 .map .node.clickable:focus {
@@ -125,7 +128,7 @@
 }
 
 .map .node.clickable:focus-visible .box {
-  stroke: var(--cyan);
+  stroke: var(--acc);
   stroke-width: 2.2;
 }
 
@@ -140,19 +143,12 @@
   font-weight: 400;
 }
 
-/* The map of everything. */
+/* The map of everything: a band per roadmap, a box per topic, panned and zoomed */
 .atlas {
   display: flex;
   flex-direction: column;
   height: 100vh;
   padding: 40px clamp(20px, 3vw, 44px) 24px;
-}
-
-@media (max-width: 960px) {
-  .atlas {
-    height: calc(100vh - 54px);
-    padding: 24px 16px 16px;
-  }
 }
 
 .atlas-head {
@@ -197,13 +193,14 @@
 }
 
 .atlas-svg:focus-visible {
-  outline: 2px solid var(--cyan);
+  outline: 2px solid var(--acc);
   outline-offset: -2px;
 }
 
+/* Bands and topic boxes (SVG) */
 .band-title {
   font: 700 16px var(--sans);
-  fill: var(--ink);
+  fill: var(--fg);
 }
 
 .band a:hover .band-title {
@@ -217,14 +214,14 @@
 
 .route-line {
   fill: none;
-  stroke: var(--cyan);
+  stroke: var(--acc);
   stroke-width: 1.4;
   stroke-dasharray: 2 4;
   stroke-linecap: round;
 }
 
 .topic-box rect {
-  fill: var(--sheet);
+  fill: var(--b0);
   stroke: var(--rule-strong);
   stroke-width: 1;
 }
@@ -235,8 +232,8 @@
 }
 
 .step-badge {
-  fill: var(--sheet);
-  stroke: var(--cyan);
+  fill: var(--b0);
+  stroke: var(--acc);
   stroke-width: 1.4;
 }
 
@@ -247,7 +244,7 @@
 
 .topic-title {
   font: 700 14px var(--sans);
-  fill: var(--ink);
+  fill: var(--fg);
 }
 
 .topic-box a:hover .topic-title {
@@ -255,15 +252,16 @@
 }
 
 .topic-box.unstarted .topic-title {
-  fill: var(--graphite);
+  fill: var(--muted);
 }
 
 .topic-count,
 .ghost-note {
   font: 12px var(--sans);
-  fill: var(--graphite);
+  fill: var(--muted);
 }
 
+/* Legend and empty state */
 .atlas-legend {
   flex: none;
   display: flex;
@@ -271,7 +269,7 @@
   gap: 6px 16px;
   margin-top: 12px;
   font-size: 0.8rem;
-  color: var(--graphite);
+  color: var(--muted);
 }
 
 .atlas-legend span {
@@ -283,14 +281,14 @@
 .cross-key {
   display: inline-block;
   width: 20px;
-  border-top: 1.5px dashed var(--cyan);
+  border-top: 1.5px dashed var(--acc);
 }
 
 .goal-key {
   display: inline-block;
   width: 14px;
   height: 10px;
-  border: 1px solid var(--cyan);
+  border: 1px solid var(--acc);
   outline: 1px solid var(--rule-strong);
   outline-offset: 2px;
   border-radius: 1px;
@@ -298,4 +296,11 @@
 
 .atlas-empty {
   padding: 48px;
+}
+
+@media (max-width: 960px) {
+  .atlas {
+    height: calc(100vh - 54px);
+    padding: 24px 16px 16px;
+  }
 }

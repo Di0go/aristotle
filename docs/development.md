@@ -4,7 +4,7 @@ Aristotle is meant to be changed by the person using it: you notice something wh
 
 ## Setup
 
-You need Node.js 24 or newer (`.nvmrc`), [pnpm](https://pnpm.io) and [Claude Code](https://claude.com/claude-code). The tests also need `rsvg-convert` (librsvg), which `preview_svg` uses to render drawings.
+You need Node.js 24 or newer (`.nvmrc`), [pnpm](https://pnpm.io) and [Claude Code](https://claude.com/claude-code). The tests also need `rsvg-convert` (librsvg), which `preview_svg` and `view_image` use to render images (`rsvgConvert` in [`server/images.ts`](../server/images.ts)).
 
 ```sh
 pnpm install     # also points Git at .githooks/ (the gates run on commit and push)
@@ -63,14 +63,14 @@ Claude Code in the drawer runs in the release copy, so lessons use the released 
 
 ## Gates
 
-`pnpm gates` runs every check, cheapest first: generated docs current, Biome (lint and format), types, the build, then the tests (which serve the built pages). The same list runs:
+`pnpm gates` runs every check, cheapest first: generated docs current, lint and format (Biome, and Prettier for `.svelte`), types, the build, then the tests (which serve the built pages). The same list runs:
 
 - on **commit**, quick ones only (`pnpm gates --quick`, [`.githooks/pre-commit`](../.githooks/pre-commit));
 - on **push** ([`.githooks/pre-push`](../.githooks/pre-push));
 - in **CI** ([`.github/workflows/ci.yml`](../.github/workflows/ci.yml));
 - before every **release**.
 
-The single commands: `pnpm lint` (Biome: lint and format, read only), `pnpm format` (apply Biome's fixes and formatting), `pnpm check` (types, through `svelte-check`, which covers the `.svelte` files Biome does not), `pnpm test`, `pnpm build`.
+The single commands: `pnpm lint` (read only: Biome lints and checks the formatting of TypeScript, CSS and JSON, Prettier the formatting of `.svelte` files), `pnpm format` (apply both), `pnpm check` (types, through `svelte-check`, which also type-checks and lints the `.svelte` files), `pnpm test`, `pnpm build`.
 
 `pnpm test` is end to end ([`tests/mcp.test.ts`](../tests/mcp.test.ts)): a real server on a throwaway data folder, a real MCP client in Claude Code's place, HTTP calls in the interface's place, a shell in the terminal's place. [`tests/docs.test.ts`](../tests/docs.test.ts) checks the docs.
 
@@ -78,7 +78,7 @@ The single commands: `pnpm lint` (Biome: lint and format, read only), `pnpm form
 
 ## Docs
 
-`pnpm docs` rewrites the generated parts of these docs from the code (see [docs/README.md](README.md#how-these-docs-stay-true)). You rarely run it by hand: the pre-commit hook and the Claude Code Stop hook do.
+`pnpm docs:gen` rewrites the generated parts of these docs from the code (see [docs/README.md](README.md#how-these-docs-stay-true)). You rarely run it by hand: the pre-commit hook and the Claude Code Stop hook do.
 
 ## Commands
 
@@ -93,10 +93,10 @@ The single commands: `pnpm lint` (Biome: lint and format, read only), `pnpm form
 | `pnpm serve` | `node server/index.ts` |
 | `pnpm build` | `vite build` |
 | `pnpm check` | `svelte-check --tsconfig ./tsconfig.json --fail-on-warnings` |
-| `pnpm lint` | `biome check .` |
-| `pnpm format` | `biome check --write .` |
+| `pnpm lint` | `biome check . && prettier --check "ui/src/**/*.svelte"` |
+| `pnpm format` | `biome check --write . && prettier --write --log-level warn "ui/src/**/*.svelte"` |
 | `pnpm test` | `node --test 'tests/*.test.ts'` |
-| `pnpm docs` | `node scripts/docs.ts` |
+| `pnpm docs:gen` | `node scripts/docs.ts` |
 | `pnpm gates` | `node scripts/gates.ts` |
 | `pnpm release` | `node scripts/release.ts` |
 | `pnpm prepare` | `git config core.hooksPath .githooks \|\| true` |
@@ -113,7 +113,7 @@ Every setting is an environment variable with a default. `.env` is not read: set
 | `ARISTOTLE_DATA_DIR` | Where this instance keeps its learning history: plain files, its own Git repository (server/backup.ts). | [`config.ts`](../server/config.ts) |
 | `ARISTOTLE_STATE_DIR` | Where this install keeps what isn't learning: certificate, settings, pid files, log. | [`config.ts`](../server/config.ts) |
 | `ARISTOTLE_PORT` | The HTTP port: 4747 live, 4757 dev. | [`config.ts`](../server/config.ts) |
-| `ARISTOTLE_HOSTNAME` | The clean name: /etc/hosts maps it to 127.0.0.82, and nftables forwards its ports 80 and 443 here (scripts/setup-hostname.sh). | [`config.ts`](../server/config.ts) |
+| `ARISTOTLE_HOSTNAME` | The clean name (the address it shows and tls.sh's certificate). | [`config.ts`](../server/config.ts) |
 | `ARISTOTLE_TLS_DIR` | HTTPS for the clean name: a certificate from scripts/tls.sh, served on its own port that 443 is forwarded to. | [`config.ts`](../server/config.ts) |
 | `ARISTOTLE_TLS_PORT` | The HTTPS port, which the clean name's port 443 is forwarded to. | [`config.ts`](../server/config.ts) |
 | `ARISTOTLE_SETTINGS` | This install's own choices, kept out of git: settings.json in the state directory (for example {"accent": "red"}). | [`config.ts`](../server/config.ts) |

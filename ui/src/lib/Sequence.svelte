@@ -4,6 +4,11 @@
 
   let { source }: { source: string } = $props();
 
+  /** The frame on screen. */
+  let at = $state(0);
+  /** The furthest frame reached, so the ticks show how far he has been. */
+  let seen = $state(0);
+
   const frames = $derived(
     source
       .split(/^\s*---\s*$/m)
@@ -11,8 +16,6 @@
       .filter(Boolean)
       .map(renderMarkdown),
   );
-  let at = $state(0);
-  let seen = $state(0);
 
   function go(i: number) {
     at = Math.max(0, Math.min(frames.length - 1, i));
@@ -31,7 +34,13 @@
 </script>
 
 <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
-<section class="sequence" tabindex="0" onkeydown={onKey} aria-roledescription="sequence" aria-label="Step through, frame {at + 1} of {frames.length}">
+<section
+  class="sequence"
+  tabindex="0"
+  onkeydown={onKey}
+  aria-roledescription="sequence"
+  aria-label="Step through, frame {at + 1} of {frames.length}"
+>
   <div class="sequence-stage">
     {#each frames as html, i (i)}
       <div class="sequence-frame md" aria-hidden={i !== at}>{@html html}</div>

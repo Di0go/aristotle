@@ -10,38 +10,29 @@ import { undocumented } from './doc-zones.ts';
 import { generate } from './docs.ts';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
+const git = (...args: string[]) => execFileSync('git', args, { cwd: ROOT, encoding: 'utf8' });
+
 const input = JSON.parse(readFileSync(0, 'utf8') || '{}') as { stop_hook_active?: boolean; transcript_path?: string };
 // Already sent back once this turn: let it stop, rather than loop.
 if (input.stop_hook_active) process.exit(0);
 
-function sessionStart(): number {
-  try {
-    const first = readFileSync(input.transcript_path ?? '', 'utf8').split('\n', 1)[0];
-    const at = Date.parse((JSON.parse(first) as { timestamp?: string }).timestamp ?? '');
-    if (at) return at;
-  } catch {}
-  return Date.now() - 3 * 3600_000;
-}
-
-const git = (...args: string[]) => execFileSync('git', args, { cwd: ROOT, encoding: 'utf8' });
+// 1. What this session changed: files touched since it started, and what it committed since.
 const since = sessionStart();
-const pending = git('status', '--porcelain', '--untracked-files=all')
-  .split('\n')
-  .filter(Boolean)
-  .map((l) => l.slice(3).replace(/^.* -> /, ''))
-  .filter((f) => {
-    try {
-      return statSync(path.join(ROOT, f)).mtimeMs >= since;
-    } catch {
-      return true; // deleted
-    }
-  });
+const pending = porcelain(git('status', '--porcelain', '-z', '--untracked-files=all')).filter((f) => {
+  try {
+    return statSync(path.join(ROOT, f)).mtimeMs >= since;
+  } catch {
+    return true; // deleted
+  }
+});
 const committed = git('log', `--since=${new Date(since).toISOString()}`, '--name-only', '--format=')
   .split('\n')
   .filter(Boolean);
 const changed = [...new Set([...pending, ...committed])];
+// Only Markdown changed (or nothing): no code to keep the docs in step with.
 if (!changed.some((f) => !f.endsWith('.md'))) process.exit(0);
 
+// 2. Rewrite the generated docs, then send Claude back if a zone's prose was left behind.
 const regenerated = await generate(true).catch(() => []);
 const missing = undocumented(changed);
 if (missing.length) {
@@ -58,3 +49,27 @@ if (missing.length) {
   console.error(`Generated docs updated: ${regenerated.join(', ')}`);
 }
 process.exit(0);
+
+/** When this session started: the first entry of its transcript, or three hours ago if that can't be read. */
+function sessionStart(): number {
+  try {
+    const first = readFileSync(input.transcript_path ?? '', 'utf8').split('\n', 1)[0];
+    const at = Date.parse((JSON.parse(first) as { timestamp?: string }).timestamp ?? '');
+    if (at) return at;
+  } catch {}
+  return Date.now() - 3 * 3600_000;
+}
+
+/** The paths in `git status --porcelain -z`, exactly as Git has them. A rename or copy counts under its new name. */
+function porcelain(out: string): string[] {
+  const entries = out.split('\0');
+  const paths: string[] = [];
+  for (let i = 0; i < entries.length; i++) {
+    const entry = entries[i];
+    if (!entry) continue;
+    paths.push(entry.slice(3));
+    // Renames and copies carry their source path as the next entry.
+    if (entry[0] === 'R' || entry[0] === 'C' || entry[1] === 'R' || entry[1] === 'C') i++;
+  }
+  return paths;
+}

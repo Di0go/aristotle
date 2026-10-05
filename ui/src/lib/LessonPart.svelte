@@ -27,7 +27,9 @@
     <span class="part-label">{section.label}</span>
     {#if section.title}<span class="part-title">{section.title}</span>{/if}
     <span class="tally">
-      {#if graded}<span class:all={c.right === graded} title="{c.right} right, {c.wrong} wrong, {c.dontKnow} didn't know">{c.right}/{graded} right</span>{/if}
+      {#if graded}<span class:all={c.right === graded} title="{c.right} right, {c.wrong} wrong, {c.dontKnow} didn't know"
+          >{c.right}/{graded} right</span
+        >{/if}
       {#if c.written}<span>{c.written} written</span>{/if}
       {#if c.unanswered}<span class="todo">{c.unanswered} to answer</span>{/if}
     </span>

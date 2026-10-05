@@ -1,6 +1,7 @@
 /* A lesson as a calm note: a centred reading column, quiet labels, checks as simple cards, and a right
    sidebar with where you are. Plus Now between sessions (home). */
 
+/* Shared: the small label above a heading, and the spinner */
 .kicker {
   margin: 0 0 10px;
   font-size: 0.78rem;
@@ -116,7 +117,7 @@
   }
 }
 
-/* The note */
+/* The note: one entry per block, map change or check */
 .notebook {
   list-style: none;
   max-width: var(--measure);
@@ -146,6 +147,11 @@
 
 .entry-map {
   margin: -64px 0 64px;
+}
+
+/* A map note that opens a list has nothing above it to tuck under. */
+.notebook > .entry-map:first-child {
+  margin-top: 0;
 }
 
 .block-title {
@@ -255,14 +261,14 @@
   margin: 0;
 }
 
+.question-text {
+  margin-top: 6px;
+}
+
 .question-text .md {
   font-weight: 600;
   font-size: 1.2rem;
   line-height: 1.55;
-}
-
-.question-text {
-  margin-top: 6px;
 }
 
 .options {
@@ -277,18 +283,19 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  width: 100%;
   padding: 11px 14px;
   margin-left: -14px;
   width: calc(100% + 14px);
-  font: 400 1.04rem/1.5 var(--sans);
+  font: 400 1.04rem / 1.5 var(--sans);
   text-align: left;
   color: var(--fg);
   background: transparent;
   border: 0;
   border-radius: 8px;
   cursor: pointer;
-  transition: border-color 0.12s, background-color 0.12s;
+  transition:
+    border-color 0.12s,
+    background-color 0.12s;
 }
 
 .option:hover:not(:disabled) {
@@ -351,6 +358,13 @@
 
 .option.dont-know {
   color: var(--muted);
+}
+
+/* On a class read back: the other options of an answered question, folded behind a link. */
+.more-options {
+  margin: 4px 0 0 12px;
+  font-size: 0.8rem;
+  color: var(--faint);
 }
 
 .verdict-mark {
@@ -432,7 +446,7 @@ textarea.note {
   margin-top: 22px;
   padding: 16px 20px;
   background: var(--b1);
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
 }
 
 .your-answer .md {
@@ -474,7 +488,7 @@ textarea.note {
   }
 }
 
-/* The right sidebar */
+/* The right sidebar (the bench): where he is, the local map, the plan */
 .bench-inner {
   position: relative;
   padding: 18px 18px 32px;
@@ -485,12 +499,6 @@ textarea.note {
   position: absolute;
   top: 8px;
   right: 8px;
-}
-
-@media (min-width: 1241px) {
-  .bench-close {
-    display: none;
-  }
 }
 
 .bench-section {
@@ -624,6 +632,12 @@ textarea.note {
 
 .mark.partial {
   color: var(--shaky);
+}
+
+@media (min-width: 1241px) {
+  .bench-close {
+    display: none;
+  }
 }
 
 /* Home: Now between sessions. */
@@ -807,16 +821,4 @@ textarea.note {
 .start-sheet {
   max-width: 44rem;
   padding: 20px 22px;
-}
-
-/* A map note that opens a list has nothing above it to tuck under. */
-.notebook > .entry-map:first-child {
-  margin-top: 0;
-}
-
-/* On a class read back: the other options of an answered question, folded behind a link. */
-.more-options {
-  margin: 4px 0 0 12px;
-  font-size: 0.8rem;
-  color: var(--faint);
 }

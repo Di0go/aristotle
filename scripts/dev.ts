@@ -16,6 +16,7 @@ const PORT = process.env.ARISTOTLE_PORT ?? '4757';
 const VITE_PORT = process.env.ARISTOTLE_VITE_PORT ?? '5173';
 const REAL_DATA = path.join(ROOT, 'data');
 
+// pnpm dev:snapshot: copy the real data in and stop. Its .git stays behind, so dev can never commit to it.
 if (process.argv[2] === 'snapshot') {
   if (!existsSync(REAL_DATA)) throw new Error(`No ${REAL_DATA} to copy.`);
   rmSync(DEV_DATA, { recursive: true, force: true });
@@ -24,6 +25,7 @@ if (process.argv[2] === 'snapshot') {
   process.exit(0);
 }
 
+// pnpm dev: the demo library on first run, then the server and Vite side by side.
 await seed();
 
 const env = { ...process.env, ARISTOTLE_INSTANCE: 'dev', ARISTOTLE_PORT: PORT, ARISTOTLE_VITE_PORT: VITE_PORT };
@@ -39,6 +41,7 @@ console.error(
     `  Claude Code    the aristotle-dev MCP server\n`,
 );
 
+// Stop both together: on Ctrl-C, or when either one fails, rather than leave half a dev instance running.
 const stop = () => {
   for (const c of children) c.kill('SIGTERM');
   process.exit(0);

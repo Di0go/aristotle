@@ -1,6 +1,7 @@
 /* What he reads: lesson text set for long, calm reading, plus callouts, figures, step-through sequences,
    and the hover terms and concept links. */
 
+/* Text */
 .md {
   font-size: 1.075rem;
   line-height: 1.8;
@@ -129,10 +130,26 @@
   border-bottom: 1px solid var(--rule);
 }
 
+.md dl {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 6px 18px;
+  margin: 0 0 1.2em;
+}
+
+.md dt {
+  font-weight: 600;
+}
+
+.md dd {
+  margin: 0;
+  color: var(--fg-2);
+}
+
 .md img {
   max-width: 100%;
   height: auto;
-  border-radius: 6px;
+  border-radius: var(--radius);
 }
 
 .md svg {
@@ -147,6 +164,7 @@
   border-radius: 2px;
 }
 
+/* Maths: a display equation scrolls sideways rather than overflow the column. */
 .math-display {
   margin: 0.4em 0 1.2em;
   overflow-x: auto;
@@ -260,22 +278,6 @@
   color: var(--fg-2);
 }
 
-.md dl {
-  display: grid;
-  grid-template-columns: max-content 1fr;
-  gap: 6px 18px;
-  margin: 0 0 1.2em;
-}
-
-.md dt {
-  font-weight: 600;
-}
-
-.md dd {
-  margin: 0;
-  color: var(--fg-2);
-}
-
 /* Hover terms ({{term|definition}}) and concept links ([[concept]]). */
 .md .term {
   border-bottom: 1px dashed var(--acc-line);
@@ -313,7 +315,9 @@
 
 .sequence-frame {
   grid-area: 1 / 1;
-  transition: opacity 0.35s var(--ease), transform 0.35s var(--ease);
+  transition:
+    opacity 0.35s var(--ease),
+    transform 0.35s var(--ease);
 }
 
 .sequence-frame[aria-hidden='true'] {
@@ -332,13 +336,16 @@
   background: var(--b1);
 }
 
-.sequence-ticks {
+/* Step ticks, shared by sequences and the kit's flow steps. */
+.sequence-ticks,
+.kit-ticks {
   display: flex;
   flex: 1;
   gap: 4px;
 }
 
-.sequence-ticks button {
+.sequence-ticks button,
+.kit-ticks button {
   flex: 1;
   height: 4px;
   padding: 0;
@@ -348,7 +355,8 @@
   cursor: pointer;
 }
 
-.sequence-ticks button.seen {
+.sequence-ticks button.seen,
+.kit-ticks button.seen {
   background: var(--acc);
 }
 
@@ -370,6 +378,7 @@
   --kit-b: #e0a84a;
 }
 
+/* The frame */
 .kit {
   margin: 2.4em 0;
   padding: 22px 22px 18px;
@@ -394,6 +403,7 @@
   text-align: left;
 }
 
+/* States to step through, a play button, and the note under them */
 .kit-states,
 .kit-steps {
   display: flex;
@@ -443,6 +453,7 @@
   text-align: left;
 }
 
+/* Try it yourself: controls folded under the figure */
 .kit-try {
   margin-top: 12px;
   text-align: left;
@@ -457,26 +468,6 @@
 .kit-try[open] {
   display: grid;
   gap: 8px;
-}
-
-.kit-ticks {
-  display: flex;
-  flex: 1;
-  gap: 4px;
-}
-
-.kit-ticks button {
-  flex: 1;
-  height: 4px;
-  padding: 0;
-  border: 0;
-  border-radius: 2px;
-  background: var(--rule-strong);
-  cursor: pointer;
-}
-
-.kit-ticks button.seen {
-  background: var(--acc);
 }
 
 /* A figure on its way in: holds the space so the page doesn't jump when it arrives. */
@@ -497,7 +488,6 @@
 /* What a click enlarges (Lightbox.svelte). */
 .md img,
 .md figure > svg,
-.md .mermaid-diagram svg,
 .kit-plate .plate img {
   cursor: zoom-in;
 }

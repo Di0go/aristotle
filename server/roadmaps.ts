@@ -15,6 +15,8 @@ export interface RoadmapInput {
   steps: { title: string; goal: string; why?: string; topic?: string }[];
 }
 
+const STATE_LABEL = { 'not-started': 'not started', started: 'started', done: 'done' } as const;
+
 export class Roadmaps {
   private roadmaps = new Map<string, Roadmap>();
   private saving = new Map<string, Promise<void>>();
@@ -31,10 +33,12 @@ export class Roadmaps {
     return store;
   }
 
+  /** By slug, or by a title that slugifies to one. */
   get(slugOrTitle: string): Roadmap | undefined {
     return this.roadmaps.get(slugOrTitle) ?? this.roadmaps.get(slugify(slugOrTitle));
   }
 
+  /** Most recently changed first. */
   all(): Roadmap[] {
     return [...this.roadmaps.values()].sort((a, b) => b.updated.localeCompare(a.updated));
   }
@@ -85,8 +89,6 @@ export class Roadmaps {
     this.events.emit('roadmap', roadmap);
   }
 }
-
-const STATE_LABEL = { 'not-started': 'not started', started: 'started', done: 'done' } as const;
 
 /** The roadmap as Claude reads it: each step with the state of its topic. */
 export function describeRoadmap(roadmap: Roadmap, topics: (slug: string) => Topic | undefined): string {

@@ -21,11 +21,10 @@ const ROOT = path.resolve(import.meta.dirname, '..');
 export const DEV_DATA = path.resolve(process.env.ARISTOTLE_DATA_DIR ?? path.join(ROOT, '.dev/data'));
 const SEED_PORT = 4759;
 const BASE = `http://localhost:${SEED_PORT}`;
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-const isEmpty = (dir: string) => !existsSync(dir) || readdirSync(dir).length === 0;
-
+/** Replays a fixture into the dev data directory, unless it already has data and `force` is not set. */
 export async function seed(fixture = 'demo', force = false): Promise<void> {
+  // Never the real learning history, whatever ARISTOTLE_DATA_DIR says.
   if (existsSync(path.join(DEV_DATA, '.git')) || DEV_DATA === path.join(ROOT, 'data')) {
     throw new Error(`Refusing to seed ${DEV_DATA}: it looks like a real learning history.`);
   }
@@ -37,6 +36,7 @@ export async function seed(fixture = 'demo', force = false): Promise<void> {
     rmSync(DEV_DATA, { recursive: true, force: true });
   }
 
+  // A throwaway server on the dev data, with its state in a temporary folder so nothing of it is left behind.
   const { steps } = (await import(`./fixtures/${fixture}.ts`)) as { steps: Step[] };
   const state = mkdtempSync(path.join(tmpdir(), 'aristotle-seed-'));
   const server = spawn(process.execPath, [path.join(ROOT, 'server/index.ts')], {
@@ -53,6 +53,7 @@ export async function seed(fixture = 'demo', force = false): Promise<void> {
   });
   const client = new Client({ name: 'seed', version: '0' });
   try {
+    // Wait for it to answer, then connect as Claude Code would.
     for (let i = 0; ; i++) {
       try {
         if ((await fetch(`${BASE}/api/health`)).ok) break;
@@ -75,11 +76,13 @@ export async function seed(fixture = 'demo', force = false): Promise<void> {
         continue;
       }
       const item = await pending();
-      await fetch(`${BASE}/api/answer`, {
+      const res = await fetch(`${BASE}/api/answer`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: item, ...step.answer }),
       });
+      // A rejected answer would leave the quiz waiting out its timeout: fail here instead.
+      if (!res.ok) throw new Error(`answer: ${res.status} ${await res.text()}`);
       await waiting;
       waiting = undefined;
     }
@@ -91,6 +94,7 @@ export async function seed(fixture = 'demo', force = false): Promise<void> {
   }
 }
 
+/** The id of the quiz or ask waiting for an answer. */
 async function pending(): Promise<string> {
   for (let i = 0; i < 100; i++) {
     const state = (await (await fetch(`${BASE}/api/state`)).json()) as FeedState;
@@ -99,6 +103,14 @@ async function pending(): Promise<string> {
     await sleep(50);
   }
   throw new Error('No question is waiting for an answer');
+}
+
+function isEmpty(dir: string) {
+  return !existsSync(dir) || readdirSync(dir).length === 0;
+}
+
+function sleep(ms: number) {
+  return new Promise((r) => setTimeout(r, ms));
 }
 
 if (import.meta.main) {

@@ -1,20 +1,16 @@
 <script lang="ts">
   // Now, between sessions: everything in progress side by side, so picking what to do is one click.
-  import { feed } from './feed.svelte.ts';
-  import { claude } from './claude.svelte.ts';
   import { actions } from './actions.ts';
-  import { link } from './router.svelte.ts';
+  import { claude } from './claude.svelte.ts';
+  import { feed } from './feed.svelte.ts';
   import { ago } from './format.ts';
   import { countsOf, placeOf, stepsOf } from './library.ts';
+  import { link } from './router.svelte.ts';
   import { stepState } from '../../../shared/types.ts';
   import StartPanel from './StartPanel.svelte';
   import StatusBar from './StatusBar.svelte';
 
   let now = $state(Date.now());
-  $effect(() => {
-    const t = setInterval(() => (now = Date.now()), 1000);
-    return () => clearInterval(t);
-  });
 
   const roadmaps = $derived(feed.roadmapList.filter((r) => r.status === 'active'));
   const drafts = $derived(feed.roadmapList.filter((r) => r.status === 'draft'));
@@ -35,6 +31,12 @@
   const last = $derived(feed.session?.endedAt ? feed.session : null);
   const waited = $derived(feed.starting ? Math.round((now - feed.starting.at) / 1000) : 0);
   const empty = $derived(feed.loaded && inProgress.length === 0 && nextSteps.length === 0);
+
+  // A clock for "still setting up (40 s)" while something is starting.
+  $effect(() => {
+    const t = setInterval(() => (now = Date.now()), 1000);
+    return () => clearInterval(t);
+  });
 </script>
 
 <div class="page home">
@@ -95,7 +97,9 @@
           {@const c = countsOf(t)}
           <li class="desk-item sheet">
             {#if place}
-              <a class="desk-where" href={link.roadmap(place.roadmap.slug)}>{place.roadmap.title}, step {place.index + 1} of {place.roadmap.steps.length}</a>
+              <a class="desk-where" href={link.roadmap(place.roadmap.slug)}
+                >{place.roadmap.title}, step {place.index + 1} of {place.roadmap.steps.length}</a
+              >
             {/if}
             <h3><a href={link.lesson(t.slug)}>{t.title}</a></h3>
             {#if t.handoff}
@@ -141,7 +145,10 @@
         {#each drafts as r (r.slug)}
           <li>
             <span class="tag">draft</span>
-            <div><p class="next-title"><a href={link.roadmap(r.slug)}>{r.title}</a></p><p class="muted">{r.goal}</p></div>
+            <div>
+              <p class="next-title"><a href={link.roadmap(r.slug)}>{r.title}</a></p>
+              <p class="muted">{r.goal}</p>
+            </div>
             <a class="ghost small" href={link.roadmap(r.slug)}>Open</a>
           </li>
         {/each}

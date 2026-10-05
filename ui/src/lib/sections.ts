@@ -30,6 +30,7 @@ const LABELS: Record<SectionKind, string> = {
 /** "2. Wired and broadcast" → "Wired and broadcast": the label carries the number. */
 const cleanTitle = (t?: string) => t?.replace(/^\s*(step\s*)?\d+[.:)]\s*/i, '') || undefined;
 
+/** The parts of a class, in order, each with its items and how its checks went. */
 export function sectionsOf(items: PublicItem[]): Section[] {
   const out: Section[] = [];
   let step = 0;
@@ -61,6 +62,20 @@ export function sectionsOf(items: PublicItem[]): Section[] {
   return out;
 }
 
+/**
+ * Which parts start open: where to pick up (the first part with an unanswered check, or else the last step)
+ * and the last summary. Everything else is folded to one line.
+ */
+export function openByDefault(sections: Section[]): Set<string> {
+  const keys = new Set<string>();
+  const resume = sections.find((s) => s.checks.unanswered > 0) ?? sections.findLast((s) => s.kind === 'step');
+  if (resume) keys.add(resume.key);
+  const summary = sections.findLast((s) => s.kind === 'summary');
+  if (summary) keys.add(summary.key);
+  return keys;
+}
+
+/** Counts an item's checks into its part: graded picks by outcome, written answers, and what is still open. */
 function tally(s: Section, item: PublicItem) {
   if (item.type === 'quiz') {
     for (const [i] of item.questions.entries()) {
@@ -74,17 +89,4 @@ function tally(s: Section, item: PublicItem) {
     if (item.answeredAt) s.checks.written++;
     else s.checks.unanswered++;
   }
-}
-
-/**
- * Which parts start open: where to pick up (the first part with an unanswered check, or else the last step)
- * and the last summary. Everything else is folded to one line.
- */
-export function openByDefault(sections: Section[]): Set<string> {
-  const keys = new Set<string>();
-  const resume = sections.find((s) => s.checks.unanswered > 0) ?? sections.findLast((s) => s.kind === 'step');
-  if (resume) keys.add(resume.key);
-  const summary = sections.findLast((s) => s.kind === 'summary');
-  if (summary) keys.add(summary.key);
-  return keys;
 }

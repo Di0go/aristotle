@@ -20,7 +20,7 @@ set -euo pipefail
 
 NAME=aristotle.test
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
-TLS=$ROOT/.aristotle/tls
+TLS="$ROOT/.aristotle/tls"
 
 if [[ $EUID -ne 0 ]]; then
   echo "Run as root: pkexec bash $0" >&2
@@ -40,7 +40,7 @@ if grep -qE '(^#.*Mind Gym|\sgym\.test(\s|$))' /etc/hosts; then
   sed -i -E '/^# Mind Gym \(~\/Projects\/Learn\)/d; /^127\.0\.0\.82\s+gym\.test\s*$/d' /etc/hosts
   echo "Removed gym.test from /etc/hosts (backup: /etc/hosts.bak-aristotle)"
 fi
-if [[ -f $TLS/retired-ca.crt ]]; then
+if [[ -f "$TLS/retired-ca.crt" ]]; then
   trust anchor --remove "$TLS/retired-ca.crt" 2>/dev/null || true
   rm -f "$TLS/retired-ca.crt"
   echo "Stopped trusting the old gym.test authority"
@@ -92,11 +92,15 @@ systemctl restart aristotle-nome.service
 echo "aristotle-nome.service: $(systemctl is-active aristotle-nome.service)"
 
 # 4. Trust Aristotle's certificate authority, but only one that cannot sign anything other than aristotle.test.
-if [[ ! -f $TLS/ca.crt ]]; then
+if [[ ! -f "$TLS/ca.crt" ]]; then
   echo "No certificate yet: run 'bash $ROOT/scripts/tls.sh' as yourself, then this again." >&2
   exit 1
 fi
-if ! openssl x509 -in "$TLS/ca.crt" -noout -ext nameConstraints | grep -q "DNS:$NAME"; then
+# Exactly one permitted name, and it is $NAME: an authority that may also sign anything else is refused.
+PERMITTED=$(openssl x509 -in "$TLS/ca.crt" -noout -ext nameConstraints 2>/dev/null \
+  | sed -n '/Permitted:/,/Excluded:/{/DNS:\|IP:\|email:\|URI:\|DirName:/p}' | tr -d ' ')
+CRITICAL=$(openssl x509 -in "$TLS/ca.crt" -noout -ext nameConstraints 2>/dev/null | grep -c 'Name Constraints: critical' || true)
+if [[ "$PERMITTED" != "DNS:$NAME" || "$CRITICAL" != 1 ]]; then
   echo "$TLS/ca.crt is not limited to $NAME: not trusting it. Run 'bash $ROOT/scripts/tls.sh' first." >&2
   exit 1
 fi

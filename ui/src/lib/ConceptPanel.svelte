@@ -1,23 +1,28 @@
 <script lang="ts">
   // The side panel for one concept on a map: status, what it rests on and leads to, notes, and its check record.
-  import { isFading, type Concept, type Evidence, type Topic } from '../../../shared/types.ts';
   import { feed } from './feed.svelte.ts';
   import { formatDay, formatTime, onDay } from './format.ts';
+  import { markOf, splitRef } from './library.ts';
   import { link } from './router.svelte.ts';
+  import { isFading, type Concept, type Evidence, type Topic } from '../../../shared/types.ts';
 
-  let {
-    topic,
-    concept,
-    onselect,
-    onclose,
-  }: { topic: Topic; concept: Concept; onselect: (id: string) => void; onclose: () => void } = $props();
+  const WORD = { solid: 'Solid', shaky: 'Shaky', unknown: 'Not yet' } as const;
+
+  let { topic, concept, onselect, onclose }: { topic: Topic; concept: Concept; onselect: (id: string) => void; onclose: () => void } =
+    $props();
 
   const byId = $derived(new Map(topic.concepts.map((c) => [c.id, c])));
   const leadsTo = $derived(topic.concepts.filter((c) => c.deps.includes(concept.id)));
   const history = $derived([...concept.evidence].reverse());
   const fading = $derived(isFading(concept));
-  const word = $derived(fading ? 'Fading' : { solid: 'Solid', shaky: 'Shaky', unknown: 'Not yet' }[concept.status]);
+  const word = $derived(fading ? 'Fading' : WORD[concept.status]);
+  /** Fading is still solid underneath (as on the map), so it keeps the solid colour; not yet has none. */
+  const tagClass = $derived(concept.status === 'unknown' ? '' : concept.status);
+  const solidSince = $derived(
+    concept.solidSince && concept.status === 'solid' ? `; solid since ${onDay(concept.solidSince).replace(/^on /, '')}` : '',
+  );
 
+  /** One line of the check record: a mark, its colour, and what happened. */
   function describe(e: Evidence): { mark: string; cls: string; text: string } {
     const r = e.result;
     const cls = r === 'right' ? 'right' : r === 'wrong' ? 'wrong' : r === 'partial' ? 'partial' : 'neutral';
@@ -35,6 +40,7 @@
     return { mark, cls, text: r === 'right' ? 'Recalled it' : r === 'partial' ? 'Partly recalled it' : 'Forgot it' };
   }
 
+  /** "due now", "tomorrow", "in 12 days", "in 3 months". */
   function inDays(iso: string): string {
     const days = Math.round((Date.parse(iso) - Date.now()) / 86_400_000);
     if (days <= 0) return 'due now';
@@ -46,7 +52,7 @@
 
 <section class="sheet concept-panel">
   <header>
-    <span class="tag {fading ? 'solid' : concept.status === 'unknown' ? '' : concept.status}">{word}</span>
+    <span class="tag {tagClass}">{word}</span>
     {#if concept.goal}<span class="tag cyan">Goal</span>{/if}
     <button class="close" onclick={onclose} aria-label="Close">×</button>
   </header>
@@ -70,12 +76,12 @@
         {@const dep = byId.get(id)}
         <li>
           {#if dep}
-            <button class="link-button" onclick={() => onselect(id)}><i class="dot {isFading(dep) ? 'fading' : dep.status}"></i>{dep.label}</button>
+            <button class="link-button" onclick={() => onselect(id)}><i class="dot {markOf(dep)}"></i>{dep.label}</button>
           {:else if id.includes('/')}
-            {@const [slug, cid] = id.split('/')}
+            {@const { topic: slug = '', concept: cid } = splitRef(id)}
             {@const ext = feed.topics[slug]?.concepts.find((c) => c.id === cid)}
             <a href={link.topic(slug, cid)}>
-              {#if ext}<i class="dot {isFading(ext) ? 'fading' : ext.status}"></i>{ext.label}{:else}{cid}{/if}
+              {#if ext}<i class="dot {markOf(ext)}"></i>{ext.label}{:else}{cid}{/if}
             </a>
             <span class="muted">in {feed.topics[slug]?.title ?? slug}</span>
           {:else}
@@ -90,7 +96,9 @@
     <h3>Leads to</h3>
     <ul class="links">
       {#each leadsTo as c (c.id)}
-        <li><button class="link-button" onclick={() => onselect(c.id)}><i class="dot {isFading(c) ? 'fading' : c.status}"></i>{c.label}</button></li>
+        <li>
+          <button class="link-button" onclick={() => onselect(c.id)}><i class="dot {markOf(c)}"></i>{c.label}</button>
+        </li>
       {/each}
     </ul>
   {/if}
@@ -107,9 +115,7 @@
       </li>
     {/each}
     <li class="muted">
-      Added to the map {onDay(concept.firstSeen)}{concept.solidSince && concept.status === 'solid'
-        ? `; solid since ${onDay(concept.solidSince).replace(/^on /, '')}`
-        : ''}
+      Added to the map {onDay(concept.firstSeen)}{solidSince}
     </li>
   </ul>
 </section>
@@ -147,18 +153,18 @@
     background: var(--shaky-soft);
     border-radius: 0 var(--radius) var(--radius) 0;
     font-size: 0.95rem;
-    color: var(--ink);
+    color: var(--fg);
   }
 
   .review-line {
     font: 0.83rem var(--sans);
-    color: var(--graphite);
+    color: var(--muted);
   }
 
   h3 {
     margin: 20px 0 8px;
     font: 500 0.8rem var(--sans);
-    color: var(--graphite);
+    color: var(--muted);
   }
 
   .links,
@@ -201,13 +207,13 @@
   }
 
   .history a:hover {
-    color: var(--ink);
+    color: var(--fg);
   }
 
   .history .when {
     margin-left: auto;
     font: 0.72rem var(--sans);
-    color: var(--graphite);
+    color: var(--muted);
   }
 
   .history li.muted {
@@ -219,7 +225,7 @@
     display: inline-block;
     width: 1em;
     font-weight: 600;
-    color: var(--graphite);
+    color: var(--muted);
   }
 
   .mark.right {

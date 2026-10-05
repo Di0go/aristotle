@@ -1,19 +1,39 @@
 <script lang="ts">
   // The library pane: roadmaps as folders, steps inside, each step's concepts inside that, then loose topics.
   import { feed } from './feed.svelte.ts';
-  import { link, router } from './router.svelte.ts';
   import { countsOf, looseTopics, markOf, outline, placeOf, stepsOf } from './library.ts';
-  import type { Topic } from '../../../shared/types.ts';
+  import { link, router } from './router.svelte.ts';
+  import { migrateKey } from './storage.ts';
   import Grip from './Grip.svelte';
   import Logo from './Logo.svelte';
+  import type { Topic } from '../../../shared/types.ts';
+
+  const OPEN_KEY = 'aristotle.tree-open';
+  /** The name it had before the app was renamed, moved over on first read. */
+  const OLD_OPEN_KEY = 'mind-gym.tree-open';
 
   let { onnavigate }: { onnavigate?: () => void } = $props();
 
-  const OPEN_KEY = 'mind-gym.tree-open';
+  /** Which folders are open, by key: "r:<roadmap>" or "t:<topic>". Only the ones he has toggled are stored. */
   let open = $state<Record<string, boolean>>(readOpen());
+
+  const route = $derived(router.route);
+  const roadmaps = $derived(feed.roadmapList);
+  const loose = $derived(looseTopics(feed.topics, roadmaps));
+  const currentTopic = $derived(route.page === 'topic' ? route.slug : (feed.liveSlug ?? undefined));
+
+  // Open the way down to whatever is on screen.
+  $effect(() => {
+    const slug = route.page === 'topic' ? route.slug : undefined;
+    if (!slug) return;
+    const place = placeOf(slug, roadmaps);
+    if (place && !isOpen(`r:${place.roadmap.slug}`)) toggle(`r:${place.roadmap.slug}`, true);
+    if (!isOpen(`t:${slug}`)) toggle(`t:${slug}`, true);
+  });
 
   function readOpen(): Record<string, boolean> {
     try {
+      migrateKey(OLD_OPEN_KEY, OPEN_KEY);
       return JSON.parse(localStorage.getItem(OPEN_KEY) ?? '{}') as Record<string, boolean>;
     } catch {
       return {};
@@ -34,24 +54,21 @@
     return open[key] ?? key.startsWith('r:');
   }
 
-  const route = $derived(router.route);
-  const roadmaps = $derived(feed.roadmapList);
-  const loose = $derived(looseTopics(feed.topics, roadmaps));
-  const live = $derived(Boolean(feed.session && !feed.session.endedAt));
-  const currentTopic = $derived(route.page === 'topic' ? route.slug : live ? feed.session?.topicSlug : undefined);
-
-  // Open the way down to whatever is on screen.
-  $effect(() => {
-    const slug = route.page === 'topic' ? route.slug : undefined;
-    if (!slug) return;
-    const place = placeOf(slug, roadmaps);
-    if (place && !isOpen(`r:${place.roadmap.slug}`)) toggle(`r:${place.roadmap.slug}`, true);
-    if (!isOpen(`t:${slug}`)) toggle(`t:${slug}`, true);
-  });
+  /** aria-current for a topic's row (no concept given) or one of its concepts: "page" when it is what is on screen. */
+  function current(slug: string, concept?: string): 'page' | undefined {
+    if (route.page !== 'topic' || route.slug !== slug) return undefined;
+    return (concept ? route.concept === concept : !route.concept) ? 'page' : undefined;
+  }
 </script>
 
 {#snippet chevron(key: string, label: string)}
-  <button class="chev" class:open={isOpen(key)} onclick={() => toggle(key)} aria-label="{isOpen(key) ? 'Collapse' : 'Expand'} {label}" aria-expanded={isOpen(key)}>
+  <button
+    class="chev"
+    class:open={isOpen(key)}
+    onclick={() => toggle(key)}
+    aria-label="{isOpen(key) ? 'Collapse' : 'Expand'} {label}"
+    aria-expanded={isOpen(key)}
+  >
     <svg viewBox="0 0 10 10" aria-hidden="true"><path d="M3.5 2l3 3-3 3" /></svg>
   </button>
 {/snippet}
@@ -62,10 +79,10 @@
   <li>
     <div class="row" class:here={currentTopic === slug} class:unstarted={!t}>
       {#if t && t.concepts.length}{@render chevron(key, title)}{:else}<span class="chev-space"></span>{/if}
-      <a href={link.topic(slug)} onclick={onnavigate} aria-current={route.page === 'topic' && route.slug === slug && !route.concept ? 'page' : undefined}>
+      <a href={link.topic(slug)} onclick={onnavigate} aria-current={current(slug)}>
         <span class="name">{number !== undefined ? `${number} · ` : ''}{title}</span>
       </a>
-      {#if live && feed.session?.topicSlug === slug}
+      {#if feed.liveSlug === slug}
         <span class="live" title="Lesson in progress"></span>
       {:else if c.total}
         <span class="count">{c.solid}/{c.total}</span>
@@ -81,7 +98,7 @@
               href={link.topic(slug, concept.id)}
               onclick={onnavigate}
               data-concept="{slug}/{concept.id}"
-              aria-current={route.page === 'topic' && route.slug === slug && route.concept === concept.id ? 'page' : undefined}
+              aria-current={current(slug, concept.id)}
             >
               <i class="dot {markOf(concept)}"></i><span class="name">{concept.label}</span>
             </a>
@@ -95,7 +112,13 @@
 <div class="files">
   <div class="vault">
     <a class="vault-name" href={link.roadmaps()} onclick={onnavigate}><Logo size={20} class="mark" />aristotle</a>
-    <a class="add" href={link.roadmaps()} onclick={onnavigate} title="Plan a roadmap or start a topic" aria-label="Plan a roadmap or start a topic">
+    <a
+      class="add"
+      href={link.roadmaps()}
+      onclick={onnavigate}
+      title="Plan a roadmap or start a topic"
+      aria-label="Plan a roadmap or start a topic"
+    >
       <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3.5v9M3.5 8h9" /></svg>
     </a>
   </div>

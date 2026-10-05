@@ -12,8 +12,8 @@ Before you start, read [docs/README.md](docs/README.md): it says which doc cover
 ## The rules
 
 - **Never touch a learner's data by hand.** `data/` is a learning history; the dev instance has its own (`.dev/data`), and `pnpm dev:snapshot` copies the real one when you need it.
-- **Every change passes `pnpm gates`**: generated docs, Biome, types, the end-to-end tests and the build. The Git hooks run them on commit (quick ones) and push (all); CI runs them again.
-- **Docs change with the code.** Reference tables are generated (`pnpm docs`); the prose next to the code you changed is yours to update. If nothing needs saying, write `Docs: none -- <why>` in the commit message.
+- **Every change passes `pnpm gates`**: generated docs, lint and format, types, the end-to-end tests and the build. The Git hooks run them on commit (quick ones) and push (all); CI runs them again.
+- **Docs change with the code.** Reference tables are generated (`pnpm docs:gen`); the prose next to the code you changed is yours to update. If nothing needs saying, write `Docs: none -- <why>` in the commit message.
 - **Every source file starts with a comment saying what it is for.**
 - **Match the code around you**: plain TypeScript run directly by Node (erasable syntax only, `.ts` in imports), Svelte 5 runes, design tokens instead of raw colours, comments that say why.
 - **Commit messages**: a short summary of what changed for the user, then why if it is not obvious.

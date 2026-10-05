@@ -103,20 +103,20 @@ Only for the interface (and the tests); Claude Code uses MCP.
 | `GET` | `/api/health` |
 | `GET` | `/api/state` |
 | `GET` | `/api/events` |
+| `POST` | `/api/answer` |
 | `GET` | `/api/topics` |
+| `GET` | `/api/topics/…` |
 | `GET` | `/api/map` |
 | `GET` | `/api/roadmaps` |
 | `GET` | `/api/roadmaps/…` |
-| `GET` | `/api/topics/…` |
 | `GET` | `/api/missions` |
 | `POST` | `/api/missions/…` |
-| `GET` | `/api/search` |
 | `GET` | `/api/sessions` |
+| `GET` | `/api/sessions/…` |
 | `GET` | `/api/progress` |
 | `GET` | `/api/reviews` |
+| `GET` | `/api/search` |
 | `GET` | `/api/backup` |
-| `GET` | `/api/sessions/…` |
-| `POST` | `/api/answer` |
 | `GET` (WebSocket) | `/api/terminal` |
 | `POST` | `/mcp` |
 <!-- /generated -->
@@ -136,7 +136,7 @@ Only for the interface (and the tests); Claude Code uses MCP.
 | [`gym.ts`](../server/gym.ts) | Ties the live feed to the knowledge maps: answers become evidence on concepts, map changes show up in the feed, practice moves review schedules and training levels, and data/ is backed up. |
 | [`images.ts`](../server/images.ts) | Real images for lessons, from Wikimedia Commons, with their licences checked before Claude may use them. |
 | [`index.ts`](../server/index.ts) | The Aristotle server: the interface, its live feed, and the MCP endpoint Claude Code connects to. |
-| [`mcp.ts`](../server/mcp.ts) | The tools Claude Code uses to teach through the interface. |
+| [`mcp.ts`](../server/mcp.ts) | The tools Claude Code uses to teach through the interface: one MCP server per request (server/index.ts), over the stores in Gym. |
 | [`missions.ts`](../server/missions.ts) | Praxis missions: one JSON file per mission in data/missions/. |
 | [`reviews.ts`](../server/reviews.ts) | Spaced review of concepts with FSRS: every solid concept carries a review card; when its due date passes, the concept is "fading" until he practises it again. |
 | [`roadmaps.ts`](../server/roadmaps.ts) | Roadmaps: one JSON file per roadmap in data/roadmaps/. |
@@ -149,7 +149,7 @@ Only for the interface (and the tests); Claude Code uses MCP.
 
 | File | What it is |
 |---|---|
-| [`types.ts`](../shared/types.ts) | Types shared by the server and the interface. |
+| [`types.ts`](../shared/types.ts) | Types shared by the server and the interface: the records kept in data/ and what the API sends and accepts. |
 
 #### Interface entry (`ui/src/`)
 
@@ -218,6 +218,7 @@ Only for the interface (and the tests); Claude Code uses MCP.
 | [`router.svelte.ts`](../ui/src/lib/router.svelte.ts) | Hash routing: #/, #/progress, #/map, #/roadmaps, #/roadmaps/<slug>, #/lesson/<slug>, #/topics, #/topics/<slug>?c=<concept>, #/log, #/log/<session>, #/praxis, #/praxis/<mission>. |
 | [`search.svelte.ts`](../ui/src/lib/search.svelte.ts) | Whether the search palette is open: Ctrl+K or / anywhere, or the ribbon's search button. |
 | [`sections.ts`](../ui/src/lib/sections.ts) | Splits a session's items into the parts of a class (orientation, probe, plan, each step with its checks, summary) and tallies each part's checks, so a long class can be read as an outline and opened part by part. |
+| [`storage.ts`](../ui/src/lib/storage.ts) | Browser storage helpers: moving a setting saved under the app's old name (Mind Gym) to its new key. |
 | [`tabs.svelte.ts`](../ui/src/lib/tabs.svelte.ts) | Open pages, as tabs. |
 | [`theme.svelte.ts`](../ui/src/lib/theme.svelte.ts) | Look settings: light or dark, and one accent. |
 

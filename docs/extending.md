@@ -21,7 +21,7 @@ Most features are some of these layers, in this order:
 4. Add it to the tool list asserted in the first test of [`tests/mcp.test.ts`](../tests/mcp.test.ts), and test what it does.
 5. Mention it in the skill that should use it, and allow it in `.claude/settings.json` if it needs no confirmation (`mcp__aristotle` already allows all).
 
-The tool appears in [architecture.md](architecture.md#mcp-tools) by itself (`pnpm docs`).
+The tool appears in [architecture.md](architecture.md#mcp-tools) by itself (`pnpm docs:gen`).
 
 ## Add an API route
 

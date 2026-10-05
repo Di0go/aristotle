@@ -2,43 +2,52 @@
   // One series over time as a step line with a light wash: the value holds until the next change.
   import { longDay, niceTicks, parseDay, shortDay } from './scale.ts';
 
-  let {
-    points,
-    label,
-    color = 'var(--right)',
-  }: { points: { day: string; count: number }[]; label: string; color?: string } = $props();
+  let { points, label, color = 'var(--right)' }: { points: { day: string; count: number }[]; label: string; color?: string } = $props();
 
+  // Height and margins in px; the width follows the card. The right margin leaves room for the end label.
   const H = 220;
   const M = { top: 18, right: 44, bottom: 30, left: 36 };
+  const plotH = H - M.top - M.bottom;
+  const DAY_MS = 86_400_000;
+  /** Roughly the tooltip's width, so it is kept inside the chart's right edge. */
+  const TOOLTIP_W = 150;
+
   let width = $state(640);
   let active = $state<number | null>(null);
 
   const plotW = $derived(Math.max(120, width - M.left - M.right));
-  const plotH = H - M.top - M.bottom;
   const times = $derived(points.map((p) => parseDay(p.day).getTime()));
   const t0 = $derived(times[0] ?? 0);
-  const t1 = $derived(times.length > 1 ? times[times.length - 1] : t0 + 86_400_000);
+  // A single point still gets a day's width of axis.
+  const t1 = $derived(times.length > 1 ? times[times.length - 1] : t0 + DAY_MS);
   const y = $derived(niceTicks(Math.max(...points.map((p) => p.count), 1)));
+  const last = $derived(points.length - 1);
 
-  const px = (t: number) => M.left + ((t - t0) / (t1 - t0 || 1)) * plotW;
-  const py = (v: number) => M.top + plotH - (v / y.max) * plotH;
-
+  /** The step line: across to each day, then up or down to its value. */
   const line = $derived.by(() => {
     if (!points.length) return '';
     let d = `M${px(times[0])},${py(points[0].count)}`;
     for (let i = 1; i < points.length; i++) d += ` H${px(times[i])} V${py(points[i].count)}`;
     return d;
   });
-  const area = $derived(
-    points.length ? `${line} V${M.top + plotH} H${px(times[0])} Z` : '',
-  );
+  /** The wash under the line, closed along the bottom of the plot. */
+  const area = $derived(points.length ? `${line} V${M.top + plotH} H${px(times[0])} Z` : '');
+  /** Day labels: every point when there are two or fewer, else the first, middle and last. */
   const xTicks = $derived.by(() => {
     if (points.length <= 2) return points.map((_, i) => i);
     const mid = Math.round((points.length - 1) / 2);
     return [0, mid, points.length - 1];
   });
-  const last = $derived(points.length - 1);
 
+  function px(t: number): number {
+    return M.left + ((t - t0) / (t1 - t0 || 1)) * plotW;
+  }
+
+  function py(v: number): number {
+    return M.top + plotH - (v / y.max) * plotH;
+  }
+
+  /** The point closest to the pointer, by x. */
   function nearest(clientX: number, rect: DOMRect): number {
     const x = clientX - rect.left;
     let best = 0;
@@ -58,7 +67,7 @@
   <!-- Focusable so the arrow keys can step through the points; the table view carries every value too. -->
   <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
   <svg
-    width={width}
+    {width}
     height={H}
     role="img"
     aria-label="{label}: {points.at(-1)?.count ?? 0} now"
@@ -74,7 +83,9 @@
       <text class="tick" x={M.left - 8} y={py(t)} text-anchor="end" dominant-baseline="central">{t}</text>
     {/each}
     {#each xTicks as i (i)}
-      <text class="tick" x={px(times[i])} y={H - 8} text-anchor={i === 0 ? 'start' : i === last ? 'end' : 'middle'}>{shortDay(points[i].day)}</text>
+      <text class="tick" x={px(times[i])} y={H - 8} text-anchor={i === 0 ? 'start' : i === last ? 'end' : 'middle'}
+        >{shortDay(points[i].day)}</text
+      >
     {/each}
     <path d={area} fill={color} fill-opacity="0.1" />
     <path d={line} fill="none" stroke={color} stroke-width="2" stroke-linejoin="round" stroke-linecap="round" />
@@ -88,7 +99,7 @@
     {/if}
   </svg>
   {#if active !== null}
-    <div class="tooltip" style:left="{Math.min(px(times[active]), width - 150)}px" style:top="{M.top}px">
+    <div class="tooltip" style:left="{Math.min(px(times[active]), width - TOOLTIP_W)}px" style:top="{M.top}px">
       <strong>{points[active].count}</strong>
       <span><i class="key" style:background={color}></i>{label}</span>
       <span class="muted">{longDay(points[active].day)}</span>

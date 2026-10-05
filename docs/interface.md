@@ -4,7 +4,7 @@
 
 Quiet and dense, like a notes vault: soft greys stepping from the page to the panes, one accent colour, Inter for everything read and JetBrains Mono only for code and keys (both self-hosted through Fontsource). Dark by default, light on a switch. No mascots, no marketing, no onboarding.
 
-All colours, type and spacing are **tokens** on `:root` in [`base.css`](../ui/src/styles/base.css), redefined for `[data-theme='dark']`, and the accent per `[data-accent]` (blue, red, violet, graphite). Components read tokens, never raw colours; the few status colours (`--solid`, `--shaky`, `--wrong`, `--heart`) are tokens too. Some older names (`--sheet`, `--cyan`, `--serif`…) are kept as aliases.
+All colours, type and spacing are **tokens** on `:root` in [`base.css`](../ui/src/styles/base.css), redefined for `[data-theme='dark']`, and the accent per `[data-accent]` (blue, red, violet, graphite). Components read tokens, never raw colours; the few status colours (`--solid`, `--shaky`, `--wrong`, `--heart`) are tokens too. Some older names (`--paper`, `--link`, `--serif`…) are kept as aliases.
 
 | Stylesheet | Covers |
 |---|---|

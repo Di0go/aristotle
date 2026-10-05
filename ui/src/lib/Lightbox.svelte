@@ -3,37 +3,13 @@
   // (with its numbered markers), inline SVG drawings and Mermaid diagrams. Escape, a click outside or × closes it.
   // Interactive figures from the kit are left alone: they are meant to be used where they are.
 
-  let shown = $state<{ node: HTMLElement | SVGElement; caption: string } | null>(null);
+  type Shown = { node: HTMLElement | SVGElement; caption: string };
+
+  let shown = $state<Shown | null>(null);
   let holder = $state<HTMLElement>();
   let closer = $state<HTMLButtonElement>();
+  /** Where focus was before opening, to give it back on close. */
   let returnTo: HTMLElement | null = null;
-
-  /** What a click opens, if anything: the element to show and its caption. */
-  function target(el: Element): { node: HTMLElement | SVGElement; caption: string } | null {
-    if (el.closest('a, button, .lightbox')) return null;
-    const plate = el.closest<HTMLElement>('.kit-plate .plate');
-    if (plate) {
-      const fig = plate.closest('figure');
-      return { node: plate, caption: fig?.querySelector('.kit-title')?.textContent ?? plate.querySelector('img')?.alt ?? '' };
-    }
-    if (el.closest('.kit, .explorable')) return null;
-    const img = el.closest<HTMLImageElement>('.md img');
-    if (img) return { node: img, caption: img.closest('figure')?.querySelector('figcaption')?.textContent ?? img.alt };
-    const svg = el.closest<SVGSVGElement>('.md svg');
-    if (svg && !svg.closest('.kit, .figure-tools') && svg.ownerSVGElement === null && svg.getBoundingClientRect().width > 120) {
-      return { node: svg, caption: svg.closest('figure')?.querySelector('figcaption')?.textContent ?? '' };
-    }
-    return null;
-  }
-
-  function onClick(e: MouseEvent) {
-    if (e.button !== 0 || e.ctrlKey || e.metaKey || !(e.target instanceof Element)) return;
-    const t = target(e.target);
-    if (!t) return;
-    e.preventDefault();
-    returnTo = document.activeElement as HTMLElement | null;
-    shown = t;
-  }
 
   // A copy of the figure goes in the box, sized to the window; the original stays in the lesson.
   $effect(() => {
@@ -50,11 +26,43 @@
     closer?.focus();
   });
 
+  /**
+   * What a click opens, if anything: the element to show and its caption. Only top-level drawings wider than
+   * 120px count, so icons and nested <svg> pieces don't open.
+   */
+  function target(el: Element): Shown | null {
+    if (el.closest('a, button, .lightbox')) return null;
+    const plate = el.closest<HTMLElement>('.kit-plate .plate');
+    if (plate) {
+      const fig = plate.closest('figure');
+      return { node: plate, caption: fig?.querySelector('.kit-title')?.textContent ?? plate.querySelector('img')?.alt ?? '' };
+    }
+    if (el.closest('.kit, .explorable')) return null;
+    const img = el.closest<HTMLImageElement>('.md img');
+    if (img) return { node: img, caption: img.closest('figure')?.querySelector('figcaption')?.textContent ?? img.alt };
+    const svg = el.closest<SVGSVGElement>('.md svg');
+    if (svg && !svg.closest('.kit, .figure-tools') && svg.ownerSVGElement === null && svg.getBoundingClientRect().width > 120) {
+      return { node: svg, caption: svg.closest('figure')?.querySelector('figcaption')?.textContent ?? '' };
+    }
+    return null;
+  }
+
+  // Listens in the capture phase on the document, so it sees the click before anything in the lesson handles it.
+  function onClick(e: MouseEvent) {
+    if (e.button !== 0 || e.ctrlKey || e.metaKey || !(e.target instanceof Element)) return;
+    const t = target(e.target);
+    if (!t) return;
+    e.preventDefault();
+    returnTo = document.activeElement as HTMLElement | null;
+    shown = t;
+  }
+
   function close() {
     shown = null;
     returnTo?.focus?.();
   }
 
+  /** Escape closes the box and goes no further, so nothing underneath closes with it. */
   function onKey(e: KeyboardEvent) {
     if (shown && e.key === 'Escape') {
       e.preventDefault();
@@ -69,7 +77,14 @@
 
 {#if shown}
   <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-  <div class="lightbox" role="dialog" tabindex="-1" aria-modal="true" aria-label={shown.caption || 'Figure'} onclick={(e) => e.target === e.currentTarget && close()}>
+  <div
+    class="lightbox"
+    role="dialog"
+    tabindex="-1"
+    aria-modal="true"
+    aria-label={shown.caption || 'Figure'}
+    onclick={(e) => e.target === e.currentTarget && close()}
+  >
     <button class="x" bind:this={closer} onclick={close} aria-label="Close">×</button>
     <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_noninteractive_element_interactions -->
     <figure onclick={(e) => e.target === e.currentTarget && close()}>

@@ -20,6 +20,11 @@ export interface MissionInput {
   concepts: string[];
 }
 
+/** A request that makes no sense for this mission; the API answers it with a 400. */
+export class MissionError extends Error {}
+
+const SCOPE = { step: 'step mission', capstone: 'capstone', topic: 'topic mission' } as const;
+
 export class Missions {
   private missions = new Map<string, Mission>();
   private saving = new Map<string, Promise<void>>();
@@ -36,6 +41,7 @@ export class Missions {
     return store;
   }
 
+  /** By id, or by a title that slugifies to one. */
   get(id: string): Mission | undefined {
     return this.missions.get(id) ?? this.missions.get(slugify(id));
   }
@@ -59,6 +65,7 @@ export class Missions {
   async save(input: MissionInput, id?: string): Promise<{ mission: Mission; created: boolean }> {
     const now = new Date().toISOString();
     const existing = id ? this.get(id) : undefined;
+    // A new mission never takes over an old one's file: a repeated title gets -2, -3 and so on.
     let newId = existing?.id ?? slugify(input.title);
     for (let n = 2; !existing && this.missions.has(newId); n++) newId = `${slugify(input.title)}-${n}`;
     const mission: Mission = {
@@ -75,6 +82,7 @@ export class Missions {
       created: existing?.created ?? now,
       updated: now,
     };
+    // Where it belongs is replaced, not merged: a rewrite may move it to another step or roadmap.
     delete mission.roadmap;
     delete mission.topic;
     if (input.roadmap) mission.roadmap = input.roadmap;
@@ -83,6 +91,7 @@ export class Missions {
     return { mission, created: !existing };
   }
 
+  /** Saves his account of how it went. */
   async debrief(id: string, text: string): Promise<Mission> {
     const mission = this.require(id);
     if (mission.status === 'dropped') throw new MissionError('This mission was dropped.');
@@ -95,6 +104,7 @@ export class Missions {
     return mission;
   }
 
+  /** Saves Claude's verdict and critique, which close the mission. */
   async review(id: string, verdict: MissionVerdict, markdown: string): Promise<Mission> {
     const mission = this.require(id);
     const now = new Date().toISOString();
@@ -135,10 +145,6 @@ export class Missions {
     this.events.emit('mission', mission);
   }
 }
-
-export class MissionError extends Error {}
-
-const SCOPE = { step: 'step mission', capstone: 'capstone', topic: 'topic mission' } as const;
 
 /** One line per mission, as Claude reads a list of them. */
 export function summarizeMission(m: Mission): string {

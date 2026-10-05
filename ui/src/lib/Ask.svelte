@@ -1,8 +1,15 @@
 <script lang="ts">
   // An open question in a lesson: the prompt, a text box with a live maths preview, and the answer once sent.
-  import type { AskItem } from '../../../shared/types.ts';
   import { feed } from './feed.svelte.ts';
   import Markdown from './Markdown.svelte';
+  import type { AskItem } from '../../../shared/types.ts';
+
+  const LABELS: Record<AskItem['kind'], string> = {
+    problem: 'Problem: work it out yourself',
+    explain: 'Explain it in your own words',
+    recall: 'From memory, without looking back',
+    open: 'Your answer',
+  };
 
   let { item, active, readonly = false }: { item: AskItem; active: boolean; readonly?: boolean } = $props();
 
@@ -12,14 +19,10 @@
   let box = $state<HTMLTextAreaElement>();
 
   const answered = $derived(Boolean(item.answeredAt));
+  /** A preview only once there is maths in it: plain text reads fine in the box. */
+  const hasMaths = $derived(text.includes('$') || text.includes('\\('));
 
-  const LABELS: Record<AskItem['kind'], string> = {
-    problem: 'Problem: work it out yourself',
-    explain: 'Explain it in your own words',
-    recall: 'From memory, without looking back',
-    open: 'Your answer',
-  };
-
+  // The question waiting for him takes the cursor, without scrolling the page to it.
   $effect(() => {
     if (active && !answered) box?.focus({ preventScroll: true });
   });
@@ -56,9 +59,8 @@
       bind:value={text}
       onkeydown={onKey}
       rows="6"
-      placeholder={item.placeholder ?? 'Write your answer. Maths works: $x^2$ or $$\\int_0^1 f$$'}
-    ></textarea>
-    {#if text.includes('$') || text.includes('\\(')}
+      placeholder={item.placeholder ?? 'Write your answer. Maths works: $x^2$ or $$\\int_0^1 f$$'}></textarea>
+    {#if hasMaths}
       <div class="preview">
         <p class="kicker">Preview</p>
         <Markdown source={text} />

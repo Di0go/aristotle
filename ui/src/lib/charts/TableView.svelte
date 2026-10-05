@@ -7,11 +7,15 @@
   <summary>Show as a table</summary>
   <table>
     <thead>
-      <tr>{#each columns as c (c)}<th>{c}</th>{/each}</tr>
+      <tr
+        >{#each columns as c (c)}<th>{c}</th>{/each}</tr
+      >
     </thead>
     <tbody>
       {#each rows as row, i (i)}
-        <tr>{#each row as cell, j (j)}<td>{cell}</td>{/each}</tr>
+        <tr
+          >{#each row as cell, j (j)}<td>{cell}</td>{/each}</tr
+        >
       {/each}
     </tbody>
   </table>

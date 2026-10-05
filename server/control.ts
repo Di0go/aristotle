@@ -19,14 +19,15 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 /** The systemd user service from scripts/install-service.sh, when installed. Only ever the live instance's. */
 const SERVICE = 'aristotle.service';
 const systemctl = (...args: string[]) => spawnSync('systemctl', ['--user', ...args, SERVICE], { stdio: 'ignore' }).status === 0;
-export const serviceEnabled = () => INSTANCE === 'live' && systemctl('is-enabled', '--quiet');
+const serviceEnabled = () => INSTANCE === 'live' && systemctl('is-enabled', '--quiet');
 
 /** The checkout the service runs, from its WorkingDirectory. */
-export function serviceRoot(): string | undefined {
+function serviceRoot(): string | undefined {
   const out = spawnSync('systemctl', ['--user', 'show', '--property=WorkingDirectory', '--value', SERVICE], { encoding: 'utf8' });
   return out.status === 0 && out.stdout.trim() ? out.stdout.trim() : undefined;
 }
 
+/** What the running server says about itself, or null when nothing answers on the port. */
 export async function health(): Promise<{ ok: boolean; instance?: string; root?: string } | null> {
   try {
     const res = await fetch(`http://localhost:${PORT}/api/health`, { signal: AbortSignal.timeout(1000) });
@@ -36,7 +37,7 @@ export async function health(): Promise<{ ok: boolean; instance?: string; root?:
   }
 }
 
-export const isRunning = async () => Boolean(await health());
+const isRunning = async () => Boolean(await health());
 
 /** Builds the interface into dist/ui of this checkout. */
 export function build(stdio: 'inherit' | number = 'inherit') {
@@ -48,6 +49,7 @@ export function build(stdio: 'inherit' | number = 'inherit') {
   );
 }
 
+/** Starts the server (through systemd when the service is installed) and waits up to 5 seconds for it to answer. */
 export async function start(): Promise<boolean> {
   if (await isRunning()) return true;
   mkdirSync(STATE_DIR, { recursive: true });
@@ -68,6 +70,7 @@ export async function start(): Promise<boolean> {
   return false;
 }
 
+/** Stops the server, through systemd or by the pid it wrote, and waits for it to go quiet. */
 export async function stop(): Promise<void> {
   if (serviceEnabled()) {
     systemctl('stop');

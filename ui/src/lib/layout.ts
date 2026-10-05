@@ -2,10 +2,24 @@
 
 import dagre from '@dagrejs/dagre';
 import type { Concept, Roadmap, RoadmapStep, Topic } from '../../../shared/types.ts';
+import { splitRef } from './library.ts';
 
-const LINE_H = 17;
+// A concept's box: line height and character width of its label, and how many characters fit on a line.
+// LINE_H is exported so whatever draws a labelBox spaces its lines to match.
+export const LINE_H = 17;
 const CHAR_W = 6.9;
 const MAX_CHARS = 22;
+
+// The map of everything: padding inside a box, a box's title, gaps between boxes, bands and rows, where a row
+// wraps, and the size of a step not started yet.
+const PAD = 20;
+const LABEL_H = 46;
+const BOX_GAP = 44;
+const BAND_LABEL = 56;
+const BAND_GAP = 72;
+const ROW_GAP = 40;
+const ROW_WIDTH = 1700;
+const GHOST = { w: 200, h: 76 };
 
 export interface PlacedNode {
   /** "id" inside a topic layout; "topic/id" in the map of everything. */
@@ -32,6 +46,31 @@ export interface Layout {
   edges: PlacedEdge[];
   width: number;
   height: number;
+}
+
+export interface PlacedBox {
+  key: string;
+  /** Set for a topic with a map; a step not started yet has only its roadmap step. */
+  topic?: Topic;
+  step?: RoadmapStep;
+  number?: number;
+  title: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+export interface PlacedBand {
+  key: string;
+  title: string;
+  roadmap?: Roadmap;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  /** The route through the band's boxes, in step order. */
+  route: string;
 }
 
 /** Wraps a label onto at most two lines, and sizes the box to fit. */
@@ -86,18 +125,12 @@ export function layoutTopic(topic: Topic, direction: 'LR' | 'TB', others: Record
   for (const c of topic.concepts) {
     for (const dep of c.deps) {
       if (nodes.has(dep)) edges.push([dep, c.id]);
-      else if (withExternal && dep.includes('/')) {
-        const [slug, id] = dep.split('/');
+      else if (withExternal) {
+        const { topic: slug, concept: id } = splitRef(dep);
+        if (slug === undefined) continue;
         const other = others[slug]?.concepts.find((x) => x.id === id);
         if (!other) continue;
-        if (!nodes.has(dep)) {
-          nodes.set(dep, {
-            key: dep,
-            concept: other,
-            external: { topic: slug, topicTitle: others[slug].title },
-            ...labelBox(other.label),
-          });
-        }
+        nodes.set(dep, { key: dep, concept: other, external: { topic: slug, topicTitle: others[slug].title }, ...labelBox(other.label) });
         edges.push([dep, c.id]);
       }
     }
@@ -120,40 +153,6 @@ export function layoutTopic(topic: Topic, direction: 'LR' | 'TB', others: Record
   const graph = g.graph();
   return { nodes: placed, edges: placedEdges, width: Math.ceil(graph.width ?? 0), height: Math.ceil(graph.height ?? 0) };
 }
-
-export interface PlacedBox {
-  key: string;
-  /** Set for a topic with a map; a step not started yet has only its roadmap step. */
-  topic?: Topic;
-  step?: RoadmapStep;
-  number?: number;
-  title: string;
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-}
-
-export interface PlacedBand {
-  key: string;
-  title: string;
-  roadmap?: Roadmap;
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-  /** The route through the band's boxes, in step order. */
-  route: string;
-}
-
-const PAD = 20;
-const LABEL_H = 46;
-const BOX_GAP = 44;
-const BAND_LABEL = 56;
-const BAND_GAP = 72;
-const ROW_GAP = 40;
-const ROW_WIDTH = 1700;
-const GHOST = { w: 200, h: 76 };
 
 /**
  * The map of everything, as the library is organised: a band per roadmap with its steps in order (wrapping
@@ -186,7 +185,6 @@ export function layoutAtlas(
   const loose = Object.values(topicsBySlug).filter((t) => !used.has(t.slug) && t.concepts.length);
   if (loose.length) groups.push({ key: ':loose', title: 'Other topics', items: loose.map((t) => ({ topic: t, title: t.title })) });
 
-  const inner = new Map<string, Layout>();
   const bands: PlacedBand[] = [];
   const boxes: PlacedBox[] = [];
   const nodes: PlacedNode[] = [];
@@ -201,13 +199,12 @@ export function layoutAtlas(
     let rowH = 0;
     const placed: PlacedBox[] = [];
     for (const item of g.items) {
-      // An empty frame is as wide as its title (set in 15px serif, about 7.4px a character).
+      // An empty frame is as wide as its title (about 7.6px a character, plus room for its number), within limits.
       let w = Math.min(440, Math.max(GHOST.w, Math.round(item.title.length * 7.6 + (item.number ? 64 : 40))));
       let h = GHOST.h;
       let l: Layout | undefined;
       if (item.topic) {
         l = layoutTopic(item.topic, 'TB', {}, false);
-        inner.set(item.topic.slug, l);
         w = Math.max(l.width, 200) + PAD * 2;
         h = l.height + PAD + LABEL_H;
       }
@@ -274,8 +271,8 @@ export function layoutAtlas(
   for (const t of Object.values(topicsBySlug)) {
     for (const c of t.concepts) {
       for (const dep of c.deps) {
-        const [slug, id] = dep.split('/');
-        if (id === undefined) continue;
+        const { topic: slug, concept: id } = splitRef(dep);
+        if (slug === undefined) continue;
         const a = at.get(dep);
         const b = at.get(`${t.slug}/${c.id}`);
         if (!a || !b) continue;
@@ -296,6 +293,7 @@ export function layoutAtlas(
   return { bands, boxes, layout: { nodes, edges, width: Math.ceil(width), height: Math.ceil(Math.max(0, y - BAND_GAP)) } };
 }
 
+/** Moves every "x,y" pair in a path by (dx, dy). */
 function translate(d: string, dx: number, dy: number): string {
   return d.replace(/(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/g, (_, x, y) => `${+x + dx},${+y + dy}`);
 }

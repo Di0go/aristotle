@@ -19,10 +19,17 @@
     }
   }
 
+  /** Grows the box with its text, up to a limit. Reset to auto first, or scrollHeight never shrinks. */
   function resize() {
     if (!box) return;
     box.style.height = 'auto';
     box.style.height = `${Math.min(box.scrollHeight, 160)}px`;
+  }
+
+  /** Starts Claude in the drawer (resuming the last conversation, or a new one) and shows it. */
+  function startClaude(resume: boolean) {
+    claude.start(resume);
+    claude.toggle(true);
   }
 </script>
 
@@ -39,16 +46,15 @@
         onkeydown={onKey}
         rows="1"
         placeholder="Message Claude: a question, “go”, “stop for today”…"
-        aria-label="Message Claude"
-      ></textarea>
+        aria-label="Message Claude"></textarea>
       <button class="primary" onclick={send} disabled={!text.trim()}>Send</button>
     </div>
   {:else if claude.connected}
     <p class="composer-off">
       Claude isn't running here. If you're talking to it in your own terminal, carry on there. Otherwise
-      <button class="link" onclick={() => { claude.start(true); claude.toggle(true); }}>resume the last conversation</button>
+      <button class="link" onclick={() => startClaude(true)}>resume the last conversation</button>
       or
-      <button class="link" onclick={() => { claude.start(); claude.toggle(true); }}>start a new one</button>.
+      <button class="link" onclick={() => startClaude(false)}>start a new one</button>.
     </p>
   {/if}
 </div>

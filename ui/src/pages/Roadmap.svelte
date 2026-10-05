@@ -1,12 +1,16 @@
 <script lang="ts">
   // One roadmap as a route: steps in order down a line, each with its goal, why it sits there, and its progress.
-  import { feed } from '../lib/feed.svelte.ts';
-  import { link } from '../lib/router.svelte.ts';
   import { actions } from '../lib/actions.ts';
+  import { feed } from '../lib/feed.svelte.ts';
   import { ago } from '../lib/format.ts';
-  import { markOf, outline, stepsOf, STATUS_LABEL } from '../lib/library.ts';
-  import type { Mission } from '../../../shared/types.ts';
+  import { markOf, outline, STATUS_LABEL, STATUS_TONE, stepsOf } from '../lib/library.ts';
+  import { link } from '../lib/router.svelte.ts';
   import StatusBar from '../lib/StatusBar.svelte';
+  import type { Mission } from '../../../shared/types.ts';
+
+  /** Each step's state: its label, and the tag colour it wears. */
+  const STATE = { 'not-started': 'Not started', started: 'In progress', done: 'Done' } as const;
+  const STATE_TONE = { 'not-started': '', started: 'shaky', done: 'solid' } as const;
 
   let { slug }: { slug: string } = $props();
 
@@ -14,23 +18,26 @@
   const steps = $derived(roadmap ? stepsOf(roadmap, feed.topics) : []);
   const next = $derived(steps.find((s) => s.state !== 'done') ?? null);
   const done = $derived(steps.filter((s) => s.state === 'done').length);
+  /** This roadmap's live missions (dropped ones left out). */
   const missions = $derived(feed.missionList.filter((m) => m.roadmap === slug && m.status !== 'dropped'));
-  const stepMissions = (topic: string) => missions.filter((m) => m.scope === 'step' && m.topic === topic);
   const capstone = $derived(missions.find((m) => m.scope === 'capstone') ?? null);
-  const STATE = { 'not-started': 'Not started', started: 'In progress', done: 'Done' } as const;
 
+  function stepMissions(topic: string): Mission[] {
+    return missions.filter((m) => m.scope === 'step' && m.topic === topic);
+  }
 </script>
 
 {#snippet missionLine(m: Mission)}
   <a class="mission-line" href={link.mission(m.id)}>
     <span class="praxis">Praxis</span>
     <span class="m-title">{m.title}</span>
-    <span class="tag {m.status === 'reviewed' ? 'solid' : m.status === 'debriefed' ? 'shaky' : 'cyan'}">{STATUS_LABEL[m.status]}</span>
+    <span class="tag {STATUS_TONE[m.status]}">{STATUS_LABEL[m.status]}</span>
   </a>
 {/snippet}
 
 <div class="page">
   {#if roadmap}
+    <!-- Header -->
     <header class="page-head">
       <nav class="crumbs"><a href={link.roadmaps()}>Library</a><span class="sep">/</span><span>Roadmap</span></nav>
       <h1 class="page-title">{roadmap.title}</h1>
@@ -51,13 +58,18 @@
     {#if roadmap.status === 'draft'}
       <section class="draft-note">
         <p class="kicker">Draft</p>
-        <p>Still being planned. Tell Claude what to change (the order, steps to add or drop, a goal that's off) and approve it when it's right. Nothing is taught until then.</p>
+        <p>
+          Still being planned. Tell Claude what to change (the order, steps to add or drop, a goal that's off) and approve it when it's
+          right. Nothing is taught until then.
+        </p>
       </section>
     {/if}
 
+    <!-- Steps, then the capstone -->
     <ol class="route-steps">
       {#each steps as s (s.index)}
         {@const isNext = roadmap.status === 'active' && s === next}
+        {@const own = stepMissions(s.slug)}
         <li class="route-item {s.state}" class:next={isNext}>
           <div class="rail-col" aria-hidden="true">
             <span class="node">{s.state === 'done' ? '✓' : s.index + 1}</span>
@@ -67,7 +79,7 @@
               <h2>
                 <a href={link.lesson(s.slug)}>{s.title}</a>
               </h2>
-              <span class="tag {s.state === 'done' ? 'solid' : s.state === 'started' ? 'shaky' : ''}">{STATE[s.state]}</span>
+              <span class="tag {STATE_TONE[s.state]}">{STATE[s.state]}</span>
             </div>
             <p class="step-goal">{s.goal}</p>
             {#if s.why}<p class="step-why">{s.why}</p>{/if}
@@ -82,11 +94,11 @@
                 {/each}
               </ul>
             {/if}
-            {#each stepMissions(s.slug) as m (m.id)}{@render missionLine(m)}{/each}
+            {#each own as m (m.id)}{@render missionLine(m)}{/each}
             <div class="step-actions">
               <a class={isNext ? 'primary small' : 'ghost small'} href={link.lesson(s.slug)}>Go</a>
               {#if s.topic}<a class="ghost small" href={link.topic(s.slug)}>Map</a>{/if}
-              {#if s.state === 'done' && stepMissions(s.slug).length === 0}
+              {#if s.state === 'done' && own.length === 0}
                 <button class="ghost small" onclick={() => actions.stepMission(roadmap, s.index)}>Get a Praxis mission</button>
               {/if}
             </div>
@@ -102,10 +114,15 @@
               {@render missionLine(capstone)}
             {:else}
               <p class="step-goal">
-                A bigger mission that uses the whole roadmap at once, in your own life. It opens once every step is done{done === steps.length ? '.' : `: ${steps.length - done} to go.`}
+                A bigger mission that uses the whole roadmap at once, in your own life. It opens once every step is done{done ===
+                steps.length
+                  ? '.'
+                  : `: ${steps.length - done} to go.`}
               </p>
               {#if done === steps.length}
-                <div class="step-actions"><button class="primary small" onclick={() => actions.capstone(roadmap)}>Design the capstone with Claude</button></div>
+                <div class="step-actions">
+                  <button class="primary small" onclick={() => actions.capstone(roadmap)}>Design the capstone with Claude</button>
+                </div>
               {/if}
             {/if}
           </div>
@@ -133,7 +150,7 @@
     margin-bottom: 40px;
     padding: 16px 20px;
     border-left: 3px solid var(--marker-solid);
-    background: var(--sheet-2);
+    background: var(--b1);
     border-radius: 0 var(--radius) var(--radius) 0;
   }
 
@@ -190,8 +207,8 @@
     height: 34px;
     margin-top: 2px;
     font: 500 0.87rem var(--sans);
-    color: var(--graphite);
-    background: var(--sheet);
+    color: var(--muted);
+    background: var(--b0);
     border: 1.5px dashed var(--unknown);
     border-radius: 50%;
   }
@@ -202,7 +219,7 @@
   }
 
   .done .node {
-    color: var(--sheet);
+    color: var(--b0);
     background: var(--solid);
     border: 1.5px solid var(--solid);
   }
@@ -237,7 +254,7 @@
   }
 
   h2 a {
-    color: var(--ink);
+    color: var(--fg);
     text-decoration: none;
   }
 
@@ -257,7 +274,7 @@
   .step-why {
     margin: 8px 0 0;
     font: 0.9rem/1.65 var(--sans);
-    color: var(--graphite);
+    color: var(--muted);
   }
 
   .step-progress {

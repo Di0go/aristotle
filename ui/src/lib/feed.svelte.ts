@@ -8,6 +8,7 @@ import {
   type PublicItem,
   type Roadmap,
   type Session,
+  type SessionSummary,
   type Topic,
 } from '../../../shared/types.ts';
 
@@ -32,7 +33,13 @@ class LiveFeed {
 
   /** The first question still waiting for the learner, if any. Once a session has ended, nothing is. */
   pending = $derived(this.session?.endedAt ? null : (this.items.find((i) => isInteractive(i) && !i.answeredAt) ?? null));
+  /** The topic of the lesson running right now, or null when none is. */
+  liveSlug = $derived(this.session && !this.session.endedAt ? this.session.topicSlug : null);
   currentTopic = $derived(this.session ? (this.topics[this.session.topicSlug] ?? null) : null);
+  /** Roadmaps, most recently changed first. */
+  roadmapList = $derived(Object.values(this.roadmaps ?? {}).sort((a, b) => b.updated.localeCompare(a.updated)));
+  /** Missions, newest first. */
+  missionList = $derived(Object.values(this.missions ?? {}).sort((a, b) => b.created.localeCompare(a.created)));
 
   private source: EventSource | null = null;
 
@@ -44,23 +51,31 @@ class LiveFeed {
     this.source.onmessage = (e) => this.apply(JSON.parse(e.data) as FeedEvent);
   }
 
-  private async reload() {
-    const state = (await (await fetch('/api/state')).json()) as FeedState;
-    this.session = state.session;
-    this.items = state.items;
-    this.connected = true;
-    const all = (await (await fetch('/api/map')).json()) as Topic[];
-    const roadmaps = (await (await fetch('/api/roadmaps')).json()) as Roadmap[];
-    const missions = (await (await fetch('/api/missions')).json()) as Mission[];
-    this.topics = Object.fromEntries(all.map((t) => [t.slug, t]));
-    this.roadmaps = Object.fromEntries(roadmaps.map((r) => [r.slug, r]));
-    this.missions = Object.fromEntries(missions.map((m) => [m.id, m]));
-    this.loaded = true;
-    this.topicVersion++;
+  /** Marks that something was asked of Claude, so Now can say so until the session starts. */
+  begin(label: string) {
+    this.starting = { label, at: Date.now(), after: this.session?.id ?? null };
   }
 
-  /** Missions, newest first. */
-  missionList = $derived(Object.values(this.missions ?? {}).sort((a, b) => b.created.localeCompare(a.created)));
+  async loadTopic(slug: string): Promise<Topic | null> {
+    const res = await fetch(`/api/topics/${encodeURIComponent(slug)}`);
+    if (!res.ok) return null;
+    const topic = (await res.json()) as Topic;
+    this.topics[slug] = topic;
+    return topic;
+  }
+
+  /** Sends his answer to a quiz or an ask. Returns an error message, or null. */
+  async answer(body: unknown): Promise<string | null> {
+    const res = await fetch('/api/answer', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    if (!res.ok) return (data as { error?: string }).error ?? 'Could not send the answer';
+    this.upsert(data as PublicItem);
+    return null;
+  }
 
   /** Sends his debrief, or drops or restores a mission. Returns an error message, or null. */
   async mission(id: string, body: { action: 'debrief'; text: string } | { action: 'drop' | 'restore' }): Promise<string | null> {
@@ -75,15 +90,26 @@ class LiveFeed {
     return null;
   }
 
-  /** Roadmaps, most recently changed first. */
-  roadmapList = $derived(Object.values(this.roadmaps ?? {}).sort((a, b) => b.updated.localeCompare(a.updated)));
+  /** Adds an item to the session, or replaces it in place when it is already there (an answered question). */
+  upsert(item: PublicItem) {
+    const i = this.items.findIndex((x) => x.id === item.id);
+    if (i === -1) this.items.push(item);
+    else this.items[i] = item;
+  }
 
-  async loadTopic(slug: string): Promise<Topic | null> {
-    const res = await fetch(`/api/topics/${encodeURIComponent(slug)}`);
-    if (!res.ok) return null;
-    const topic = (await res.json()) as Topic;
-    this.topics[slug] = topic;
-    return topic;
+  private async reload() {
+    const state = await getJson<FeedState>('/api/state');
+    this.session = state.session;
+    this.items = state.items;
+    this.connected = true;
+    const topics = await getJson<Topic[]>('/api/map');
+    const roadmaps = await getJson<Roadmap[]>('/api/roadmaps');
+    const missions = await getJson<Mission[]>('/api/missions');
+    this.topics = Object.fromEntries(topics.map((t) => [t.slug, t]));
+    this.roadmaps = Object.fromEntries(roadmaps.map((r) => [r.slug, r]));
+    this.missions = Object.fromEntries(missions.map((m) => [m.id, m]));
+    this.loaded = true;
+    this.topicVersion++;
   }
 
   private apply(event: FeedEvent) {
@@ -107,29 +133,15 @@ class LiveFeed {
       this.upsert(event.item);
     }
   }
-
-  /** Marks that something was asked of Claude, so Now can say so until the session starts. */
-  begin(label: string) {
-    this.starting = { label, at: Date.now(), after: this.session?.id ?? null };
-  }
-
-  upsert(item: PublicItem) {
-    const i = this.items.findIndex((x) => x.id === item.id);
-    if (i === -1) this.items.push(item);
-    else this.items[i] = item;
-  }
-
-  async answer(body: unknown): Promise<string | null> {
-    const res = await fetch('/api/answer', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-    const data = await res.json();
-    if (!res.ok) return (data as { error?: string }).error ?? 'Could not send the answer';
-    this.upsert(data as PublicItem);
-    return null;
-  }
 }
 
 export const feed = new LiveFeed();
+
+/** Summaries of every session on a topic, newest first. */
+export async function topicSessions(slug: string): Promise<SessionSummary[]> {
+  return (await getJson<SessionSummary[]>('/api/sessions')).filter((s) => s.topicSlug === slug);
+}
+
+async function getJson<T>(url: string): Promise<T> {
+  return (await (await fetch(url)).json()) as T;
+}

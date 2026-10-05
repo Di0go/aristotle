@@ -12,13 +12,15 @@ import './styles/lesson.css';
 import './styles/map.css';
 import './styles/charts.css';
 import { mount } from 'svelte';
+import App from './App.svelte';
 
-// After a rebuild, an open tab may ask for page chunks that no longer exist. Reload once to get the new build.
+// After a rebuild, an open tab may ask for page chunks that no longer exist. Reload once to get the new build;
+// the flag stops a reload loop if the chunk is still missing, and clears after ten seconds so a later rebuild can reload again.
 addEventListener('vite:preloadError', (e) => {
   e.preventDefault();
   try {
-    if (sessionStorage.getItem('mind-gym.reloaded') === '1') return;
-    sessionStorage.setItem('mind-gym.reloaded', '1');
+    if (sessionStorage.getItem('aristotle.reloaded') === '1') return;
+    sessionStorage.setItem('aristotle.reloaded', '1');
   } catch {
     // Reload anyway.
   }
@@ -26,11 +28,10 @@ addEventListener('vite:preloadError', (e) => {
 });
 setTimeout(() => {
   try {
-    sessionStorage.removeItem('mind-gym.reloaded');
+    sessionStorage.removeItem('aristotle.reloaded');
   } catch {
     // Not essential.
   }
 }, 10_000);
-import App from './App.svelte';
 
 mount(App, { target: document.getElementById('app')! });

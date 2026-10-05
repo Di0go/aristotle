@@ -1,5 +1,7 @@
 // The docs stay true: every doc is in the index, every link resolves, every command and setting is
 // documented, and code that changed since the last release came with a change to the docs that describe it.
+//
+//   pnpm test
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -10,10 +12,13 @@ import { undocumented, NO_DOCS } from '../scripts/doc-zones.ts';
 import { header, mappedFiles } from '../scripts/docs.ts';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
-const read = (rel: string) => readFileSync(path.join(ROOT, rel), 'utf8');
 const docs = readdirSync(path.join(ROOT, 'docs'))
   .filter((f) => f.endsWith('.md'))
   .map((f) => `docs/${f}`);
+
+const read = (rel: string) => readFileSync(path.join(ROOT, rel), 'utf8');
+
+/** Runs git in the repository; null when it fails (no such tag, not a repository). */
 const git = (...args: string[]) => {
   try {
     return execFileSync('git', args, { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();

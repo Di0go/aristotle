@@ -1,31 +1,34 @@
 <script lang="ts">
   // The live lesson: what Claude is showing and asking right now, with the composer and the lesson's bench.
-  import { placeFigures } from '../lib/explorables/index.ts';
-  import { setContext } from 'svelte';
-  import { tick } from 'svelte';
-  import { feed } from '../lib/feed.svelte.ts';
-  import { link } from '../lib/router.svelte.ts';
-  import { countsOf, placeOf } from '../lib/library.ts';
-  import FeedList from '../lib/FeedList.svelte';
-  import ReviewPanel from '../lib/ReviewPanel.svelte';
-  import LessonBench from '../lib/LessonBench.svelte';
-  import Composer from '../lib/Composer.svelte';
-  import Home from '../lib/Home.svelte';
-  import Grip from '../lib/Grip.svelte';
-  import LessonActivity from '../lib/LessonActivity.svelte';
+  import { setContext, tick } from 'svelte';
   import { actions } from '../lib/actions.ts';
   import { claude } from '../lib/claude.svelte.ts';
+  import { placeFigures } from '../lib/explorables/index.ts';
+  import { feed } from '../lib/feed.svelte.ts';
+  import { countsOf, placeOf } from '../lib/library.ts';
+  import { link } from '../lib/router.svelte.ts';
+  import Composer from '../lib/Composer.svelte';
+  import FeedList from '../lib/FeedList.svelte';
+  import Grip from '../lib/Grip.svelte';
+  import Home from '../lib/Home.svelte';
+  import LessonActivity from '../lib/LessonActivity.svelte';
+  import LessonBench from '../lib/LessonBench.svelte';
+  import ReviewPanel from '../lib/ReviewPanel.svelte';
+
+  const KIND = { learn: 'Lesson', review: 'Review', train: 'Training set' } as const;
 
   let benchOpen = $state(false);
   let stopHint = $state(false);
+  /** How many items the feed had last time we looked; plain, so reading it doesn't make the scroll effect depend on it. */
   let count = 0;
 
-  const live = $derived(Boolean(feed.session && !feed.session.endedAt));
+  const live = $derived(feed.liveSlug !== null);
   const topic = $derived(feed.currentTopic);
   const reviewing = $derived(feed.session?.kind === 'review');
   const place = $derived(topic ? placeOf(topic.slug, feed.roadmapList) : null);
   const counts = $derived(countsOf(topic ?? undefined));
-  const KIND = { learn: 'Lesson', review: 'Review', train: 'Training set' } as const;
+
+  setContext('topic-slug', () => feed.session?.topicSlug);
 
   // When Claude starts working at the end of the lesson, keep its activity card in view if he is near the bottom.
   $effect(() => {
@@ -52,7 +55,10 @@
     });
   });
 
-  setContext('topic-slug', () => feed.session?.topicSlug);
+  /** Asks Claude to wrap up; if Claude isn't running here, says where to tell it instead. */
+  function stop() {
+    if (!actions.stopForToday()) stopHint = true;
+  }
 </script>
 
 {#if live && feed.session}
@@ -74,19 +80,29 @@
           <h1 class="page-title">{reviewing ? 'Review' : feed.session.topic}</h1>
           <button
             class="ghost small stop"
-            onclick={() => (actions.stopForToday() ? null : (stopHint = true))}
+            onclick={stop}
             disabled={feed.wrapping}
             title="Claude updates your map and writes where to pick up next time"
-          >{feed.wrapping ? 'Wrapping up…' : 'Stop for today'}</button>
+            >{feed.wrapping ? 'Wrapping up…' : 'Stop for today'}</button
+          >
         </div>
-        {#if stopHint && !claude.running}<p class="stop-hint muted">Claude isn't running in Aristotle. If you're talking to it in your own terminal, tell it there to stop for today.</p>{/if}
+        {#if stopHint && !claude.running}<p class="stop-hint muted">
+            Claude isn't running in Aristotle. If you're talking to it in your own terminal, tell it there to stop for today.
+          </p>{/if}
         <dl class="props">
-          <dt>session</dt><dd>{KIND[feed.session.kind ?? 'learn']}: {feed.session.goal}</dd>
-          {#if place}<dt>roadmap</dt><dd><a href={link.roadmap(place.roadmap.slug)}>{place.roadmap.title}</a>, step {place.index + 1} of {place.roadmap.steps.length}</dd>{/if}
-          {#if topic && counts.total}<dt>progress</dt><dd>{counts.solid} of {counts.total} concepts solid</dd>{/if}
+          <dt>session</dt>
+          <dd>{KIND[feed.session.kind ?? 'learn']}: {feed.session.goal}</dd>
+          {#if place}<dt>roadmap</dt>
+            <dd>
+              <a href={link.roadmap(place.roadmap.slug)}>{place.roadmap.title}</a>, step {place.index + 1} of {place.roadmap.steps.length}
+            </dd>{/if}
+          {#if topic && counts.total}<dt>progress</dt>
+            <dd>{counts.solid} of {counts.total} concepts solid</dd>{/if}
         </dl>
         {#if topic || reviewing}
-          <button class="ghost small bench-toggle" onclick={() => (benchOpen = true)}>{reviewing ? 'The queue' : 'Outline and graph'}</button>
+          <button class="ghost small bench-toggle" onclick={() => (benchOpen = true)}
+            >{reviewing ? 'The queue' : 'Outline and graph'}</button
+          >
         {/if}
       </header>
 

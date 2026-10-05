@@ -1,7 +1,7 @@
 // Real images for lessons, from Wikimedia Commons, with their licences checked before Claude may use them.
 // find: search Commons and keep only files whose licence allows reuse (public domain, CC0, CC BY, CC BY-SA),
 // with the author and licence to credit. view: fetch one and draw a percentage grid over it, so markers
-// on a plate can be placed where the structures really are.
+// on a plate can be placed where the structures really are. rsvgConvert, shared with preview_svg, turns SVG into PNG.
 
 import { execFile } from 'node:child_process';
 
@@ -25,19 +25,24 @@ export interface FoundImage {
   credit: string;
 }
 
-interface Meta {
-  value?: string;
+/** The parts of a Commons search result read here. */
+interface Page {
+  title: string;
+  /** Rank in the search results. */
+  index?: number;
+  imageinfo?: ImageInfo[];
 }
 
-const strip = (html = '') =>
-  html
-    .replace(/<[^>]+>/g, '')
-    .replace(/&amp;/g, '&')
-    .replace(/&quot;/g, '"')
-    .replace(/&#0?39;/g, "'")
-    .replace(/&nbsp;/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
+interface ImageInfo {
+  thumburl?: string;
+  url?: string;
+  descriptionurl?: string;
+  thumbwidth?: number;
+  thumbheight?: number;
+  mime?: string;
+  /** Licence, author and restrictions, each as a snippet of HTML. */
+  extmetadata?: Record<string, { value?: string }>;
+}
 
 /** Licences an app may reuse with credit. NC/ND and anything unknown are refused. */
 export function allowed(license: string, restrictions = ''): boolean {
@@ -47,6 +52,7 @@ export function allowed(license: string, restrictions = ''): boolean {
   return /public domain|^pd\b|^pd-|cc0|cc[ -]by(?![ -]n)|cc[ -]by[ -]sa|attribution/.test(l);
 }
 
+/** Searches Commons and keeps the reusable files, in search order; `rejected` counts those refused for their licence. */
 export async function findImages(query: string, limit = 8): Promise<{ images: FoundImage[]; rejected: number }> {
   const params = new URLSearchParams({
     action: 'query',
@@ -62,24 +68,12 @@ export async function findImages(query: string, limit = 8): Promise<{ images: Fo
   });
   const res = await fetch(`${API}?${params}`, { headers: { 'User-Agent': UA } });
   if (!res.ok) throw new Error(`Wikimedia Commons answered ${res.status}`);
-  const data = (await res.json()) as {
-    query?: { pages?: Record<string, { title: string; index?: number; imageinfo?: Array<Record<string, unknown>> }> };
-  };
+  const data = (await res.json()) as { query?: { pages?: Record<string, Page> } };
   const pages = Object.values(data.query?.pages ?? {}).sort((a, b) => (a.index ?? 0) - (b.index ?? 0));
   const images: FoundImage[] = [];
   let rejected = 0;
   for (const p of pages) {
-    const info = p.imageinfo?.[0] as
-      | {
-          thumburl?: string;
-          url?: string;
-          descriptionurl?: string;
-          thumbwidth?: number;
-          thumbheight?: number;
-          mime?: string;
-          extmetadata?: Record<string, Meta>;
-        }
-      | undefined;
+    const info = p.imageinfo?.[0];
     if (!info || !/^image\/(jpeg|png|svg\+xml|gif|webp)$/.test(info.mime ?? '')) continue;
     const m = info.extmetadata ?? {};
     const license = strip(m.LicenseShortName?.value);
@@ -133,16 +127,28 @@ export async function viewImage(src: string, width = 0, height = 0): Promise<Buf
     <image width="100%" height="100%" preserveAspectRatio="none" xlink:href="data:${type};base64,${bytes.toString('base64')}"/>
     <g stroke="#ff2d55" stroke-opacity="0.55" stroke-width="1" fill="#ff2d55" font-family="sans-serif" font-size="12" font-weight="700">${lines.join('')}</g>
   </svg>`;
+  return rsvgConvert(svg, ['--format', 'png'], { maxBuffer: 40 * 1024 * 1024, timeout: 20_000 });
+}
+
+/** Pipes an SVG through rsvg-convert and resolves with what it prints; its stderr becomes the error. */
+export function rsvgConvert(svg: string, args: string[], limits: { maxBuffer: number; timeout: number }): Promise<Buffer> {
   return new Promise((resolve, reject) => {
-    const child = execFile(
-      'rsvg-convert',
-      ['--format', 'png'],
-      { encoding: 'buffer', maxBuffer: 40 * 1024 * 1024, timeout: 20_000 },
-      (err, stdout, stderr) => {
-        if (err) reject(new Error(String(stderr || err.message).trim()));
-        else resolve(stdout);
-      },
-    );
+    const child = execFile('rsvg-convert', args, { encoding: 'buffer', ...limits }, (err, stdout, stderr) => {
+      if (err) reject(new Error(String(stderr || err.message).trim()));
+      else resolve(stdout);
+    });
     child.stdin?.end(svg);
   });
+}
+
+/** Commons metadata comes as HTML: down to plain text. */
+function strip(html = ''): string {
+  return html
+    .replace(/<[^>]+>/g, '')
+    .replace(/&amp;/g, '&')
+    .replace(/&quot;/g, '"')
+    .replace(/&#0?39;/g, "'")
+    .replace(/&nbsp;/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 }

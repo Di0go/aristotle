@@ -4,10 +4,17 @@
   import { link } from './router.svelte.ts';
   import type { ReviewQueue } from '../../../shared/types.ts';
 
+  const MARK: Record<string, { mark: string; cls: string }> = {
+    right: { mark: '✓', cls: 'right' },
+    partial: { mark: '~', cls: 'partial' },
+    wrong: { mark: '✗', cls: 'wrong' },
+  };
+
   let { onclose }: { onclose: () => void } = $props();
 
   let queue = $state<ReviewQueue | null>(null);
 
+  // Refetch whenever a map changes (a review was just recorded) or the session changes.
   $effect(() => {
     void feed.topicVersion;
     void feed.session?.id;
@@ -15,12 +22,6 @@
       .then((r) => r.json())
       .then((q: ReviewQueue) => (queue = q));
   });
-
-  const MARK: Record<string, { mark: string; cls: string }> = {
-    right: { mark: '✓', cls: 'right' },
-    partial: { mark: '~', cls: 'partial' },
-    wrong: { mark: '✗', cls: 'wrong' },
-  };
 </script>
 
 <button class="close bench-close" onclick={onclose} aria-label="Close">×</button>
@@ -31,7 +32,9 @@
       <ul class="plan">
         {#each queue.practised as p (p.topic + p.id)}
           <li>
-            <a href={link.topic(p.topic, p.id)}><span class="mark {MARK[p.result]?.cls ?? 'neutral'}">{MARK[p.result]?.mark ?? '·'}</span><span>{p.label}</span></a>
+            <a href={link.topic(p.topic, p.id)}
+              ><span class="mark {MARK[p.result]?.cls ?? 'neutral'}">{MARK[p.result]?.mark ?? '·'}</span><span>{p.label}</span></a
+            >
           </li>
         {/each}
       </ul>

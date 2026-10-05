@@ -1,22 +1,26 @@
 <script lang="ts">
   // Praxis: what he learned, put to work. Missions waiting for a review first, then the ones to do, then the
   // closed ones; above them, the finished steps and roadmaps that are ready for a mission.
-  import { feed } from '../lib/feed.svelte.ts';
-  import { link } from '../lib/router.svelte.ts';
   import { actions } from '../lib/actions.ts';
+  import { feed } from '../lib/feed.svelte.ts';
   import { ago } from '../lib/format.ts';
-  import { missionsDue, missionSource, SCOPE_LABEL, VERDICT_LABEL } from '../lib/library.ts';
+  import { missionSource, missionsDue, SCOPE_LABEL, VERDICT_LABEL, VERDICT_TONE } from '../lib/library.ts';
+  import { link } from '../lib/router.svelte.ts';
   import type { Mission, MissionStatus } from '../../../shared/types.ts';
-
-  const missions = $derived(feed.missionList);
-  const due = $derived(missionsDue(feed.roadmapList, feed.topics, missions));
-  const by = (status: MissionStatus) => missions.filter((m) => m.status === status);
 
   const SECTIONS = [
     { status: 'debriefed', title: 'Waiting for review', note: 'You reported back. Ask Claude to look at it.' },
     { status: 'open', title: 'To do', note: 'Out there, not in here. Come back with a debrief.' },
     { status: 'reviewed', title: 'Done', note: '' },
   ] as const;
+
+  const missions = $derived(feed.missionList);
+  const due = $derived(missionsDue(feed.roadmapList, feed.topics, missions));
+  const dropped = $derived(by('dropped'));
+
+  function by(status: MissionStatus): Mission[] {
+    return missions.filter((m) => m.status === status);
+  }
 </script>
 
 {#snippet row(m: Mission)}
@@ -24,11 +28,13 @@
     <a href={link.mission(m.id)}>
       <span class="m-title">{m.title}</span>
       <span class="m-meta">
-        <span>{SCOPE_LABEL[m.scope]}</span><span class="sep">·</span><span>{m.arena}</span><span class="sep">·</span><span class="src">{missionSource(m, feed.roadmaps ?? {}, feed.topics)}</span>
+        <span>{SCOPE_LABEL[m.scope]}</span><span class="sep">·</span><span>{m.arena}</span><span class="sep">·</span><span class="src"
+          >{missionSource(m, feed.roadmaps ?? {}, feed.topics)}</span
+        >
       </span>
     </a>
     <span class="m-side">
-      {#if m.review}<span class="tag {m.review.verdict === 'achieved' ? 'solid' : m.review.verdict === 'partly' ? 'shaky' : ''}">{VERDICT_LABEL[m.review.verdict]}</span>{/if}
+      {#if m.review}<span class="tag {VERDICT_TONE[m.review.verdict]}">{VERDICT_LABEL[m.review.verdict]}</span>{/if}
       <span class="muted when">{ago(m.updated)}</span>
     </span>
   </li>
@@ -38,8 +44,8 @@
   <header class="page-head">
     <h1 class="page-title">Praxis</h1>
     <p class="page-lede">
-      What you understand, put to work. Each finished step gets a mission in your own projects, your training or your days (or anywhere, when
-      nothing of yours fits), and each roadmap ends with a bigger one. Do it out there, then write what happened.
+      What you understand, put to work. Each finished step gets a mission in your own projects, your training or your days (or anywhere,
+      when nothing of yours fits), and each roadmap ends with a bigger one. Do it out there, then write what happened.
     </p>
   </header>
 
@@ -50,9 +56,15 @@
         {#each due as d (`${d.roadmap.slug}:${d.index}`)}
           <li>
             <span class="due-what">
-              {#if d.index === null}<span class="tag cyan">Capstone</span> {d.roadmap.title}{:else}<span class="muted">{d.roadmap.title} · step {d.index + 1}</span> {d.title}{/if}
+              {#if d.index === null}<span class="tag cyan">Capstone</span> {d.roadmap.title}{:else}<span class="muted"
+                  >{d.roadmap.title} · step {d.index + 1}</span
+                >
+                {d.title}{/if}
             </span>
-            <button class="ghost small" onclick={() => (d.index === null ? actions.capstone(d.roadmap) : actions.stepMission(d.roadmap, d.index!))}>
+            <button
+              class="ghost small"
+              onclick={() => (d.index === null ? actions.capstone(d.roadmap) : actions.stepMission(d.roadmap, d.index!))}
+            >
               Design it with Claude
             </button>
           </li>
@@ -67,8 +79,8 @@
     <div class="empty-state">
       <h2>No missions yet</h2>
       <p>
-        When every goal concept of a roadmap step is solid, it shows up above, ready for a mission. You can also ask for one at any time: open Claude and
-        type <code>/praxis</code> with a topic.
+        When every goal concept of a roadmap step is solid, it shows up above, ready for a mission. You can also ask for one at any time:
+        open Claude and type <code>/praxis</code> with a topic.
       </p>
     </div>
   {:else}
@@ -84,11 +96,11 @@
         </section>
       {/if}
     {/each}
-    {#if by('dropped').length}
+    {#if dropped.length}
       <details class="group">
-        <summary class="muted">Dropped ({by('dropped').length})</summary>
+        <summary class="muted">Dropped ({dropped.length})</summary>
         <ul class="missions">
-          {#each by('dropped') as m (m.id)}{@render row(m)}{/each}
+          {#each dropped as m (m.id)}{@render row(m)}{/each}
         </ul>
       </details>
     {/if}

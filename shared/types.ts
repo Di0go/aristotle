@@ -1,4 +1,30 @@
-// Types shared by the server and the interface.
+// Types shared by the server and the interface: the records kept in data/ and what the API sends and accepts.
+
+// Sessions and their feed: what Claude shows and asks, and what he answers.
+
+/** learn: a lesson on one topic; review: fading concepts across topics; train: problems on one topic. */
+export type SessionKind = 'learn' | 'review' | 'train';
+
+export interface Session {
+  id: string;
+  kind?: SessionKind;
+  /** The topic's title ("Review" for a review session). */
+  topic: string;
+  /** Empty for a review session, which spans topics. */
+  topicSlug: string;
+  goal: string;
+  startedAt: string;
+  endedAt?: string;
+}
+
+/** What a session leaves for the next one ("done for now"). */
+export interface Handoff {
+  at: string;
+  session: string;
+  locked: string;
+  shaky: string;
+  next: string;
+}
 
 export type BlockKind = 'orient' | 'step' | 'plan' | 'summary' | 'feedback' | 'note';
 export type AskKind = 'problem' | 'explain' | 'recall' | 'open';
@@ -66,28 +92,54 @@ export interface MapItem extends ItemBase {
 export type Item = BlockItem | QuizItem | AskItem | MapItem;
 export type InteractiveItem = QuizItem | AskItem;
 
+/** Quizzes and asks: the items he answers. */
 export function isInteractive<T extends { type: string }>(item: T): item is T & { type: 'quiz' | 'ask' } {
   return item.type === 'quiz' || item.type === 'ask';
 }
 
-/** learn: a lesson on one topic; review: fading concepts across topics; train: problems on one topic. */
-export type SessionKind = 'learn' | 'review' | 'train';
+/** An unanswered quiz reaches the interface without its answer key. */
+export type PublicQuestion = Omit<QuizQuestion, 'correct' | 'explanation'> & Partial<Pick<QuizQuestion, 'correct' | 'explanation'>>;
+export type PublicQuizItem = Omit<QuizItem, 'questions'> & { questions: PublicQuestion[] };
+export type PublicItem = BlockItem | PublicQuizItem | AskItem | MapItem;
 
-export interface Session {
-  id: string;
-  kind?: SessionKind;
-  /** The topic's title ("Review" for a review session). */
-  topic: string;
-  /** Empty for a review session, which spans topics. */
-  topicSlug: string;
-  goal: string;
-  startedAt: string;
-  endedAt?: string;
+export interface FeedState {
+  session: Session | null;
+  items: PublicItem[];
 }
+
+/** What the live feed (/api/events) sends: a change to the session, or to any stored record. */
+export type FeedEvent =
+  | { type: 'session'; session: Session }
+  | { type: 'item'; item: PublicItem }
+  | { type: 'topic'; topic: Topic }
+  | { type: 'roadmap'; roadmap: Roadmap }
+  | { type: 'mission'; mission: Mission };
 
 // Knowledge maps
 
 export type ConceptStatus = 'unknown' | 'shaky' | 'solid';
+
+export interface Concept {
+  /** Kebab-case, unique within the topic. */
+  id: string;
+  label: string;
+  /** One line: what it is. */
+  summary?: string;
+  status: ConceptStatus;
+  /** Prerequisites: ids in this topic, or "other-topic/id". */
+  deps: string[];
+  /** One of the things the topic is aiming at. */
+  goal?: boolean;
+  /** Something to watch, such as a misconception. */
+  note?: string;
+  firstSeen: string;
+  updated: string;
+  /** When it last became solid. */
+  solidSince?: string;
+  /** Spaced-review schedule, from the first time it became solid. */
+  review?: ReviewState;
+  evidence: Evidence[];
+}
 
 export interface Evidence {
   at: string;
@@ -116,40 +168,9 @@ export interface ReviewState {
   last?: string;
 }
 
-export interface Concept {
-  /** Kebab-case, unique within the topic. */
-  id: string;
-  label: string;
-  /** One line: what it is. */
-  summary?: string;
-  status: ConceptStatus;
-  /** Prerequisites: ids in this topic, or "other-topic/id". */
-  deps: string[];
-  /** One of the things the topic is aiming at. */
-  goal?: boolean;
-  /** Something to watch, such as a misconception. */
-  note?: string;
-  firstSeen: string;
-  updated: string;
-  /** When it last became solid. */
-  solidSince?: string;
-  /** Spaced-review schedule, from the first time it became solid. */
-  review?: ReviewState;
-  evidence: Evidence[];
-}
-
 /** Solid, but due for review. */
 export function isFading(concept: Pick<Concept, 'status' | 'review'>, now = Date.now()): boolean {
   return concept.status === 'solid' && Boolean(concept.review) && Date.parse(concept.review!.due) <= now;
-}
-
-/** What a session leaves for the next one ("done for now"). */
-export interface Handoff {
-  at: string;
-  session: string;
-  locked: string;
-  shaky: string;
-  next: string;
 }
 
 export interface Topic {
@@ -165,6 +186,15 @@ export interface Topic {
   sessions: string[];
   /** Difficulty of training problems, 1-10, raised as he solves them. */
   training?: { level: number; updated: string };
+}
+
+export interface MapChange {
+  id: string;
+  label: string;
+  from?: ConceptStatus;
+  to?: ConceptStatus;
+  added?: boolean;
+  removed?: boolean;
 }
 
 // Roadmaps: an ordered path of topics, planned with him before any of them is taught.
@@ -194,6 +224,7 @@ export interface Roadmap {
 /** not-started: no topic yet; started: a topic with a map; done: every goal concept on its map is solid. */
 export type StepState = 'not-started' | 'started' | 'done';
 
+/** A roadmap step's state, read off its topic's map. */
 export function stepState(topic: Pick<Topic, 'concepts'> | undefined): StepState {
   if (!topic) return 'not-started';
   const goals = topic.concepts.filter((c) => c.goal);
@@ -232,14 +263,7 @@ export interface Mission {
   review?: { at: string; verdict: MissionVerdict; markdown: string };
 }
 
-export interface MapChange {
-  id: string;
-  label: string;
-  from?: ConceptStatus;
-  to?: ConceptStatus;
-  added?: boolean;
-  removed?: boolean;
-}
+// What the API returns and accepts beyond the stored records
 
 export interface TopicSummary {
   slug: string;
@@ -304,26 +328,16 @@ export interface Progress {
   training: { topic: string; title: string; level: number }[];
 }
 
-/** An unanswered quiz reaches the interface without its answer key. */
-export type PublicQuestion = Omit<QuizQuestion, 'correct' | 'explanation'> & Partial<Pick<QuizQuestion, 'correct' | 'explanation'>>;
-export type PublicQuizItem = Omit<QuizItem, 'questions'> & { questions: PublicQuestion[] };
-export type PublicItem = BlockItem | PublicQuizItem | AskItem | MapItem;
-
-export interface FeedState {
-  session: Session | null;
-  items: PublicItem[];
-}
-
-export type FeedEvent =
-  | { type: 'session'; session: Session }
-  | { type: 'item'; item: PublicItem }
-  | { type: 'topic'; topic: Topic }
-  | { type: 'roadmap'; roadmap: Roadmap }
-  | { type: 'mission'; mission: Mission };
-
+/** POST /api/answer for a quiz: one pick per question. */
 export interface QuizAnswerBody {
   id: string;
   picks: { choice: number | null; note?: string }[];
+}
+
+/** POST /api/answer for an open question. */
+export interface AskAnswerBody {
+  id: string;
+  text: string;
 }
 
 export type SearchKind = 'roadmap' | 'step' | 'topic' | 'concept' | 'mission' | 'session';
@@ -335,13 +349,10 @@ export interface SearchHit {
   context?: string;
   /** Text around the first match. */
   snippet?: string;
-  /** Roadmap, topic or session id, and mission id. */
+  /** Roadmap, topic or session id. */
   slug?: string;
+  /** Concept id, with the topic in `slug`. */
   concept?: string;
+  /** Mission id. */
   id?: string;
-}
-
-export interface AskAnswerBody {
-  id: string;
-  text: string;
 }

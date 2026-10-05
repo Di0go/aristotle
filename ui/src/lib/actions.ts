@@ -7,20 +7,6 @@ import { feed } from './feed.svelte.ts';
 import { link } from './router.svelte.ts';
 import type { Roadmap } from '../../../shared/types.ts';
 
-const oneLine = (s: string) => s.replace(/\s+/g, ' ').trim();
-
-/** Lessons, reviews and training open a session, so they move to Now. Planning a roadmap is a conversation:
- * it stays on the page (where the draft appears) and opens Claude beside it. */
-function go(command: string, initial: string, label: string, converse = false) {
-  claude.run(command, initial);
-  if (converse) {
-    claude.toggle(true);
-    return;
-  }
-  feed.begin(label);
-  if (location.hash !== link.now() && location.hash !== '') location.hash = link.now();
-}
-
 export const actions = {
   /** Ask Claude to wrap up: the map, then the handoff. Typed in even while it works (Claude Code queues it). */
   stopForToday(): boolean {
@@ -93,3 +79,21 @@ export const actions = {
     );
   },
 };
+
+/**
+ * Lessons, reviews and training open a session, so they move to Now. Planning a roadmap or a mission is a
+ * conversation: it stays on the page (where the draft appears) and opens Claude beside it.
+ */
+function go(command: string, initial: string, label: string, converse = false) {
+  claude.run(command, initial);
+  if (converse) {
+    claude.toggle(true);
+    return;
+  }
+  feed.begin(label);
+  if (location.hash !== link.now() && location.hash !== '') location.hash = link.now();
+}
+
+function oneLine(s: string): string {
+  return s.replace(/\s+/g, ' ').trim();
+}

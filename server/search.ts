@@ -2,10 +2,7 @@
 // and the text of every session (steps, questions and his answers). Words match anywhere, in any order,
 // ignoring case and accents; matches in a title rank above matches in the body.
 
-import { stat } from 'node:fs/promises';
-import path from 'node:path';
-import { SESSIONS_DIR } from './config.ts';
-import { readSession, sessionFiles } from './feed.ts';
+import { SessionCache, type SessionRecord } from './feed.ts';
 import type { Gym } from './gym.ts';
 import type { SearchHit } from '../shared/types.ts';
 
@@ -17,55 +14,32 @@ interface Doc {
   at: string;
 }
 
+/** Lower case without accents, so "Café" matches "cafe". */
 const fold = (s: string) => s.normalize('NFKD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
-/** Markdown down to the words: no fences, LaTeX delimiters, links, tags or markup characters. */
-function plain(md: string): string {
-  return md
-    .replace(/```[a-z]*\s*\{[\s\S]*?```/g, ' ') // kit and explorable blocks are JSON
-    .replace(/<svg[\s\S]*?<\/svg>/g, ' ')
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1')
-    .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
-    .replace(/\[\[([^\]|]+)\|?([^\]]*)\]\]/g, (_, a, b) => b || a)
-    .replace(/\{\{([^}|]+)\|[^}]*\}\}/g, '$1')
-    .replace(/^>\s*\[![a-z]+\]/gm, '')
-    .replace(/[*_`#>=~$\\]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-/** Text around the first matching word, with an ellipsis where it was cut. */
-function snippet(text: string, words: string[]): string | undefined {
-  if (!text) return undefined;
-  const folded = fold(text);
-  const at = Math.min(...words.map((w) => folded.indexOf(w)).filter((i) => i >= 0));
-  if (!Number.isFinite(at)) return text.length > 140 ? `${text.slice(0, 140)}…` : text;
-  const start = Math.max(0, at - 50);
-  const end = Math.min(text.length, at + 110);
-  return `${start > 0 ? '…' : ''}${text.slice(start, end).trim()}${end < text.length ? '…' : ''}`;
-}
-
 export class Search {
-  private sessions = new Map<string, { mtime: number; docs: Doc[] }>();
+  private sessions = new SessionCache((record, id) => indexSession(id, record));
   private gym: Gym;
 
   constructor(gym: Gym) {
     this.gym = gym;
   }
 
+  /** Hits containing every word of `q`, best first: title starts, then word starts, then anywhere. */
   async query(q: string, limit = 40): Promise<SearchHit[]> {
     const words = fold(q).split(/\s+/).filter(Boolean);
     if (words.length === 0) return [];
     const scored: { doc: Doc; score: number }[] = [];
-    for (const doc of [...this.library(), ...(await this.sessionDocs())]) {
+    const library = this.library();
+    const sessionDocs = (await this.sessions.values()).flat();
+    for (const doc of [...library, ...sessionDocs]) {
       const title = fold(doc.title);
       const all = `${title} ${fold(doc.body)}`;
       if (!words.every((w) => all.includes(w))) continue;
       let score = 0;
       for (const w of words) {
         if (title.startsWith(w)) score += 4;
-        else if (new RegExp(`\\b${w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`).test(title)) score += 3;
+        else if (new RegExp(`\\b${escapeRegExp(w)}`).test(title)) score += 3;
         else if (title.includes(w)) score += 2;
       }
       // The places themselves before what was said in sessions.
@@ -125,41 +99,59 @@ export class Search {
     }
     return docs;
   }
-
-  /** One document per step, question and answer in every session log, cached by modification time. */
-  private async sessionDocs(): Promise<Doc[]> {
-    const out: Doc[] = [];
-    for (const name of await sessionFiles()) {
-      const file = path.join(SESSIONS_DIR, name);
-      const mtime = (await stat(file)).mtimeMs;
-      let cached = this.sessions.get(file);
-      if (!cached || cached.mtime !== mtime) {
-        cached = { mtime, docs: indexSession(name.replace(/\.jsonl$/, ''), await readSession(file)) };
-        this.sessions.set(file, cached);
-      }
-      out.push(...cached.docs);
-    }
-    return out;
-  }
 }
 
-function indexSession(id: string, record: Awaited<ReturnType<typeof readSession>>): Doc[] {
+/** One document per step, question, quiz and handoff in a session. */
+function indexSession(id: string, record: SessionRecord): Doc[] {
   const s = record.session;
   if (!s) return [];
   const context = `${s.topic} · ${s.startedAt.slice(0, 10)}`;
   const doc = (title: string, body: string, at: string): Doc => ({ hit: { kind: 'session', title, slug: id, context }, title, body, at });
   const docs: Doc[] = [];
   for (const item of record.items) {
-    if (item.type === 'block') docs.push(doc(item.title ?? s.goal, plain(item.markdown), item.at));
-    else if (item.type === 'ask')
-      docs.push(doc(item.kind === 'problem' ? 'Problem' : 'Question', plain(`${item.prompt} ${item.response ?? ''}`), item.at));
-    // An unanswered quiz keeps its answers hidden here too.
-    else if (item.type === 'quiz')
-      docs.push(
-        doc('Quiz', plain(item.questions.map((q) => (item.answeredAt ? `${q.question} ${q.explanation}` : q.question)).join(' ')), item.at),
-      );
+    if (item.type === 'block') {
+      docs.push(doc(item.title ?? s.goal, plain(item.markdown), item.at));
+    } else if (item.type === 'ask') {
+      const title = item.kind === 'problem' ? 'Problem' : 'Question';
+      docs.push(doc(title, plain(`${item.prompt} ${item.response ?? ''}`), item.at));
+    } else if (item.type === 'quiz') {
+      // An unanswered quiz keeps its answers hidden here too.
+      const text = item.questions.map((q) => (item.answeredAt ? `${q.question} ${q.explanation}` : q.question)).join(' ');
+      docs.push(doc('Quiz', plain(text), item.at));
+    }
   }
-  if (record.handoff)
-    docs.push(doc('Done for now', `${record.handoff.locked} ${record.handoff.shaky} ${record.handoff.next}`, record.handoff.at));
+  const h = record.handoff;
+  if (h) docs.push(doc('Done for now', `${h.locked} ${h.shaky} ${h.next}`, h.at));
   return docs;
+}
+
+/** Markdown down to the words: no fences, LaTeX delimiters, links, tags or markup characters. */
+function plain(md: string): string {
+  return md
+    .replace(/```[a-z]*\s*\{[\s\S]*?```/g, ' ') // kit and explorable blocks are JSON
+    .replace(/<svg[\s\S]*?<\/svg>/g, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
+    .replace(/\[\[([^\]|]+)\|?([^\]]*)\]\]/g, (_, a, b) => b || a)
+    .replace(/\{\{([^}|]+)\|[^}]*\}\}/g, '$1')
+    .replace(/^>\s*\[![a-z]+\]/gm, '')
+    .replace(/[*_`#>=~$\\]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/** Text around the first matching word, with an ellipsis where it was cut. */
+function snippet(text: string, words: string[]): string | undefined {
+  if (!text) return undefined;
+  const folded = fold(text);
+  const at = Math.min(...words.map((w) => folded.indexOf(w)).filter((i) => i >= 0));
+  if (!Number.isFinite(at)) return text.length > 140 ? `${text.slice(0, 140)}…` : text;
+  const start = Math.max(0, at - 50);
+  const end = Math.min(text.length, at + 110);
+  return `${start > 0 ? '…' : ''}${text.slice(start, end).trim()}${end < text.length ? '…' : ''}`;
+}
+
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }

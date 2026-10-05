@@ -6,7 +6,19 @@
     "useIgnoreFile": true
   },
   "files": {
-    "includes": ["server/**", "shared/**", "scripts/**", "tests/**", "ui/src/**/*.ts", "*.ts", "*.js", "*.json", "!data", "!dist"]
+    "includes": [
+      "server/**",
+      "shared/**",
+      "scripts/**",
+      "tests/**",
+      "ui/src/**/*.ts",
+      "ui/src/**/*.css",
+      "*.ts",
+      "*.js",
+      "*.json",
+      "!data",
+      "!dist"
+    ]
   },
   "formatter": {
     "enabled": true,
@@ -32,12 +44,22 @@
     "rules": {
       "preset": "recommended",
       "style": {
-        "noNonNullAssertion": "off"
+        "noNonNullAssertion": "off",
+        "noDescendingSpecificity": "off"
       },
       "suspicious": {
         "noControlCharactersInRegex": "off",
         "noAssignInExpressions": "off"
+      },
+      "complexity": {
+        "noImportantStyles": "off"
       }
+    }
+  },
+  "css": {
+    "formatter": {
+      "enabled": true,
+      "quoteStyle": "single"
     }
   }
 }

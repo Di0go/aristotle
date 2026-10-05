@@ -2,4 +2,5 @@
 # All the gates before anything leaves this machine: docs, lint, types, the end-to-end tests and the build.
 # It is the same list CI runs (.github/workflows/ci.yml) and `pnpm release` runs.
 set -eu
+
 pnpm gates

@@ -17,6 +17,7 @@ NODE=$(command -v node)
 UNIT_DIR="$HOME/.config/systemd/user"
 mkdir -p "$UNIT_DIR"
 
+# Pass the data and state folders on to the service when they are set (pnpm release sets them).
 EXTRA_ENV=""
 for var in ARISTOTLE_DATA_DIR ARISTOTLE_STATE_DIR; do
   if [[ -n "${!var:-}" ]]; then EXTRA_ENV+="Environment=$var=${!var}"$'\n'; fi
@@ -49,6 +50,7 @@ if ! systemctl --user is-enabled --quiet aristotle.service; then
   "$NODE" "$ROOT/server/control.ts" stop || true
 fi
 
+# Load the unit and (re)start it, then say what is running.
 systemctl --user daemon-reload
 systemctl --user enable aristotle.service
 systemctl --user restart aristotle.service

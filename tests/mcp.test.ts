@@ -1,4 +1,8 @@
 // End-to-end: a real server, a real MCP client in Claude Code's place, and HTTP calls in the interface's place.
+// The server runs on its own port with a throwaway data folder and certificate, so it never touches the live
+// app or the dev instance.
+//
+//   pnpm test
 
 import { after, before, test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -28,33 +32,11 @@ import type {
 const PORT = 4799;
 const TLS_PORT = 4798;
 const BASE = `http://localhost:${PORT}`;
+
 let server: ChildProcess;
 let dataDir: string;
 let tlsDir: string;
 let client: Client;
-
-async function startServer() {
-  server = spawn('node', ['server/index.ts'], {
-    env: {
-      ...process.env,
-      ARISTOTLE_PORT: String(PORT),
-      ARISTOTLE_DATA_DIR: dataDir,
-      ARISTOTLE_TLS_DIR: tlsDir,
-      ARISTOTLE_TLS_PORT: String(TLS_PORT),
-      ARISTOTLE_WAIT_MS: '1500',
-      ARISTOTLE_CLAUDE_CMD: 'bash --norc --noprofile',
-      PS1: '$ ',
-    },
-    stdio: 'inherit',
-  });
-  for (let i = 0; i < 50; i++) {
-    try {
-      if ((await fetch(`${BASE}/api/health`)).ok) return;
-    } catch {}
-    await new Promise((r) => setTimeout(r, 100));
-  }
-  throw new Error('Server did not start');
-}
 
 before(async () => {
   dataDir = await mkdtemp(path.join(tmpdir(), 'aristotle-test-'));
@@ -74,6 +56,40 @@ after(async () => {
   await rm(tlsDir, { recursive: true, force: true });
 });
 
+// The server.
+
+async function startServer() {
+  server = spawn('node', ['server/index.ts'], {
+    env: {
+      ...process.env,
+      ARISTOTLE_PORT: String(PORT),
+      ARISTOTLE_DATA_DIR: dataDir,
+      ARISTOTLE_TLS_DIR: tlsDir,
+      ARISTOTLE_TLS_PORT: String(TLS_PORT),
+      ARISTOTLE_WAIT_MS: '1500',
+      // A plain shell in Claude Code's place, so the terminal tests can type into it.
+      ARISTOTLE_CLAUDE_CMD: 'bash --norc --noprofile',
+      PS1: '$ ',
+    },
+    stdio: 'inherit',
+  });
+  for (let i = 0; i < 50; i++) {
+    try {
+      if ((await fetch(`${BASE}/api/health`)).ok) return;
+    } catch {}
+    await sleep(100);
+  }
+  throw new Error('Server did not start');
+}
+
+async function restart() {
+  server.kill();
+  await new Promise((r) => server.once('exit', r));
+  await startServer();
+}
+
+// Claude Code's side (MCP) and the interface's side (HTTP).
+
 type ToolResult = Awaited<ReturnType<Client['callTool']>>;
 const textOf = (result: ToolResult) => (result.content as { text: string }[]).map((c) => c.text).join('\n');
 const call = (name: string, args: Record<string, unknown> = {}) => client.callTool({ name, arguments: args });
@@ -83,7 +99,7 @@ async function waitForPending(type: 'quiz' | 'ask'): Promise<PublicItem> {
   for (let i = 0; i < 50; i++) {
     const item = (await get<FeedState>('/api/state')).items.find((x) => x.type === type && !x.answeredAt);
     if (item) return item;
-    await new Promise((r) => setTimeout(r, 50));
+    await sleep(50);
   }
   throw new Error(`No pending ${type}`);
 }
@@ -95,6 +111,58 @@ async function answer(body: unknown) {
     body: JSON.stringify(body),
   });
 }
+
+// The terminal drawer's WebSocket, and the clean name over http and https.
+
+type TerminalMessage = { type: string; data?: string; running?: boolean };
+
+function openTerminal(origin?: string): Promise<{ ws: WebSocket; messages: TerminalMessage[] }> {
+  return new Promise((resolve, reject) => {
+    const ws = new WebSocket(`ws://localhost:${PORT}/api/terminal`, origin ? { origin } : {});
+    const messages: TerminalMessage[] = [];
+    ws.on('message', (raw) => messages.push(JSON.parse(String(raw))));
+    ws.on('open', () => resolve({ ws, messages }));
+    ws.on('error', reject);
+  });
+}
+
+/** Everything the terminal has printed so far, as one string. */
+const terminalOutput = (messages: TerminalMessage[]) =>
+  messages
+    .filter((m) => m.type === 'output')
+    .map((m) => m.data)
+    .join('');
+
+/** A request to aristotle.test, the way the browser makes it once nftables has forwarded it to the server. */
+function requestName(secure: boolean, route: string, ca?: Buffer): Promise<{ status: number; location?: string; body: string }> {
+  return new Promise((resolve, reject) => {
+    const options = { host: '127.0.0.1', port: secure ? TLS_PORT : PORT, path: route, headers: { host: 'aristotle.test' } };
+    const req = secure ? https.get({ ...options, servername: 'aristotle.test', ca }) : http.get(options);
+    req.on('response', (res) => {
+      let body = '';
+      res.on('data', (chunk) => (body += chunk));
+      res.on('end', () => resolve({ status: res.statusCode!, location: res.headers.location, body }));
+    });
+    req.on('error', reject);
+  });
+}
+
+// Waiting.
+
+function sleep(ms: number) {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+/** Waits until `check` holds, or fails after `ms`. */
+async function until(check: () => boolean, ms = 5000) {
+  const end = Date.now() + ms;
+  while (!check()) {
+    if (Date.now() > end) throw new Error('Timed out');
+    await sleep(30);
+  }
+}
+
+// The tests run in order and share one server and one data folder: later ones build on what earlier ones made.
 
 test('lists the tools', async () => {
   const { tools } = await client.listTools();
@@ -253,12 +321,6 @@ test('rejects requests from other sites', async () => {
   assert.equal(res.status, 403);
 });
 
-async function restart() {
-  server.kill();
-  await new Promise((r) => server.once('exit', r));
-  await startServer();
-}
-
 test('a restarted server keeps the session and the map', async () => {
   await restart();
   const s = await get<FeedState>('/api/state');
@@ -362,24 +424,6 @@ test('a concept past its review date is fading, and a review session practises i
   assert.equal(progress.fading.length, 0);
 });
 
-function openTerminal(origin?: string): Promise<{ ws: WebSocket; messages: { type: string; data?: string; running?: boolean }[] }> {
-  return new Promise((resolve, reject) => {
-    const ws = new WebSocket(`ws://localhost:${PORT}/api/terminal`, origin ? { origin } : {});
-    const messages: { type: string; data?: string; running?: boolean }[] = [];
-    ws.on('message', (raw) => messages.push(JSON.parse(String(raw))));
-    ws.on('open', () => resolve({ ws, messages }));
-    ws.on('error', reject);
-  });
-}
-
-async function until(check: () => boolean, ms = 5000) {
-  const end = Date.now() + ms;
-  while (!check()) {
-    if (Date.now() > end) throw new Error('Timed out');
-    await new Promise((r) => setTimeout(r, 30));
-  }
-}
-
 test('the terminal runs the command, takes messages, and only opens to Aristotle itself', async () => {
   await assert.rejects(openTerminal(), /403/, 'no Origin');
   await assert.rejects(openTerminal('https://example.com'), /403/, 'another site');
@@ -393,11 +437,7 @@ test('the terminal runs the command, takes messages, and only opens to Aristotle
   await until(() => messages.some((m) => m.type === 'state' && m.running));
 
   ws.send(JSON.stringify({ type: 'send', text: 'echo gym-$((40+2)) $COLUMNS' }));
-  const output = () =>
-    messages
-      .filter((m) => m.type === 'output')
-      .map((m) => m.data)
-      .join('');
+  const output = () => terminalOutput(messages);
   await until(() => /gym-42 120/.test(output()));
 
   // A second window catches up on what is already on screen.
@@ -428,11 +468,7 @@ test('preview_svg renders an SVG to a PNG in either theme', async () => {
 test('run starts the command with the request as its first message, or types it in when running', async () => {
   const { ws, messages } = await openTerminal(BASE);
   await until(() => messages.some((m) => m.type === 'state'));
-  const output = () =>
-    messages
-      .filter((m) => m.type === 'output')
-      .map((m) => m.data)
-      .join('');
+  const output = () => terminalOutput(messages);
 
   // Not running: the request becomes an argument. Bash takes it as a script path, which shows it arrived intact.
   ws.send(
@@ -453,20 +489,6 @@ test('run starts the command with the request as its first message, or types it 
   ws.send(JSON.stringify({ type: 'stop' }));
   ws.close();
 });
-
-/** A request to aristotle.test, the way the browser makes it once nftables has forwarded it to the server. */
-function requestName(secure: boolean, route: string, ca?: Buffer): Promise<{ status: number; location?: string; body: string }> {
-  return new Promise((resolve, reject) => {
-    const options = { host: '127.0.0.1', port: secure ? TLS_PORT : PORT, path: route, headers: { host: 'aristotle.test' } };
-    const req = secure ? https.get({ ...options, servername: 'aristotle.test', ca }) : http.get(options);
-    req.on('response', (res) => {
-      let body = '';
-      res.on('data', (chunk) => (body += chunk));
-      res.on('end', () => resolve({ status: res.statusCode!, location: res.headers.location, body }));
-    });
-    req.on('error', reject);
-  });
-}
 
 test('aristotle.test is served over https with its own certificate, and its pages move there from http', async () => {
   const ca = await readFile(path.join(tlsDir, 'ca.crt'));
@@ -518,14 +540,14 @@ test('a roadmap orders topics and reads its progress off their maps', async () =
       title: 'Geometry path',
       goal: 'Read Maxwell in forms',
       status: 'active',
-      steps: steps.reverse(),
+      steps: [...steps].reverse(),
     }),
   );
   assert.match(revised, /Roadmap updated/);
-  const after = await get<Roadmap>('/api/roadmaps/geometry-path');
-  assert.equal(after.status, 'active');
-  assert.equal(after.created, roadmap.created);
-  assert.equal(after.steps[0].topic, 'stokes-theorem');
+  const updated = await get<Roadmap>('/api/roadmaps/geometry-path');
+  assert.equal(updated.status, 'active');
+  assert.equal(updated.created, roadmap.created);
+  assert.equal(updated.steps[0].topic, 'stokes-theorem');
   assert.equal((await call('save_roadmap', { roadmap: 'nope', title: 'X', goal: 'Y', steps })).isError, true);
 
   // A lesson on a step learns where it sits on the path.

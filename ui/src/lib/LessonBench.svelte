@@ -1,12 +1,12 @@
 <script lang="ts">
   // The right sidebar beside a lesson: where it sits on the roadmap, the concept being taught, the plan as
   // an outline, and the local graph around the concept. The answer to "what are we doing, and why now?".
-  import type { Topic } from '../../../shared/types.ts';
   import { feed } from './feed.svelte.ts';
+  import { countsOf, markOf, outline, placeOf, splitRef, stepsOf } from './library.ts';
   import { link } from './router.svelte.ts';
-  import { countsOf, markOf, outline, placeOf, stepsOf } from './library.ts';
-  import StatusBar from './StatusBar.svelte';
   import LocalGraph from './LocalGraph.svelte';
+  import StatusBar from './StatusBar.svelte';
+  import type { Topic } from '../../../shared/types.ts';
 
   let { topic, onclose }: { topic: Topic; onclose?: () => void } = $props();
 
@@ -16,6 +16,16 @@
   const counts = $derived(countsOf(topic));
   const focus = $derived(topic.concepts.find((c) => c.id === topic.focus) ?? null);
   const byId = $derived(new Map(topic.concepts.map((c) => [c.id, c])));
+
+  /** A prerequisite as "topic/id": bare ids are in this topic, borrowed ones already say where they are from. */
+  function qualified(dep: string): string {
+    return dep.includes('/') ? dep : `${topic.slug}/${dep}`;
+  }
+
+  function depHref(dep: string): string {
+    const { topic: slug = topic.slug, concept: id } = splitRef(dep);
+    return link.topic(slug, id);
+  }
 </script>
 
 <div class="bench-inner">
@@ -33,7 +43,7 @@
           Builds on
           {#each focus.deps as d, i (d)}
             {@const dep = byId.get(d)}
-            {#if i}{', '}{/if}<a href={d.includes('/') ? link.topic(d.split('/')[0], d.split('/')[1]) : link.topic(topic.slug, d)} data-concept={d.includes('/') ? d : `${topic.slug}/${d}`}>{dep?.label ?? d.split('/').at(-1)}</a>
+            {#if i}{', '}{/if}<a href={depHref(d)} data-concept={qualified(d)}>{dep?.label ?? d.split('/').at(-1)}</a>
           {/each}
         </p>
       {/if}
@@ -60,7 +70,7 @@
           </li>
         {/each}
       </ol>
-      <StatusBar counts={counts} fading={counts.fading} />
+      <StatusBar {counts} fading={counts.fading} />
     </section>
   {/if}
 
