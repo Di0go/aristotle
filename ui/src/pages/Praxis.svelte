@@ -42,10 +42,10 @@
 
 <div class="page">
   <header class="page-head">
-    <h1 class="page-title">Praxis</h1>
+    <h1 class="page-title">Missions</h1>
     <p class="page-lede">
-      What you understand, put to work. Each finished step gets a mission in your own projects, your training or your days (or anywhere,
-      when nothing of yours fits), and each roadmap ends with a bigger one. Do it out there, then write what happened.
+      What you understand, put to work. Each finished class gets a mission in your own projects, your training or your days (or anywhere,
+      when nothing of yours fits), and each course ends with a bigger one. Do it out there, then write what happened.
     </p>
   </header>
 
@@ -79,8 +79,8 @@
     <div class="empty-state">
       <h2>No missions yet</h2>
       <p>
-        When every goal concept of a roadmap step is solid, it shows up above, ready for a mission. You can also ask for one at any time:
-        open Claude and type <code>/praxis</code> with a topic.
+        When every goal concept of a class is solid, it shows up above, ready for a mission. You can also ask for one at any time: open
+        Claude and type <code>/praxis</code> with a topic.
       </p>
     </div>
   {:else}

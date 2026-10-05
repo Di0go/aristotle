@@ -28,7 +28,7 @@ export const actions = {
   learn(topic: string, goal = '') {
     const what = oneLine(topic);
     const want = oneLine(goal) ? `. What I want from it: ${oneLine(goal)}` : '';
-    go(`/teach ${what}${want}`, `Use the teach skill to teach me: ${what}${want}`, `A lesson on ${what}`);
+    go(`/teach ${what}${want}`, `Use the teach skill to teach me: ${what}${want}`, `A class on ${what}`);
   },
   /** A step's topic is named after the step, so the lesson must use the title exactly. */
   startStep(roadmap: Roadmap, index: number, said = '') {
@@ -46,10 +46,10 @@ export const actions = {
   planRoadmap(area: string, goal = '') {
     const what = oneLine(area);
     const want = oneLine(goal) ? `. What I want from it: ${oneLine(goal)}` : '';
-    go(`/roadmap ${what}${want}`, `Use the roadmap skill to plan a roadmap with me: ${what}${want}`, `Planning a roadmap: ${what}`, true);
+    go(`/roadmap ${what}${want}`, `Use the roadmap skill to plan a roadmap with me: ${what}${want}`, `Planning a course: ${what}`, true);
   },
   editRoadmap(slug: string) {
-    go(`/roadmap change ${slug}`, `Use the roadmap skill: I want to change my roadmap ${slug}.`, 'Changing the roadmap', true);
+    go(`/roadmap change ${slug}`, `Use the roadmap skill: I want to change my roadmap ${slug}.`, 'Changing the course', true);
   },
   /** Continue a topic's lesson; what he typed, if anything, goes along as his first words. */
   continueTopic(slug: string, said = '') {
@@ -83,7 +83,7 @@ export const actions = {
     );
   },
   topicMission(slug: string) {
-    go(`/praxis topic ${slug}`, `Use the praxis skill: design a mission for the topic ${slug}.`, 'A Praxis mission', true);
+    go(`/praxis topic ${slug}`, `Use the praxis skill: design a mission for the topic ${slug}.`, 'A mission', true);
   },
   capstone(roadmap: Roadmap) {
     go(

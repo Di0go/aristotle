@@ -379,3 +379,41 @@ body.resizing {
   text-align: left;
   cursor: pointer;
 }
+
+/* Focus mode (focus.svelte.ts): only the page, nothing around it. */
+html.focus .app {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+html.focus .ribbon-col,
+html.focus .rail,
+html.focus .scrim,
+html.focus .stage > .tabbar,
+html.focus .mobile-bar,
+html.focus .status-col,
+html.focus .bench,
+html.focus .bench-toggle {
+  display: none;
+}
+
+html.focus .stage {
+  padding-bottom: var(--drawer-space);
+}
+
+html.focus .lesson.with-bench {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.focus-exit {
+  position: fixed;
+  z-index: 40;
+  top: 12px;
+  right: 16px;
+  opacity: 0.55;
+  transition: opacity 0.15s;
+}
+
+.focus-exit:hover,
+.focus-exit:focus-visible {
+  opacity: 1;
+}

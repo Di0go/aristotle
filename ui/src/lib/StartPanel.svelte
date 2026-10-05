@@ -24,7 +24,7 @@
 </script>
 
 <form class="start-form" onsubmit={start}>
-  <label class="start-label" for="new-topic">One topic, straight away</label>
+  <label class="start-label" for="new-topic">One class, straight away</label>
   <input
     id="new-topic"
     class="field big"
@@ -41,9 +41,9 @@
     aria-label="What you want from it"></textarea>
   <div class="start-row">
     <span class="muted">
-      {claude.running ? 'Claude switches to it.' : 'Starts Claude here.'} For a whole field, <a href={link.roadmaps()}>plan a roadmap</a> instead.
+      {claude.running ? 'Claude switches to it.' : 'Starts Claude here.'} For a whole field, <a href={link.roadmaps()}>plan a course</a> instead.
     </span>
-    <button class="primary" type="submit">Start the lesson</button>
+    <button class="primary" type="submit">Start the class</button>
   </div>
 </form>
 

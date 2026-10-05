@@ -9,6 +9,7 @@ data/
 ├── roadmaps/<slug>.json      one file per roadmap
 ├── missions/<id>.json        one file per Praxis mission
 ├── glosses.json              the phrases he asked to have explained, with their glosses
+├── asides.json               his questions on passages of a lesson, with Claude's answers
 └── profile.md                what the tutor has learned about how he learns (written by the skills)
 ```
 
@@ -50,6 +51,10 @@ Quiz items keep the right answers and explanations; the interface only receives 
 ## Glosses
 
 `glosses.json` is an array of `Gloss`: a phrase he selected and asked to have explained (from the context menu), the explanation Claude Code wrote, the passage and topic it came from, an optional `image` (a Wikimedia Commons rendition with its page and credit), and when. One per phrase: its `id` is the phrase as a slug, so asking again, in any case, returns the same gloss. Forgetting one removes it from the file. The whole file is rewritten atomically on every change ([`glosses.ts`](../server/glosses.ts)); `get_topic` lists a topic's glosses for the tutor, as gaps he noticed himself.
+
+## Questions on a passage
+
+`asides.json` is an array of `Aside`: a question he asked about a passage he selected ("Ask about this"), the passage, Claude Code's answer, the topic, and the feed item the passage was in (so the step's page can show it), with when. Rewritten whole and atomically on every change ([`asides.ts`](../server/asides.ts)); `get_topic` lists a topic's questions for the tutor.
 
 ## Backup
 

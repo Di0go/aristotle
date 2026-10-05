@@ -25,6 +25,7 @@ import type {
   Roadmap,
   SearchHit,
   SessionSummary,
+  Aside,
   Gloss,
   Topic,
   TopicSummary,
@@ -71,7 +72,7 @@ async function startServer() {
       // A plain shell in Claude Code's place, so the terminal tests can type into it.
       ARISTOTLE_CLAUDE_CMD: 'bash --norc --noprofile',
       // cat in Claude Code's place for glosses: the gloss is the request it was sent.
-      ARISTOTLE_GLOSS_CMD: 'cat',
+      ARISTOTLE_ONESHOT_CMD: 'cat',
       ARISTOTLE_GLOSS_IMAGES: 'off',
       PS1: '$ ',
     },
@@ -721,4 +722,33 @@ test('a step without hover cards reminds Claude to write them', async () => {
   assert.match(textOf(await call('show', { markdown: 'Plain words only.', kind: 'step' })), /no hover cards/);
   assert.equal(textOf(await call('show', { markdown: 'A {{form|a field of covectors}}.', kind: 'step' })), 'Shown.');
   assert.equal(textOf(await call('show', { markdown: 'Builds on [[covector]].', kind: 'step' })), 'Shown.');
+});
+
+test('a question on a passage is answered with its paragraph, kept with its step, and shown to the tutor', async () => {
+  const post = (body: unknown) =>
+    fetch(`${BASE}/api/asides`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  await call('start_session', { topic: 'Asked topic', goal: 'Read a step' });
+  await call('show', { kind: 'step', title: 'The pacemaker', markdown: 'It fires at about 100 a minute, varying a lot by person.' });
+  const step = (await get<FeedState>('/api/state')).items.at(-1)!;
+  const res = await post({
+    passage: 'varying a lot by person',
+    question: 'Why does it vary?',
+    context: 'It fires at about 100 a minute, varying a lot by person.',
+    topic: 'asked-topic',
+    item: step.id,
+  });
+  assert.equal(res.status, 200);
+  const aside = (await res.json()) as Aside;
+  assert.equal(aside.item, step.id);
+  // The request Claude Code got: the class, the step, the paragraph, the words and the question.
+  assert.match(aside.answer, /Lesson: Asked topic/);
+  assert.match(aside.answer, /Step: The pacemaker/);
+  assert.match(aside.answer, /The paragraph it is in: "It fires at about 100/);
+  assert.match(aside.answer, /His question: Why does it vary\?/);
+  assert.equal((await get<Aside[]>('/api/asides')).length, 1);
+  assert.match(textOf(await call('get_topic', { topic: 'asked-topic' })), /questions he asked on passages[\s\S]*"Why does it vary\?"/i);
+
+  assert.equal((await post({ passage: 'x', question: '  ' })).status, 400);
+  assert.equal((await fetch(`${BASE}/api/asides/${aside.id}`, { method: 'DELETE' })).status, 200);
+  assert.deepEqual(await get<Aside[]>('/api/asides'), []);
 });

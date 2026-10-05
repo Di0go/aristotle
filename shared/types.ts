@@ -115,7 +115,9 @@ export type FeedEvent =
   | { type: 'roadmap'; roadmap: Roadmap }
   | { type: 'mission'; mission: Mission }
   /** Every gloss, after one is added or removed. */
-  | { type: 'glosses'; glosses: Gloss[] };
+  | { type: 'glosses'; glosses: Gloss[] }
+  /** Every question he asked on a passage, after one is added or removed. */
+  | { type: 'asides'; asides: Aside[] };
 
 // Knowledge maps
 
@@ -396,4 +398,34 @@ export interface GlossBody {
   text: string;
   context?: string;
   topic?: string;
+}
+
+// Questions on a passage
+
+/**
+ * A question he asked about a passage of a lesson ("Ask about this"), answered by Claude Code on the spot, beside
+ * the step, without interrupting the class. Kept with the step it was asked on.
+ */
+export interface Aside {
+  id: string;
+  /** The topic he was reading, by slug. */
+  topic?: string;
+  /** The feed item (a step, a check, feedback) the passage is in, so the step's page can show it. */
+  item?: string;
+  /** The text he selected. */
+  passage: string;
+  question: string;
+  /** Claude's answer, Markdown. */
+  answer: string;
+  at: string;
+}
+
+/** POST /api/asides. */
+export interface AsideBody {
+  passage: string;
+  question: string;
+  /** The paragraph the passage is in, so a few selected words are read in their sense. */
+  context?: string;
+  topic?: string;
+  item?: string;
 }

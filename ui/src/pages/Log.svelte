@@ -52,7 +52,6 @@
                 <span class="what">
                   <strong>{s.kind === 'train' ? `Training: ${s.topic}` : s.topic}</strong>
                   <span>{s.goal}</span>
-                  {#if s.handoff}<span class="muted">Next: {s.handoff.next}</span>{/if}
                 </span>
                 <span class="stats muted">{sessionStats(s, 'log')}</span>
               </a>
@@ -111,15 +110,6 @@
   .what strong {
     font-weight: 560;
     font-size: 0.9rem;
-  }
-
-  .what .muted {
-    display: -webkit-box;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
-    line-clamp: 2;
-    overflow: hidden;
-    font-size: 0.91rem;
   }
 
   .stats {

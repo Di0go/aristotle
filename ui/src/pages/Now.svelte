@@ -24,6 +24,8 @@
   let count = 0;
 
   const live = $derived(feed.liveSlug !== null);
+  /** A review or a training set running now: the only sessions shown here (a lesson is in its class). */
+  const running = $derived(live && feed.session !== null && feed.session.kind !== 'learn');
   const topic = $derived(feed.currentTopic);
   const reviewing = $derived(feed.session?.kind === 'review');
   const place = $derived(topic ? placeOf(topic.slug, feed.roadmapList) : null);
@@ -33,14 +35,14 @@
 
   // When Claude starts working at the end of the lesson, keep its activity card in view if he is near the bottom.
   $effect(() => {
-    if (!claude.busy && !feed.wrapping) return;
+    if (!running || (!claude.busy && !feed.wrapping)) return;
     const nearBottom = window.innerHeight + window.scrollY >= document.body.scrollHeight - 500;
     if (nearBottom && !feed.pending) void tick().then(() => window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }));
   });
 
   // Follow the lesson as it grows, unless he has scrolled back up to reread.
   $effect(() => {
-    const n = feed.items.length;
+    const n = running ? feed.items.length : 0;
     if (n <= count) {
       count = n;
       return;
@@ -62,7 +64,7 @@
   }
 </script>
 
-{#if live && feed.session && feed.session.kind !== 'learn'}
+{#if running && feed.session}
   <div class="lesson" class:with-bench={topic || reviewing}>
     <div class="lesson-main">
       <header class="lesson-head">
@@ -70,9 +72,9 @@
           {#if place}
             <a href={link.roadmap(place.roadmap.slug)}>{place.roadmap.title}</a>
             <span class="sep">/</span>
-            <a href={link.topic(feed.session.topicSlug)}>{place.index + 1} · {feed.session.topic}</a>
+            <a href={link.lesson(feed.session.topicSlug)}>{place.index + 1} · {feed.session.topic}</a>
           {:else if !reviewing}
-            <a href={link.topic(feed.session.topicSlug)}>{feed.session.topic}</a>
+            <a href={link.lesson(feed.session.topicSlug)}>{feed.session.topic}</a>
           {:else}
             <span>Review</span>
           {/if}

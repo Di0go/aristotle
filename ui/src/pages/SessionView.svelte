@@ -43,7 +43,7 @@
         <a href={link.log()}>Log</a><span class="sep">/</span><span>{when}</span>
       </nav>
       <h1 class="page-title">
-        {#if record.session.topicSlug}<a class="title-link" href={link.topic(record.session.topicSlug)}>{record.session.topic}</a
+        {#if record.session.topicSlug}<a class="title-link" href={link.lesson(record.session.topicSlug)}>{record.session.topic}</a
           >{:else}{record.session.topic}{/if}
       </h1>
       <p class="page-lede">{record.session.goal}</p>

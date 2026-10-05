@@ -1,5 +1,6 @@
 <script lang="ts">
-  // One roadmap as a route: steps in order down a line, each with its goal, why it sits there, and its progress.
+  // One course (a roadmap, in the data) as a route: its classes in order down a line, each with its goal, why it sits
+  // there, and its progress.
   import { actions } from '../lib/actions.ts';
   import { feed } from '../lib/feed.svelte.ts';
   import { ago } from '../lib/format.ts';
@@ -29,7 +30,7 @@
 
 {#snippet missionLine(m: Mission)}
   <a class="mission-line" href={link.mission(m.id)}>
-    <span class="praxis">Praxis</span>
+    <span class="praxis">Mission</span>
     <span class="m-title">{m.title}</span>
     <span class="tag {STATUS_TONE[m.status]}">{STATUS_LABEL[m.status]}</span>
   </a>
@@ -39,19 +40,19 @@
   {#if roadmap}
     <!-- Header -->
     <header class="page-head">
-      <nav class="crumbs"><a href={link.roadmaps()}>Library</a><span class="sep">/</span><span>Roadmap</span></nav>
+      <nav class="crumbs"><a href={link.roadmaps()}>Library</a><span class="sep">/</span><span>Course</span></nav>
       <h1 class="page-title">{roadmap.title}</h1>
       <p class="page-lede">{roadmap.goal}</p>
       <div class="head-actions">
         {#if roadmap.status === 'draft'}
           <button class="primary" onclick={() => actions.editRoadmap(slug)}>Keep planning with Claude</button>
         {:else if next}
-          <a class="primary" href={link.lesson(next.slug)}>Go to step {next.index + 1}: {next.title}</a>
-          <button class="ghost" onclick={() => actions.editRoadmap(slug)}>Change the roadmap</button>
+          <a class="primary" href={link.lesson(next.slug)}>Go to class {next.index + 1}: {next.title}</a>
+          <button class="ghost" onclick={() => actions.editRoadmap(slug)}>Change the course</button>
         {:else}
-          <button class="ghost" onclick={() => actions.editRoadmap(slug)}>Change the roadmap</button>
+          <button class="ghost" onclick={() => actions.editRoadmap(slug)}>Change the course</button>
         {/if}
-        <span class="muted progress-note">{done} of {steps.length} steps done. Changed {ago(roadmap.updated)}.</span>
+        <span class="muted progress-note">{done} of {steps.length} classes done. Changed {ago(roadmap.updated)}.</span>
       </div>
     </header>
 
@@ -59,7 +60,7 @@
       <section class="draft-note">
         <p class="kicker">Draft</p>
         <p>
-          Still being planned. Tell Claude what to change (the order, steps to add or drop, a goal that's off) and approve it when it's
+          Still being planned. Tell Claude what to change (the order, classes to add or drop, a goal that's off) and approve it when it's
           right. Nothing is taught until then.
         </p>
       </section>
@@ -99,7 +100,7 @@
               <a class={isNext ? 'primary small' : 'ghost small'} href={link.lesson(s.slug)}>Go</a>
               {#if s.topic}<a class="ghost small" href={link.topic(s.slug)}>Map</a>{/if}
               {#if s.state === 'done' && own.length === 0}
-                <button class="ghost small" onclick={() => actions.stepMission(roadmap, s.index)}>Get a Praxis mission</button>
+                <button class="ghost small" onclick={() => actions.stepMission(roadmap, s.index)}>Plan a mission</button>
               {/if}
             </div>
           </div>
@@ -114,7 +115,7 @@
               {@render missionLine(capstone)}
             {:else}
               <p class="step-goal">
-                A bigger mission that uses the whole roadmap at once, in your own life. It opens once every step is done{done ===
+                A bigger mission that uses the whole course at once, in your own life. It opens once every class is done{done ===
                 steps.length
                   ? '.'
                   : `: ${steps.length - done} to go.`}
@@ -131,7 +132,7 @@
     </ol>
   {:else if feed.roadmaps}
     <div class="empty-state">
-      <h2>No such roadmap</h2>
+      <h2>No such course</h2>
       <p><a href={link.roadmaps()}>Back to the library</a></p>
     </div>
   {:else}

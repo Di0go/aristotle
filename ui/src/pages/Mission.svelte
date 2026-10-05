@@ -64,7 +64,7 @@
   {#if mission}
     <header class="page-head">
       <nav class="crumbs">
-        <a href={link.praxis()}>Praxis</a><span class="sep">/</span>
+        <a href={link.praxis()}>Missions</a><span class="sep">/</span>
         {#if roadmap}
           <a href={link.roadmap(roadmap.slug)}>{roadmap.title}</a><span class="sep">/</span>
         {/if}
@@ -152,7 +152,7 @@
   {:else if feed.missions}
     <div class="empty-state">
       <h2>No such mission</h2>
-      <p><a href={link.praxis()}>Back to Praxis</a></p>
+      <p><a href={link.praxis()}>Back to missions</a></p>
     </div>
   {:else}
     <p class="muted">Loading…</p>

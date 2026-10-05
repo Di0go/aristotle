@@ -57,7 +57,7 @@
       case 'step':
         return `${topicTitle(r.slug)}: ${r.number ? `step ${r.number}` : 'intro'}`;
       case 'praxis':
-        return 'Praxis';
+        return 'Missions';
       case 'mission':
         return feed.missions?.[r.id]?.title ?? 'Mission';
       case 'session': {

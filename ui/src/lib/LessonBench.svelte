@@ -81,7 +81,7 @@
         {#each steps as s (s.index)}
           <li class="route-step {s.state}" class:here={s.index === place.index}>
             <i class="dot {s.state}"></i>
-            <a href={link.topic(s.slug)}>{s.title}</a>
+            <a href={link.lesson(s.slug)}>{s.title}</a>
           </li>
         {/each}
       </ol>
@@ -89,7 +89,7 @@
   {/if}
 
   <section class="bench-section">
-    <h3 class="bench-title">What this topic is for</h3>
+    <h3 class="bench-title">What this class is for</h3>
     <p class="bench-goal">{topic.goal}</p>
   </section>
 </div>

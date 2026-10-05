@@ -30,7 +30,7 @@ A plain Node HTTP server, run directly as TypeScript (Node's type stripping: onl
 - **MCP** is stateless: a fresh `McpServer` per request on the Streamable HTTP transport, so restarting the server never strands Claude Code.
 - **The interface** is the built `dist/ui`, served with long caching for hashed assets.
 - **The terminal**: [`terminal.ts`](../server/terminal.ts) runs `claude` in a pseudo-terminal (node-pty) in the app's folder and streams it over a WebSocket to the drawer. The interface starts it when Aristotle opens; messages sent before it has drawn its screen and gone quiet are held and typed in then.
-- **Glosses**: [`glosses.ts`](../server/glosses.ts) explains a phrase he selected by running `claude -p` on his own login, headless and locked down: no tools, no MCP servers, no settings or hooks, no saved session, in a neutral folder. The request (phrase, topic, passage) goes on stdin; what it prints is the gloss. Sonnet by default (`ARISTOTLE_GLOSS_MODEL`); about five seconds. It is also handed up to five licence-checked pictures from Wikimedia Commons ([`images.ts`](../server/images.ts)), by title and description, and names one on a last `IMAGE: n` line only when the phrase is visual and a candidate clearly shows it (`ARISTOTLE_GLOSS_IMAGES=off` turns this off).
+- **Glosses and questions on a passage**: [`oneshot.ts`](../server/oneshot.ts) runs `claude -p` on his own login, headless and locked down: no tools, no MCP servers, no settings or hooks, no saved session, in a neutral folder. The request goes on stdin; what it prints is the answer. Sonnet by default (`ARISTOTLE_ONESHOT_MODEL`); five to fifteen seconds. [`glosses.ts`](../server/glosses.ts) explains a phrase (phrase, topic, passage); it is also handed up to five licence-checked pictures from Wikimedia Commons ([`images.ts`](../server/images.ts)), by title and description, and names one on a last `IMAGE: n` line only when the phrase is visual and a candidate clearly shows it (`ARISTOTLE_GLOSS_IMAGES=off` turns this off). [`asides.ts`](../server/asides.ts) answers his question on a passage, with the paragraph, the step's title and the topic.
 - **Backup**: [`backup.ts`](../server/backup.ts) commits `data/` (its own Git repository) after quiet periods and pushes if it has a remote.
 
 ### Security model
@@ -41,7 +41,7 @@ The server is for one person on one machine, but a browser runs other people's p
 - every request must carry an allowed **Host** (`localhost`, `127.0.0.1` or the clean name, on a known port), which stops DNS rebinding;
 - any request with an **Origin** must come from the app's own pages, which stops other sites posting answers;
 - the **terminal WebSocket** runs Claude Code, so it demands an Origin, and an allowed one, always;
-- **glossing** runs Claude Code too, but with no tools at all, so the phrase and passage it is sent can only shape the text it prints back;
+- **glossing and questions on a passage** run Claude Code too, but with no tools at all, so what they are sent can only shape the text it prints back;
 - the certificate authority for `aristotle.test` is limited to that name (`nameConstraints`), so trusting it cannot vouch for anything else.
 
 ## The interface
@@ -74,7 +74,7 @@ The method is in `.claude/`: skills Claude follows and subagents it calls. See [
 | Tool | What it does |
 |---|---|
 | `list_topics` | List every topic the learner has studied, with how much of each map is solid and where the last session left off. |
-| `get_topic` | Read a topic's knowledge map (every concept, its status, prerequisites, notes and check record), the last handoff, recent sessions, and the phrases he asked Aristotle to explain while reading it. |
+| `get_topic` | Read a topic's knowledge map (every concept, its status, prerequisites, notes and check record), the last handoff, recent sessions, and the phrases he asked Aristotle to explain and the questions he asked on passages while reading it. |
 | `list_roadmaps` | List his roadmaps: ordered paths of topics planned with him, with how far along each one is. |
 | `get_roadmap` | Read a roadmap: its goal, and every step in order with its goal, why it comes there, and the state of the step's topic. |
 | `save_roadmap` | Create a roadmap, or replace the steps of an existing one (pass its slug as `roadmap`): reordering, adding and dropping steps all go through here. |
@@ -116,6 +116,9 @@ Only for the interface (and the tests); Claude Code uses MCP.
 | `GET` | `/api/glosses` |
 | `POST` | `/api/glosses` |
 | `DELETE` | `/api/glosses/…` |
+| `GET` | `/api/asides` |
+| `POST` | `/api/asides` |
+| `DELETE` | `/api/asides/…` |
 | `GET` | `/api/sessions` |
 | `GET` | `/api/sessions/…` |
 | `GET` | `/api/progress` |
@@ -133,17 +136,19 @@ Only for the interface (and the tests); Claude Code uses MCP.
 
 | File | What it is |
 |---|---|
+| [`asides.ts`](../server/asides.ts) | His questions on a passage ("Ask about this"): asked beside a step, answered by Claude Code on his own login (oneshot.ts) without interrupting the class, and kept with the step. |
 | [`backup.ts`](../server/backup.ts) | Versions data/ in its own Git repository, kept apart from the code so his learning history never lands in the app's repo. |
 | [`bridge.ts`](../server/bridge.ts) | Claude Code starts this over stdio (see .mcp.json). |
 | [`config.ts`](../server/config.ts) | Every setting the server reads, in one place. |
 | [`control.ts`](../server/control.ts) | Start, stop and check the Aristotle server. |
 | [`feed.ts`](../server/feed.ts) | The live session: what the interface shows under "Now", and the session log on disk. |
-| [`glosses.ts`](../server/glosses.ts) | Glosses: phrases he selected because he didn't know them, each with a short explanation written by Claude Code on his own login (`claude -p`, no tools). |
+| [`glosses.ts`](../server/glosses.ts) | Glosses: phrases he selected because he didn't know them, each with a short explanation written by Claude Code on his own login (oneshot.ts). |
 | [`gym.ts`](../server/gym.ts) | Ties the live feed to the knowledge maps: answers become evidence on concepts, map changes show up in the feed, practice moves review schedules and training levels, and data/ is backed up. |
 | [`images.ts`](../server/images.ts) | Real images for lessons, from Wikimedia Commons, with their licences checked before Claude may use them. |
 | [`index.ts`](../server/index.ts) | The Aristotle server: the interface, its live feed, and the MCP endpoint Claude Code connects to. |
 | [`mcp.ts`](../server/mcp.ts) | The tools Claude Code uses to teach through the interface: one MCP server per request (server/index.ts), over the stores in Gym. |
 | [`missions.ts`](../server/missions.ts) | Praxis missions: one JSON file per mission in data/missions/. |
+| [`oneshot.ts`](../server/oneshot.ts) | One question to Claude Code, answered in a few seconds and forgotten: `claude -p` on his own login, headless and locked down (no tools, no MCP servers, no settings or hooks, no saved session, run from a neutral folder). |
 | [`reviews.ts`](../server/reviews.ts) | Spaced review of concepts with FSRS: every solid concept carries a review card; when its due date passes, the concept is "fading" until he practises it again. |
 | [`roadmaps.ts`](../server/roadmaps.ts) | Roadmaps: one JSON file per roadmap in data/roadmaps/. |
 | [`search.ts`](../server/search.ts) | Search across everything he has: roadmaps and their steps, topics and their concepts, Praxis missions, and the text of every session (steps, questions and his answers). |
@@ -170,32 +175,33 @@ Only for the interface (and the tests); Claude Code uses MCP.
 | File | What it is |
 |---|---|
 | [`KnowledgeMap.svelte`](../ui/src/pages/KnowledgeMap.svelte) | Everything on one map, organised like the library: a band per roadmap with its steps in order, a box per topic with its concepts inside, and links where one topic builds on another. |
-| [`Lesson.svelte`](../ui/src/pages/Lesson.svelte) | A class: its steps, in order, one line each with how its checks went, and where he picks it up. |
+| [`Lesson.svelte`](../ui/src/pages/Lesson.svelte) | A class: where he is, with the one thing to do next; its steps, one line each with how its checks went; and beside them what it teaches (its concepts), with the other ways to work on it. |
 | [`Log.svelte`](../ui/src/pages/Log.svelte) | The log: every session, grouped by day, each linking to its full record. |
 | [`Mission.svelte`](../ui/src/pages/Mission.svelte) | One Praxis mission: why it matters, what to do, when it's done, the concepts it uses; then his debrief and Claude's review. |
 | [`Now.svelte`](../ui/src/pages/Now.svelte) | Home (#/). |
 | [`Praxis.svelte`](../ui/src/pages/Praxis.svelte) | Praxis: what he learned, put to work. |
 | [`Progress.svelte`](../ui/src/pages/Progress.svelte) | Progress: what is solid over time, activity by week, and what is fading. |
-| [`Roadmap.svelte`](../ui/src/pages/Roadmap.svelte) | One roadmap as a route: steps in order down a line, each with its goal, why it sits there, and its progress. |
+| [`Roadmap.svelte`](../ui/src/pages/Roadmap.svelte) | One course (a roadmap, in the data) as a route: its classes in order down a line, each with its goal, why it sits there, and its progress. |
 | [`Roadmaps.svelte`](../ui/src/pages/Roadmaps.svelte) | The library: what you have, at a glance. |
 | [`SessionView.svelte`](../ui/src/pages/SessionView.svelte) | One past session, read back in full: every step, check and answer, and its handoff. |
 | [`Step.svelte`](../ui/src/pages/Step.svelte) | One page of a class, as linked from the library tree and from Previous / Next: #/lesson/<slug>/<number>. |
-| [`Topic.svelte`](../ui/src/pages/Topic.svelte) | A topic's page: its knowledge map as a graph, the concept panel, the outline and its sessions. |
+| [`Topic.svelte`](../ui/src/pages/Topic.svelte) | A class's concepts: what it teaches, as an outline and a graph, with the panel for one concept. |
 
 #### Components and state (`ui/src/lib/`)
 
 | File | What it is |
 |---|---|
 | [`Ask.svelte`](../ui/src/lib/Ask.svelte) | An open question in a lesson: the prompt, a text box with a live maths preview, and the answer once sent. |
+| [`AskPanel.svelte`](../ui/src/lib/AskPanel.svelte) | The "Ask about this" panel: it opens by the passage he selected, takes his question, and shows Claude's answer there, while the class carries on. |
 | [`Block.svelte`](../ui/src/lib/Block.svelte) | One piece of teaching from `show` (orientation, step, plan, summary, feedback or note), labelled and rendered. |
 | [`ClassPage.svelte`](../ui/src/lib/ClassPage.svelte) | One page of a class: the intro, or one step with its checks and the feedback on his answers, with Previous and Next. |
 | [`Composer.svelte`](../ui/src/lib/Composer.svelte) | Talk to Claude from Aristotle: types the message into the Claude Code running in the drawer. |
 | [`ConceptNode.svelte`](../ui/src/lib/ConceptNode.svelte) | One concept on a map: status by fill and outline, goal by an inner ring, focus by a halo. |
 | [`ConceptPanel.svelte`](../ui/src/lib/ConceptPanel.svelte) | The side panel for one concept on a map: status, what it rests on and leads to, notes, and its check record. |
-| [`ContextMenu.svelte`](../ui/src/lib/ContextMenu.svelte) | The menu on right-clicking selected text: copy it, search for it in Aristotle, or gloss it (Claude Code explains it in a hover card, which then shows wherever the phrase appears). |
+| [`ContextMenu.svelte`](../ui/src/lib/ContextMenu.svelte) | The menu on right-clicking selected text: copy it, search for it in Aristotle, gloss it (Claude Code explains it in a hover card, which then shows wherever the phrase appears), or ask a question about it (answered beside the step, kept with it). |
 | [`FeedList.svelte`](../ui/src/lib/FeedList.svelte) | A lesson as one long note: each entry a block in the reading column. |
 | [`Grip.svelte`](../ui/src/lib/Grip.svelte) | A drag handle on a pane's edge. |
-| [`Home.svelte`](../ui/src/lib/Home.svelte) | Home: everything in progress side by side, so picking what to do is one click, and the lesson being taught right now (it happens in its class: this only points there). |
+| [`Home.svelte`](../ui/src/lib/Home.svelte) | Home: a dashboard that answers what to do now (one card, one button), how he is doing (this week, his courses) and what needs him (reviews coming due, recent answers, words he looked up, missions). |
 | [`HoverCard.svelte`](../ui/src/lib/HoverCard.svelte) | One hover card for the whole app. |
 | [`LessonActivity.svelte`](../ui/src/lib/LessonActivity.svelte) | The foot of a running lesson: what is happening right now, so he never has to guess whether to wait. |
 | [`LessonBench.svelte`](../ui/src/lib/LessonBench.svelte) | The right sidebar beside a lesson: where it sits on the roadmap, the concept being taught, the plan as an outline, and the local graph around the concept. |
@@ -210,16 +216,18 @@ Only for the interface (and the tests); Claude Code uses MCP.
 | [`Ribbon.svelte`](../ui/src/lib/Ribbon.svelte) | The thin strip on the far left: the main places, Claude, and the look settings. |
 | [`Search.svelte`](../ui/src/lib/Search.svelte) | The search palette: everything he has (roadmaps, steps, topics, concepts, missions, and what was said in every session), searched on the server as he types. |
 | [`Sequence.svelte`](../ui/src/lib/Sequence.svelte) | A process he steps through, one frame at a time: written as a ```sequence block, frames split by "---". |
-| [`Sidebar.svelte`](../ui/src/lib/Sidebar.svelte) | The library pane: roadmaps as folders, steps inside, and in each step's topic two folders: its Class (its pages, the intro and every step taught, with how its checks went) and its Concepts. |
+| [`Sidebar.svelte`](../ui/src/lib/Sidebar.svelte) | The library pane: courses as folders, their classes inside, and in each class its pages: the intro and every step taught, with how its checks went. |
 | [`StartPanel.svelte`](../ui/src/lib/StartPanel.svelte) | Start a lesson on anything, without the terminal. |
 | [`StatusBar.svelte`](../ui/src/lib/StatusBar.svelte) | A thin bar of solid, shaky and not-yet counts (and fading), with an optional legend. |
 | [`StatusLine.svelte`](../ui/src/lib/StatusLine.svelte) | The small bar along the bottom: what's going on, in a few words. |
 | [`TabBar.svelte`](../ui/src/lib/TabBar.svelte) | The open pages, as tabs above the page. |
 | [`TerminalDrawer.svelte`](../ui/src/lib/TerminalDrawer.svelte) | Claude Code's terminal, docked at the bottom of every page. |
 | [`actions.ts`](../ui/src/lib/actions.ts) | Starting things from the interface: each action asks the Claude Code running in Aristotle to run a skill. |
+| [`aside.svelte.ts`](../ui/src/lib/aside.svelte.ts) | "Ask about this": a question on a passage he selected, asked in a small panel by the passage and answered by Claude Code beside the step, without interrupting the class. |
 | [`classes.svelte.ts`](../ui/src/lib/classes.svelte.ts) | Each topic's class as pages (steps.ts), for the library tree, the class page and its step pages: past sessions loaded on first use and kept, the session running now read from the live feed as it grows. |
 | [`claude.svelte.ts`](../ui/src/lib/claude.svelte.ts) | The connection to Claude Code running inside Aristotle (server/terminal.ts). |
 | [`feed.svelte.ts`](../ui/src/lib/feed.svelte.ts) | Live copy of the server's state, kept current over Server-Sent Events. |
+| [`focus.svelte.ts`](../ui/src/lib/focus.svelte.ts) | Focus mode: everything but the page hides (ribbon, library, tabs, status line, the bench beside a lesson), for reading and answering with nothing else in view. |
 | [`format.ts`](../ui/src/lib/format.ts) | Dates, times, durations and plurals, written the way the interface shows them. |
 | [`gloss.svelte.ts`](../ui/src/lib/gloss.svelte.ts) | Glossing a phrase he selected: asks the server (which asks Claude Code), and keeps a card pinned to the selection while the answer is on its way, then with the answer. |
 | [`layout.ts`](../ui/src/lib/layout.ts) | Graph layout shared by the topic maps and the map of everything. |

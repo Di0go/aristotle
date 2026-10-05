@@ -1,43 +1,118 @@
 <script lang="ts">
-  // Home: everything in progress side by side, so picking what to do is one click, and the lesson being taught
-  // right now (it happens in its class: this only points there).
+  // Home: a dashboard that answers what to do now (one card, one button), how he is doing (this week, his courses)
+  // and what needs him (reviews coming due, recent answers, words he looked up, missions). Lessons happen in their
+  // class; the card only points there. Each panel is a short live list with its way onwards at the foot.
   import { actions } from './actions.ts';
   import { claude } from './claude.svelte.ts';
   import { classes } from './classes.svelte.ts';
   import { feed } from './feed.svelte.ts';
-  import { ago } from './format.ts';
-  import { countsOf, placeOf, stepsOf } from './library.ts';
+  import { ago, dayKey, formatDay, onDay } from './format.ts';
+  import { countsOf, stepsOf } from './library.ts';
   import { link } from './router.svelte.ts';
-  import { stepState } from '../../../shared/types.ts';
+  import { pageLabel } from './steps.ts';
+  import { isFading, type SessionSummary, type Topic } from '../../../shared/types.ts';
   import StartPanel from './StartPanel.svelte';
-  import StatusBar from './StatusBar.svelte';
+
+  const RESULT = { right: 'right', partial: 'partly', wrong: 'wrong', 'dont-know': "didn't know" } as const;
+  const TONE = { right: 'ok', partial: 'mx', wrong: 'bad', 'dont-know': 'mx' } as const;
+  /** Days shown in the strip of days studied. */
+  const DAYS = 14;
 
   let now = $state(Date.now());
+  let sessions = $state<SessionSummary[]>([]);
 
-  const roadmaps = $derived(feed.roadmapList.filter((r) => r.status === 'active'));
+  const topics = $derived(Object.values(feed.topics));
+  const courses = $derived(feed.roadmapList.filter((r) => r.status === 'active'));
   const drafts = $derived(feed.roadmapList.filter((r) => r.status === 'draft'));
-  const inProgress = $derived(
-    Object.values(feed.topics)
-      .filter((t) => t.concepts.length && stepState(t) !== 'done')
-      .sort((a, b) => b.updated.localeCompare(a.updated)),
-  );
-  /** For each roadmap, the first step nobody has started, if the ones before it are under way. */
-  const nextSteps = $derived(
-    roadmaps.flatMap((r) => {
-      const steps = stepsOf(r, feed.topics);
-      const next = steps.find((s) => s.state === 'not-started');
-      return next ? [{ roadmap: r, step: next, done: steps.filter((s) => s.state === 'done').length, total: steps.length }] : [];
-    }),
-  );
-  const fading = $derived(Object.values(feed.topics).reduce((n, t) => n + countsOf(t).fading, 0));
-  const last = $derived(feed.session?.endedAt ? feed.session : null);
-  const waited = $derived(feed.starting ? Math.round((now - feed.starting.at) / 1000) : 0);
   /** The lesson running now, if any: its class and the step being taught. */
   const teaching = $derived(feed.session?.kind === 'learn' && feed.liveSlug ? feed.session : null);
   const teachingPage = $derived(teaching ? (classes.pages(teaching.topicSlug)?.at(-1) ?? null) : null);
-  const empty = $derived(feed.loaded && inProgress.length === 0 && nextSteps.length === 0);
+  /** With nothing being taught: the class he studied last, still unfinished, to continue. */
+  const lastClass = $derived(
+    topics
+      .filter((t) => t.concepts.length && countsOf(t).solid < countsOf(t).total)
+      .sort((a, b) => b.updated.localeCompare(a.updated))[0] ?? null,
+  );
+  const lastPage = $derived(
+    lastClass
+      ? (classes
+          .pages(lastClass.slug)
+          ?.filter((p) => p.number > 0)
+          .at(-1) ?? null)
+      : null,
+  );
+  /** With nothing started at all: the first class of a course nobody has begun. */
+  const firstClass = $derived.by(() => {
+    for (const r of courses) {
+      const next = stepsOf(r, feed.topics).find((s) => s.state === 'not-started');
+      if (next) return { course: r, step: next };
+    }
+    return null;
+  });
+  const waited = $derived(feed.starting ? Math.round((now - feed.starting.at) / 1000) : 0);
 
-  // A lesson asked for while its topic wasn't known (a new one): once it is live, go to the step being taught.
+  // This week, and the strip of days studied.
+  const monday = $derived.by(() => {
+    const d = new Date(now);
+    d.setHours(0, 0, 0, 0);
+    d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+    return d;
+  });
+  const minutes = $derived(sessions.filter((s) => new Date(s.startedAt) >= monday).reduce((n, s) => n + s.activeMinutes, 0));
+  const solidThisWeek = $derived(
+    topics.flatMap((t) => t.concepts).filter((c) => c.status === 'solid' && c.solidSince && new Date(c.solidSince) >= monday).length,
+  );
+  const studied = $derived(new Set(sessions.map((s) => dayKey(new Date(s.startedAt)))));
+  const days = $derived(
+    Array.from({ length: DAYS }, (_, i) => {
+      const d = new Date(now);
+      d.setDate(d.getDate() - (DAYS - 1 - i));
+      return { key: dayKey(d), label: formatDay(d.toISOString()), on: studied.has(dayKey(d)) };
+    }),
+  );
+  /** Days in a row with a sitting, up to today (or yesterday, when today hasn't had one yet). */
+  const streak = $derived.by(() => {
+    let n = 0;
+    const d = new Date(now);
+    if (!studied.has(dayKey(d))) d.setDate(d.getDate() - 1);
+    while (studied.has(dayKey(d))) {
+      n++;
+      d.setDate(d.getDate() - 1);
+    }
+    return n;
+  });
+
+  // What needs him.
+  const fading = $derived(topics.reduce((n, t) => n + countsOf(t).fading, 0));
+  /** Solid concepts by when they come due for review, soonest first. */
+  const due = $derived(
+    topics
+      .flatMap((t) => t.concepts.filter((c) => c.status === 'solid' && c.review).map((c) => ({ topic: t, concept: c })))
+      .sort((a, b) => a.concept.review!.due.localeCompare(b.concept.review!.due))
+      .slice(0, 4),
+  );
+  /** His latest graded answers across every class. */
+  const recent = $derived(
+    topics
+      .flatMap((t) =>
+        t.concepts.flatMap((c) =>
+          c.evidence.filter((e) => e.result && e.kind !== 'practice').map((e) => ({ topic: t, concept: c, at: e.at, result: e.result! })),
+        ),
+      )
+      .sort((a, b) => b.at.localeCompare(a.at))
+      .slice(0, 5),
+  );
+  const words = $derived([...feed.glosses].sort((a, b) => b.at.localeCompare(a.at)).slice(0, 5));
+  const missions = $derived(feed.missionList.filter((m) => m.status === 'open' || m.status === 'debriefed'));
+
+  $effect(() => {
+    void feed.topicVersion;
+    void fetch('/api/sessions')
+      .then((r) => r.json())
+      .then((all: SessionSummary[]) => (sessions = all));
+  });
+
+  // A lesson asked for while its class wasn't known (a new one): once it is live, go to the step being taught.
   $effect(() => {
     const href = classes.liveHref();
     if (feed.follow !== '*' || !teaching || !href) return;
@@ -45,166 +120,195 @@
     location.hash = href;
   });
 
-  // A clock for "still setting up (40 s)" while something is starting.
+  // A clock: for "still setting up (40 s)", and so the week turns over at midnight.
   $effect(() => {
     const t = setInterval(() => (now = Date.now()), 1000);
     return () => clearInterval(t);
   });
+
+  /** "The stress response · Step 3: The fast arm". */
+  function where(t: Topic | { topic: string }, p: { number: number; title?: string } | null): string {
+    const title = 'title' in t ? t.title : t.topic;
+    if (!p) return title;
+    return `${title} · ${pageLabel(p as never)}${p.title ? `: ${p.title}` : ''}`;
+  }
 </script>
 
 <div class="page home">
+  <!-- What to do now: one card, one primary button. -->
   {#if feed.starting}
-    <section class="starting sheet" aria-live="polite">
-      <div class="starting-line">
-        <span class="spinner" aria-hidden="true"></span>
-        <div>
-          <p class="starting-title">{feed.starting.label}</p>
-          <p class="muted">
-            {#if claude.asking}
-              Claude is asking something in the terminal before it can begin.
-            {:else if waited > 40}
-              Still setting up ({waited} s). Claude may be reading your notes, or waiting in the terminal.
-            {:else}
-              Claude is preparing it. The lesson opens here as soon as it starts.
-            {/if}
-          </p>
-        </div>
+    <section class="now sheet" aria-live="polite">
+      <span class="spinner" aria-hidden="true"></span>
+      <div class="now-text">
+        <p class="now-k">Starting</p>
+        <p class="now-title">{feed.starting.label}</p>
+        <p class="muted">
+          {#if claude.asking}
+            Claude is asking something in the terminal before it can begin.
+          {:else if waited > 40}
+            Still setting up ({waited} s). Claude may be reading your notes, or waiting in the terminal.
+          {:else}
+            Claude is preparing it. You'll be taken to it as soon as it starts.
+          {/if}
+        </p>
       </div>
-      <div class="starting-actions">
-        <button class={claude.asking ? 'primary small' : 'ghost small'} onclick={() => claude.toggle(true)}>Open the terminal</button>
-        <button class="link" onclick={() => (feed.starting = null)}>Dismiss</button>
-      </div>
+      <button class={claude.asking ? 'primary' : 'ghost'} onclick={() => claude.toggle(true)}>Open the terminal</button>
+      <button class="link" onclick={() => (feed.starting = null)}>Dismiss</button>
     </section>
-  {/if}
-
-  {#if teaching}
-    <a class="teaching sheet" href={classes.liveHref() ?? link.lesson(teaching.topicSlug)}>
+  {:else if teaching}
+    <a class="now sheet live" href={classes.liveHref() ?? link.lesson(teaching.topicSlug)}>
       <span class="live-dot" aria-hidden="true"></span>
-      <span class="teaching-text">
-        <span class="kicker">{feed.pending ? 'Your turn' : 'Being taught now'}</span>
-        <span class="teaching-title"
-          >{teaching.topic}{#if teachingPage}<span class="muted">
-              {` · `}{teachingPage.number ? `Step ${teachingPage.number}` : 'Intro'}{teachingPage.title
-                ? `: ${teachingPage.title}`
-                : ''}</span
-            >{/if}</span
+      <span class="now-text">
+        <span class="now-k">{feed.pending ? 'Your turn' : 'Being taught now'}</span>
+        <span class="now-title">{where(teaching, teachingPage)}</span>
+        <span class="muted"
+          >{feed.pending ? 'A question is waiting for your answer.' : 'Claude is teaching; follow along in the class.'}</span
         >
       </span>
-      <span class="primary small">Open</span>
+      <span class="primary">{feed.pending ? 'Answer it' : 'Open the class'}</span>
     </a>
-  {/if}
-
-  <header class="page-head">
-    <h1 class="page-title">{empty ? 'What do you want to learn?' : 'Pick up where you left off'}</h1>
-    {#if !empty}
-      <p class="page-lede">Everything in progress, side by side. Continue one, start the next step of a roadmap, or begin something new.</p>
-    {/if}
-  </header>
-
-  {#if last}
-    <section class="last-session">
-      <p class="kicker">Last session, {ago(last.endedAt!)}</p>
-      <p><a href={link.session(last.id)}>{last.topic}</a>: {last.goal}</p>
+  {:else if lastClass}
+    <section class="now sheet">
+      <span class="now-text">
+        <span class="now-k">Pick up where you left off</span>
+        <a class="now-title" href={link.lesson(lastClass.slug)}>{where(lastClass, lastPage)}</a>
+        <span class="muted"
+          >Studied {ago(lastClass.updated)}. {countsOf(lastClass).solid} of {countsOf(lastClass).total} concepts solid.</span
+        >
+      </span>
+      <button class="primary" onclick={() => actions.continueTopic(lastClass.slug)}>Continue</button>
+    </section>
+  {:else if firstClass}
+    <section class="now sheet">
+      <span class="now-text">
+        <span class="now-k">Next in {firstClass.course.title}</span>
+        <a class="now-title" href={link.lesson(firstClass.step.slug)}>{firstClass.step.title}</a>
+        <span class="muted">Class {firstClass.step.index + 1} of {firstClass.course.steps.length}.</span>
+      </span>
+      <button class="primary" onclick={() => actions.startStep(firstClass.course, firstClass.step.index)}>Start</button>
     </section>
   {/if}
 
-  {#if fading}
-    <section class="review-callout">
-      <div>
-        <h2>{fading} {fading === 1 ? 'concept is' : 'concepts are'} fading</h2>
-        <p class="muted">Solid once, now due. Recalling them just as they fade is what makes them last.</p>
-      </div>
-      <button class="primary" onclick={() => actions.review()}>Review now</button>
-    </section>
-  {/if}
+  {#if feed.loaded && topics.length === 0 && courses.length === 0}
+    <header class="page-head">
+      <h1 class="page-title">What do you want to learn?</h1>
+      <p class="page-lede">Plan a course towards something bigger, or start one class straight away.</p>
+    </header>
+  {:else}
+    <!-- How he is doing, and what needs him. -->
+    <div class="panels">
+      <section class="panel">
+        <h2 class="panel-h">This week</h2>
+        <div class="stats">
+          <div><span class="big">{minutes}</span><span class="cap">min studied</span></div>
+          <div><span class="big">{solidThisWeek}</span><span class="cap">concepts solid</span></div>
+          <div><span class="big">{streak}</span><span class="cap">{streak === 1 ? 'day' : 'days'} in a row</span></div>
+        </div>
+        <ol class="days" aria-label="Days studied, last two weeks">
+          {#each days as d (d.key)}<li class:on={d.on} title="{d.label}{d.on ? ': studied' : ''}"></li>{/each}
+        </ol>
+        <a class="panel-foot" href={link.progress()}>Charts</a>
+      </section>
 
-  {#if inProgress.length}
-    <section class="home-section">
-      <h2 class="section-title">In progress</h2>
-      <ul class="desk">
-        {#each inProgress as t (t.slug)}
-          {@const place = placeOf(t.slug, feed.roadmapList)}
-          {@const c = countsOf(t)}
-          <li class="desk-item sheet">
-            {#if place}
-              <a class="desk-where" href={link.roadmap(place.roadmap.slug)}
-                >{place.roadmap.title}, topic {place.index + 1} of {place.roadmap.steps.length}</a
-              >
-            {/if}
-            <h3><a href={link.lesson(t.slug)}>{t.title}</a></h3>
-            {#if t.handoff}
-              <p class="desk-next"><span class="muted">Next:</span> {t.handoff.next}</p>
-            {:else}
-              <p class="desk-next muted">{t.goal}</p>
-            {/if}
-            <div class="desk-foot">
-              <div class="desk-progress">
-                <StatusBar counts={c} fading={c.fading} />
-                <span class="muted">{c.solid} of {c.total} concepts solid, studied {ago(t.updated)}</span>
-              </div>
-              <a class="primary small" href={link.lesson(t.slug)}>Go</a>
-            </div>
-          </li>
+      <section class="panel">
+        <h2 class="panel-h">Courses <span>{courses.length}</span></h2>
+        {#each courses as r (r.slug)}
+          {@const steps = stepsOf(r, feed.topics)}
+          {@const done = steps.filter((s) => s.state === 'done').length}
+          {@const at = steps.find((s) => s.state !== 'done')}
+          <a class="item" href={link.roadmap(r.slug)}>
+            <span class="item-t">{r.title}</span>
+            <span class="item-m">{at ? `class ${at.index + 1} of ${steps.length}` : 'done'}</span>
+          </a>
+          <div class="bar" aria-label="{done} of {steps.length} classes done">
+            {#each steps as s (s.index)}<i class={s.state}></i>{/each}
+          </div>
+        {:else}
+          <p class="empty">A course is a path of classes towards something bigger.</p>
         {/each}
-      </ul>
-    </section>
-  {/if}
-
-  {#if nextSteps.length}
-    <section class="home-section">
-      <h2 class="section-title">Next on your roadmaps</h2>
-      <ul class="next-steps">
-        {#each nextSteps as n (n.roadmap.slug)}
-          <li>
-            <span class="tag cyan">{n.step.index + 1}/{n.total}</span>
-            <div>
-              <p class="next-title"><a href={link.lesson(n.step.slug)}>{n.step.title}</a> <span class="muted">· {n.roadmap.title}</span></p>
-              <p class="muted">{n.step.goal}</p>
-            </div>
-            <a class="ghost small" href={link.lesson(n.step.slug)}>Go</a>
-          </li>
-        {/each}
-      </ul>
-    </section>
-  {/if}
-
-  {#if drafts.length}
-    <section class="home-section">
-      <h2 class="section-title">Roadmaps still being planned</h2>
-      <ul class="next-steps">
         {#each drafts as r (r.slug)}
-          <li>
-            <span class="tag">draft</span>
-            <div>
-              <p class="next-title"><a href={link.roadmap(r.slug)}>{r.title}</a></p>
-              <p class="muted">{r.goal}</p>
-            </div>
-            <a class="ghost small" href={link.roadmap(r.slug)}>Open</a>
-          </li>
+          <a class="item" href={link.roadmap(r.slug)}><span class="item-t">{r.title}</span><span class="item-m">being planned</span></a>
         {/each}
-      </ul>
-    </section>
+        <a class="panel-foot" href={link.roadmaps()}>Plan a course</a>
+      </section>
+
+      <section class="panel">
+        <h2 class="panel-h">To review <span>{fading ? `${fading} fading` : 'soon'}</span></h2>
+        {#each due as d (`${d.topic.slug}/${d.concept.id}`)}
+          <a class="item" href={link.topic(d.topic.slug, d.concept.id)} data-concept="{d.topic.slug}/{d.concept.id}">
+            <span class="item-t">{d.concept.label}</span>
+            <span class="item-m" class:todo={isFading(d.concept)}>{isFading(d.concept) ? 'fading' : onDay(d.concept.review!.due)}</span>
+          </a>
+        {:else}
+          <p class="empty">Concepts come here once they're solid, to be recalled just before they fade.</p>
+        {/each}
+        {#if fading}
+          <button class="panel-foot link" onclick={() => actions.review()}>Review what's fading</button>
+        {/if}
+      </section>
+
+      <section class="panel">
+        <h2 class="panel-h">Recent answers</h2>
+        {#each recent as r, i (i)}
+          <a class="item" href={link.topic(r.topic.slug, r.concept.id)} data-concept="{r.topic.slug}/{r.concept.id}">
+            <span class="item-t">{r.concept.label}</span>
+            <span class="item-m {TONE[r.result]}">{RESULT[r.result]}</span>
+          </a>
+        {:else}
+          <p class="empty">Your answers to checks show up here.</p>
+        {/each}
+        <a class="panel-foot" href={link.log()}>History</a>
+      </section>
+
+      <section class="panel">
+        <h2 class="panel-h">Words you looked up <span>{feed.glosses.length || ''}</span></h2>
+        {#each words as g (g.id)}
+          <a class="item" href={g.topic ? link.lesson(g.topic) : link.now()}>
+            <span class="item-t term gloss" data-gloss={g.id}>{g.text}</span>
+            <span class="item-m">{ago(g.at)}</span>
+          </a>
+        {:else}
+          <p class="empty">Select a word you don't know in a lesson, right-click it and choose Gloss.</p>
+        {/each}
+      </section>
+
+      <section class="panel">
+        <h2 class="panel-h">Missions <span>{missions.length || ''}</span></h2>
+        {#each missions as m (m.id)}
+          <a class="item" href={link.mission(m.id)}>
+            <span class="item-t">{m.title}</span>
+            <span class="item-m" class:todo={m.status === 'open'}>{m.status === 'open' ? 'to do' : 'to review'}</span>
+          </a>
+        {:else}
+          <p class="empty">A mission puts a finished class to work in your own life. The first comes when a class is solid.</p>
+        {/each}
+        <a class="panel-foot" href={link.praxis()}>All missions</a>
+      </section>
+    </div>
   {/if}
 
   <section class="home-section start-section">
-    <h2 class="section-title">{empty ? 'Start here' : 'Something new'}</h2>
+    <h2 class="section-title">Something new</h2>
     <div class="sheet start-sheet"><StartPanel /></div>
   </section>
 </div>
 
 <style>
-  .teaching {
+  .now {
     display: flex;
     align-items: center;
-    gap: 14px;
-    margin-bottom: 36px;
-    padding: 16px 18px;
+    gap: 16px;
+    margin-bottom: 28px;
+    padding: 18px 20px;
     color: var(--fg);
     text-decoration: none;
-    border: 1px solid var(--acc-line);
   }
 
-  .teaching:hover {
+  .now.live {
+    border-color: var(--acc-line);
+  }
+
+  .now.live:hover {
     border-color: var(--acc);
     text-decoration: none;
   }
@@ -217,23 +321,202 @@
     background: var(--acc);
   }
 
-  .teaching-text {
+  .now-text {
     display: flex;
     flex-direction: column;
     flex: 1;
     gap: 2px;
+    min-width: 0;
   }
 
-  .teaching .kicker {
-    margin: 0;
+  .now-k {
+    font-size: 0.78rem;
+    font-weight: 600;
     color: var(--acc);
   }
 
-  .teaching-title {
+  .now-title {
+    font-size: 1.12rem;
+    font-weight: 600;
+    color: var(--fg);
+    text-decoration: none;
+  }
+
+  a.now-title:hover {
+    color: var(--acc);
+  }
+
+  .now .muted {
+    margin: 0;
+    font-size: 0.88rem;
+  }
+
+  .panels {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 16px;
+    margin-bottom: 48px;
+  }
+
+  .panel {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+    padding: 16px 18px 14px;
+    background: var(--b1);
+    border-radius: var(--radius-lg);
+  }
+
+  .panel-h {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin: 0 0 8px;
+    font-size: 0.95rem;
     font-weight: 600;
   }
 
-  .teaching-title .muted {
+  .panel-h span {
+    font-size: 0.8rem;
     font-weight: 400;
+    color: var(--faint);
+  }
+
+  .item {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    padding: 5px 0;
+    color: var(--fg-2);
+    text-decoration: none;
+    font-size: 0.9rem;
+  }
+
+  .item:hover .item-t {
+    color: var(--fg);
+  }
+
+  .item-t {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .item-t.term {
+    flex: 0 1 auto;
+  }
+
+  .item-m {
+    flex: none;
+    margin-left: auto;
+    font-size: 0.78rem;
+    color: var(--faint);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .item-m.ok {
+    color: var(--solid);
+  }
+
+  .item-m.mx {
+    color: var(--shaky);
+  }
+
+  .item-m.bad {
+    color: var(--wrong);
+  }
+
+  .item-m.todo {
+    color: var(--acc);
+  }
+
+  .empty {
+    margin: 0;
+    font-size: 0.86rem;
+    color: var(--faint);
+    line-height: 1.5;
+  }
+
+  .panel-foot {
+    align-self: flex-start;
+    margin-top: auto;
+    padding-top: 10px;
+    font-size: 0.84rem;
+    color: var(--acc);
+  }
+
+  button.panel-foot {
+    margin-top: 6px;
+  }
+
+  .stats {
+    display: flex;
+    gap: 22px;
+    margin: 2px 0 12px;
+  }
+
+  .stats div {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .big {
+    font-size: 1.7rem;
+    font-weight: 600;
+    line-height: 1.1;
+    color: var(--fg);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .cap {
+    font-size: 0.78rem;
+    color: var(--muted);
+  }
+
+  .days {
+    display: grid;
+    grid-template-columns: repeat(14, 1fr);
+    gap: 4px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .days li {
+    aspect-ratio: 1;
+    border-radius: 3px;
+    background: var(--b2);
+  }
+
+  .days li.on {
+    background: var(--solid);
+  }
+
+  .bar {
+    display: flex;
+    gap: 3px;
+    margin: 2px 0 8px;
+  }
+
+  .bar i {
+    flex: 1;
+    height: 5px;
+    border-radius: 3px;
+    background: var(--b2);
+  }
+
+  .bar i.started {
+    background: color-mix(in srgb, var(--acc) 55%, var(--b2));
+  }
+
+  .bar i.done {
+    background: var(--solid);
+  }
+
+  .start-section {
+    margin-top: 8px;
   }
 </style>

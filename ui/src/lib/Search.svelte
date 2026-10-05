@@ -7,11 +7,11 @@
   import type { SearchHit, SearchKind } from '../../../shared/types.ts';
 
   const KIND: Record<SearchKind, string> = {
-    roadmap: 'Roadmap',
-    step: 'Step',
-    topic: 'Topic',
+    roadmap: 'Course',
+    step: 'Class',
+    topic: 'Class',
     concept: 'Concept',
-    mission: 'Praxis',
+    mission: 'Mission',
     session: 'Session',
   };
 
@@ -65,9 +65,9 @@
       case 'roadmap':
         return link.roadmap(h.slug!);
       case 'step':
-        return feed.topics[h.slug!] ? link.topic(h.slug!) : link.lesson(h.slug!);
+        return link.lesson(h.slug!);
       case 'topic':
-        return link.topic(h.slug!);
+        return link.lesson(h.slug!);
       case 'concept':
         return link.topic(h.slug!, h.concept);
       case 'mission':
@@ -138,7 +138,7 @@
         bind:this={input}
         bind:value={q}
         onkeydown={onKey}
-        placeholder="Search roadmaps, concepts, missions, lessons…"
+        placeholder="Search courses, classes, concepts, missions…"
         aria-label="Search"
         aria-controls="search-results"
         aria-activedescendant={hits.length ? `hit-${selected}` : undefined}

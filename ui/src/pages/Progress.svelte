@@ -112,7 +112,7 @@
         <div class="fading-groups">
           {#each fadingByTopic as g (g.slug)}
             <div class="sheet fading-group">
-              <h3><a href={link.topic(g.slug)}>{g.title}</a></h3>
+              <h3><a href={link.lesson(g.slug)}>{g.title}</a></h3>
               <ul>
                 {#each g.concepts as f (f.id)}
                   <li>
@@ -201,7 +201,7 @@
         <ul class="levels">
           {#each progress.training as t (t.topic)}
             <li>
-              <a href={link.topic(t.topic)}>{t.title}</a>
+              <a href={link.lesson(t.topic)}>{t.title}</a>
               <span
                 class="meter"
                 role="meter"

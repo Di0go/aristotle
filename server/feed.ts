@@ -195,6 +195,16 @@ export class Feed {
     return item;
   }
 
+  /** The title of the step an item of this session belongs to: the step it is, or the last one shown before it. */
+  stepTitleOf(id: string): string | undefined {
+    const at = this.items.findIndex((i) => i.id === id);
+    for (let i = at; i >= 0; i--) {
+      const item = this.items[i];
+      if (item.type === 'block' && item.kind === 'step') return item.title;
+    }
+    return undefined;
+  }
+
   /** Whether a tool call is waiting for this question's answer right now. */
   awaited(id: string): boolean {
     return (this.waiters.get(id)?.size ?? 0) > 0;

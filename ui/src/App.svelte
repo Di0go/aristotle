@@ -4,10 +4,12 @@
   import { claude } from './lib/claude.svelte.ts';
   import { classes } from './lib/classes.svelte.ts';
   import { feed } from './lib/feed.svelte.ts';
+  import { focus } from './lib/focus.svelte.ts';
   import { link, router } from './lib/router.svelte.ts';
   import { searchBox } from './lib/search.svelte.ts';
   import './lib/tabs.svelte.ts';
   import './lib/theme.svelte.ts';
+  import AskPanel from './lib/AskPanel.svelte';
   import ContextMenu from './lib/ContextMenu.svelte';
   import HoverCard from './lib/HoverCard.svelte';
   import Lightbox from './lib/Lightbox.svelte';
@@ -115,6 +117,10 @@
 
 <HoverCard />
 <ContextMenu />
+{#if focus.on}
+  <button class="ghost small focus-exit" onclick={() => focus.toggle(false)} title="Show everything again (Esc or F)">Leave focus</button>
+{/if}
+<AskPanel />
 <Search />
 <Lightbox />
 

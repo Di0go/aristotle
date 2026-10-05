@@ -1,21 +1,18 @@
 // Glosses: phrases he selected because he didn't know them, each with a short explanation written by Claude Code
-// on his own login (`claude -p`, no tools). All of them in one file, data/glosses.json.
+// on his own login (oneshot.ts). All of them in one file, data/glosses.json.
 
-import { spawn } from 'node:child_process';
 import { EventEmitter } from 'node:events';
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
-import os from 'node:os';
 import path from 'node:path';
-import { GLOSS_CMD, GLOSS_IMAGES, GLOSS_MODEL, GLOSSES_FILE } from './config.ts';
+import { GLOSS_IMAGES, GLOSSES_FILE } from './config.ts';
 import { type FoundImage, findImages } from './images.ts';
+import { OneshotError, oneshot } from './oneshot.ts';
 import { slugify } from './slug.ts';
 import type { Gloss, GlossBody, GlossImage } from '../shared/types.ts';
 
 /** Longer than this is a passage, not a phrase: there is nothing short to say about it. */
 export const MAX_PHRASE = 120;
 const MAX_CONTEXT = 800;
-/** Claude Code usually answers in about five seconds; past this, something is wrong. */
-const TIMEOUT_MS = 60_000;
 
 const SYSTEM =
   'You write glosses for a learner reading a lesson: a short, accurate explanation of a phrase he selected because he ' +
@@ -75,7 +72,7 @@ export class Glosses {
             () => [],
           )
         : [];
-      const { gloss: written, image } = pickImage(await ask(prompt(text, context, topicTitle, candidates)), candidates, text);
+      const { gloss: written, image } = pickImage(await answer(prompt(text, context, topicTitle, candidates)), candidates, text);
       const gloss: Gloss = {
         id,
         text,
@@ -149,48 +146,12 @@ function pickImage(out: string, candidates: FoundImage[], text: string): { gloss
   return { gloss, image: { src: found.src.replace(/\/\d+px-/, '/500px-'), page: found.page, credit: found.credit, alt: text } };
 }
 
-/**
- * Runs Claude Code headless with the request on stdin: no tools, no MCP servers, no settings or hooks, no saved
- * session, from a neutral folder so no project's CLAUDE.md is read. Whatever it prints is the gloss.
- */
-function ask(request: string): Promise<string> {
-  const args = GLOSS_CMD
-    ? GLOSS_CMD.split(' ')
-    : [
-        'claude',
-        '-p',
-        '--model',
-        GLOSS_MODEL,
-        '--tools',
-        '',
-        '--strict-mcp-config',
-        '--setting-sources',
-        '',
-        '--no-session-persistence',
-        '--system-prompt',
-        SYSTEM,
-      ];
-  const [file, ...rest] = args;
-  const home = os.homedir();
-  return new Promise((resolve, reject) => {
-    const child = spawn(file, rest, {
-      cwd: os.tmpdir(),
-      stdio: ['pipe', 'pipe', 'pipe'],
-      timeout: TIMEOUT_MS,
-      // A service started at login may not have the user's PATH; Claude Code lives in ~/.local/bin.
-      env: { ...process.env, PATH: [path.join(home, '.local/bin'), process.env.PATH ?? '/usr/local/bin:/usr/bin:/bin'].join(':') },
-    });
-    let out = '';
-    let err = '';
-    child.stdout.on('data', (d) => (out += d));
-    child.stderr.on('data', (d) => (err += d));
-    child.on('error', (e) => reject(new GlossError(`Could not start Claude Code: ${e.message}`)));
-    child.on('close', (code, signal) => {
-      const text = out.trim();
-      if (code === 0 && text) return resolve(text);
-      if (signal) return reject(new GlossError('Claude Code took too long to answer'));
-      reject(new GlossError(`Claude Code could not write a gloss${err.trim() ? `: ${err.trim().split('\n').at(-1)}` : ''}`));
-    });
-    child.stdin.end(request);
-  });
+/** Claude Code's gloss; its failures as gloss errors, so the interface says what went wrong. */
+async function answer(request: string): Promise<string> {
+  try {
+    return await oneshot(SYSTEM, request);
+  } catch (err) {
+    if (err instanceof OneshotError) throw new GlossError(err.message);
+    throw err;
+  }
 }

@@ -27,13 +27,14 @@ import {
 } from './config.ts';
 import { PID_FILE } from './control.ts';
 import { AnswerError, publicItem } from './feed.ts';
+import { AsideError } from './asides.ts';
 import { GlossError } from './glosses.ts';
 import { Gym } from './gym.ts';
 import { createMcpServer } from './mcp.ts';
 import { MissionError } from './missions.ts';
 import { Search } from './search.ts';
 import { Terminal } from './terminal.ts';
-import type { AskAnswerBody, FeedEvent, GlossBody, QuizAnswerBody } from '../shared/types.ts';
+import type { AskAnswerBody, AsideBody, FeedEvent, GlossBody, QuizAnswerBody } from '../shared/types.ts';
 
 const gym = await Gym.load();
 const feed = gym.feed;
@@ -193,6 +194,31 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ro
   if (req.method === 'DELETE' && route.startsWith('/api/glosses/')) {
     const removed = await gym.glosses.remove(tail('/api/glosses/'));
     return removed ? json(res, 200, { ok: true }) : json(res, 404, { error: 'No such gloss' });
+  }
+
+  // His questions on a passage: answered by Claude Code, so the request waits for the answer.
+  if (req.method === 'GET' && route === '/api/asides') return json(res, 200, gym.asides.all());
+  if (req.method === 'POST' && route === '/api/asides') {
+    const body = (await readJson(req)) as Partial<AsideBody> | null;
+    if (typeof body?.question !== 'string') return json(res, 400, { error: 'Missing question' });
+    const str = (v: unknown) => (typeof v === 'string' ? v : undefined);
+    const topic = str(body.topic);
+    const item = str(body.item);
+    const step = item ? gym.feed.stepTitleOf(item) : undefined;
+    try {
+      const aside = await gym.asides.ask(
+        { question: body.question, passage: str(body.passage) ?? '', context: str(body.context), topic, item },
+        { topicTitle: topic ? gym.topics.get(topic)?.title : undefined, step },
+      );
+      return json(res, 200, aside);
+    } catch (err) {
+      if (err instanceof AsideError) return json(res, 400, { error: err.message });
+      throw err;
+    }
+  }
+  if (req.method === 'DELETE' && route.startsWith('/api/asides/')) {
+    const removed = await gym.asides.remove(tail('/api/asides/'));
+    return removed ? json(res, 200, { ok: true }) : json(res, 404, { error: 'No such question' });
   }
 
   // History, progress and search

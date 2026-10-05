@@ -22,6 +22,7 @@ export const TOPICS_DIR = path.join(DATA_DIR, 'topics');
 export const ROADMAPS_DIR = path.join(DATA_DIR, 'roadmaps');
 export const MISSIONS_DIR = path.join(DATA_DIR, 'missions');
 export const GLOSSES_FILE = path.join(DATA_DIR, 'glosses.json');
+export const ASIDES_FILE = path.join(DATA_DIR, 'asides.json');
 
 /** Where this install keeps what isn't learning: certificate, settings, pid files, log. Never in git. */
 export const STATE_DIR = process.env.ARISTOTLE_STATE_DIR ?? path.join(ROOT, DEV ? '.dev/state' : '.aristotle');
@@ -61,12 +62,12 @@ export const BACKUP = !DEV && process.env.ARISTOTLE_BACKUP !== 'off';
 /** The command the terminal drawer runs (server/terminal.ts); tests swap in a shell. */
 export const CLAUDE_CMD = process.env.ARISTOTLE_CLAUDE_CMD ?? 'claude';
 
-/** The model that writes glosses (server/glosses.ts): an alias Claude Code knows, on his own login. */
-export const GLOSS_MODEL = process.env.ARISTOTLE_GLOSS_MODEL ?? 'sonnet';
+/** The model for glosses and his questions on a passage (server/oneshot.ts): an alias Claude Code knows, on his own login. */
+export const ONESHOT_MODEL = process.env.ARISTOTLE_ONESHOT_MODEL ?? 'sonnet';
 /** Whether a gloss may carry a picture from Wikimedia Commons, when one would help (off in the tests: no network). */
 export const GLOSS_IMAGES = process.env.ARISTOTLE_GLOSS_IMAGES !== 'off';
-/** A command that reads a gloss request on stdin and prints the gloss, in place of Claude Code; tests swap one in. */
-export const GLOSS_CMD = process.env.ARISTOTLE_GLOSS_CMD;
+/** A command that reads a question on stdin and prints the answer, in place of Claude Code (oneshot.ts); tests swap one in. */
+export const ONESHOT_CMD = process.env.ARISTOTLE_ONESHOT_CMD;
 
 /** How long quiz and ask wait for an answer before handing control back to Claude. */
 export const WAIT_MS = Number(process.env.ARISTOTLE_WAIT_MS ?? 15 * 60_000);

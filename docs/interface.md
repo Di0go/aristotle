@@ -20,24 +20,45 @@ Styles for one component live in its `<style>` block; the files above are for wh
 ## Layout
 
 ```
-┌ribbon┬ sidebar (library tree)  ┬ tabs ────────────────────────────┐
-│      │ roadmap                 │ page                     │ bench │
-│      │  └ step (a topic)       │ (lesson, map, roadmap…)  │ (map, │
-│      │     ├ Class › steps     │                          │ outline)
-│      │     └ Concepts          │                          │
-└──────┴─────────────────────────┴ status line ─────────────────────┘
+┌ribbon─┬ library tree           ┬ tabs ─────────────────────────────┐
+│ Home  │ course                 │ page                      │ bench │
+│ Map   │  └ class               │ (Home, a class, a step,   │ (on a │
+│ Search│     └ intro, steps     │  the map, a course…)      │  step)│
+│ Claude│                        │                           │       │
+└───────┴────────────────────────┴ status line ──────────────────────┘
                                    terminal drawer (Claude Code, Ctrl+`)
 ```
 
-- **Sidebar**: the library as a tree, roadmap > topic > two folders: **Class**, its pages (Intro, then each step with the same mark as on the class page), and **Concepts**, the map's concepts ([`Sidebar.svelte`](../ui/src/lib/Sidebar.svelte), [`library.ts`](../ui/src/lib/library.ts)). Every folder folds with its arrow; clicking a folder's name opens its page and unfolds it. A roadmap's position is "topic N of M", so "step" only ever means a step of a class.
-- **Tabs**: one per page visited, eight at most, remembered per browser ([`tabs.svelte.ts`](../ui/src/lib/tabs.svelte.ts)).
+### Three words
+
+Everything he opens is one of three things, and each word means only that:
+
+- a **course** (a roadmap in the data and to Claude): a path of classes towards something bigger ([`Roadmap.svelte`](../ui/src/pages/Roadmap.svelte));
+- a **class** (a topic in the data): one subject, taught over as many sittings as it takes;
+- a **step**: one idea of a class, its checks and his answers.
+
+Concepts are what a class teaches, shown beside it, never a level of their own. Sessions, lessons and handoffs are the tutor's record and never reach the screen; "where you are" is said from the class itself. A course's position is "class N of M". A mission (Praxis, to Claude) is a page of its own.
+
+### Places
+
+- **Ribbon**: four labelled places, Home, Map, Search and Claude, with the appearance menu below ([`Ribbon.svelte`](../ui/src/lib/Ribbon.svelte)). The library is the tree; Progress, the Log and Missions are reached from Home's panels.
+- **Library tree**: courses, their classes, and in each class its pages: the Intro and every step, each with its mark ([`Sidebar.svelte`](../ui/src/lib/Sidebar.svelte), [`library.ts`](../ui/src/lib/library.ts)). Every folder folds with its arrow; clicking a folder's name opens its page and unfolds it.
+- **Home** (`#/`, [`Home.svelte`](../ui/src/lib/Home.svelte)) is the dashboard. One card says what to do now, with the one primary button (answer the question waiting, continue the last class, start the next class of a course); then panels, each a short live list with its way onwards at the foot: This week (minutes, concepts made solid, days in a row, the last two weeks), Courses, To review (fading and coming due), Recent answers, Words you looked up, Missions. A review or a training set running now shows here, since neither belongs to a class ([`Now.svelte`](../ui/src/pages/Now.svelte)).
+- **A class** (`#/lesson/<slug>`, [`Lesson.svelte`](../ui/src/pages/Lesson.svelte)): where you are, with its one button; the pages, one mark each (✓ done with nothing wrong, `1/2` when something went wrong, "to answer", ● being taught now); the box to continue; and beside them what the class teaches, its concepts, with training, review and its mission. Its concepts open on **the class's map** (`#/topics/<slug>?c=<concept>`, [`Topic.svelte`](../ui/src/pages/Topic.svelte)): the outline, the graph and one concept's record.
+- **A step** (`#/lesson/<slug>/<n>`, [`ClassPage.svelte`](../ui/src/lib/ClassPage.svelte)) with Previous and Next ([`steps.ts`](../ui/src/lib/steps.ts) and [`classes.svelte.ts`](../ui/src/lib/classes.svelte.ts) build the pages). The class is an **Intro** (the big picture, what he already knew, the plan) and one page per step, numbered across the whole class whichever sitting taught it; the checks a later sitting opens with are the next step's **warm-up**; the summary closing a sitting is left out. The step being taught is its page, live: it grows as Claude teaches, carries the composer, and a new step takes him along if he was on the last page. Starting or continuing a class waits on the class and moves to the step being taught when it starts. His questions on its passages are kept under it. Number keys in a title are dropped.
+- **Tabs**: one per page visited, eight at most, remembered per browser; a class keeps one tab whichever of its pages is open ([`tabs.svelte.ts`](../ui/src/lib/tabs.svelte.ts)).
 - **Search**: Ctrl+K or `/`, answered by the server ([`server/search.ts`](../server/search.ts)) over the library, missions and session text.
-- **Hover cards** on terms and concept links ([`HoverCard.svelte`](../ui/src/lib/HoverCard.svelte)); a **lightbox** for images and figures.
-- **Right-click on selected text** opens Aristotle's menu ([`ContextMenu.svelte`](../ui/src/lib/ContextMenu.svelte)): Copy, Search Aristotle (the palette, with the selection typed in), and **Gloss**. Glossing asks Claude Code for a short explanation of the phrase in the sense the passage uses it, shown in a card pinned under the selection, which follows the words as the page scrolls and then hangs from the marked phrase ([`gloss.svelte.ts`](../ui/src/lib/gloss.svelte.ts)). When the phrase names something seen better than described, the card carries a picture from Wikimedia Commons with its credit. From then on the phrase is a hover term (dotted underline) wherever it appears in a lesson, until he forgets it from its card. Without a selection, in a text box or the terminal, or with Shift held, the browser's own menu opens.
-- **Questions left unanswered** in the latest session stay answerable wherever they show, also on a class's step pages or a past session's page, even after the session has ended. If no tool call was waiting for the answer (the server says so in `X-Aristotle-Heard`), answering the last open one hands over to Claude ([`actions.ts`](../ui/src/lib/actions.ts)): it is told to collect the answers, or the class continues and Now shows it starting.
+- **Focus mode**: F (or Focus on a step) hides everything but the page; Escape or F brings it back, remembered per browser ([`focus.svelte.ts`](../ui/src/lib/focus.svelte.ts)).
+- **Routes** are hashes, listed in [`router.svelte.ts`](../ui/src/lib/router.svelte.ts).
+
+### On a page
+
+- **Hover cards** on terms, glossed phrases and concept links ([`HoverCard.svelte`](../ui/src/lib/HoverCard.svelte)); a **lightbox** for images and figures.
+- **Right-click on selected text** opens Aristotle's menu ([`ContextMenu.svelte`](../ui/src/lib/ContextMenu.svelte)): Copy, Search Aristotle (the palette, with the selection typed in), Gloss and Ask about this. Without a selection, in a text box or the terminal, or with Shift held, the browser's own menu opens.
+  - **Gloss** asks Claude Code for a short explanation of the phrase in the sense the passage uses it, shown in a card pinned under the selection, which follows the words as the page scrolls and then hangs from the marked phrase ([`gloss.svelte.ts`](../ui/src/lib/gloss.svelte.ts)). When the phrase names something seen better than described, the card carries a picture from Wikimedia Commons with its credit. From then on the phrase is a hover term (dotted underline) wherever it appears in a lesson, until he forgets it from its card.
+  - **Ask about this** opens a panel by the passage for his question ([`AskPanel.svelte`](../ui/src/lib/AskPanel.svelte), [`aside.svelte.ts`](../ui/src/lib/aside.svelte.ts)). Claude Code answers there, with the paragraph and the step as context, while the class carries on; the question and its answer are kept under the step.
+- **Questions left unanswered** in the latest session stay answerable wherever they show, also on a class's step pages or a past session's page, even after the session has ended. If no tool call was waiting for the answer (the server says so in `X-Aristotle-Heard`), answering the last open one hands over to Claude ([`actions.ts`](../ui/src/lib/actions.ts)): it is told to collect the answers, or the class continues.
 - **Claude Code starts when Aristotle opens** (once per page load, never again after he stops it), so it is ready before he asks for anything. Not in the dev instance, whose Claude Code would still teach through the live app's MCP server.
-- **A class is its steps** ([`steps.ts`](../ui/src/lib/steps.ts), [`classes.svelte.ts`](../ui/src/lib/classes.svelte.ts)). Sessions are the tutor's record and never show here: a class is an **Intro** (the big picture, what he already knew, the plan) and then one page per step, numbered across the whole class, whichever sitting taught it. A step's page holds the step, its checks and the feedback on his answers; the checks a later sitting opens with are that next step's **warm-up**; the summary that closes a sitting is left out (the class page says where he is instead). `#/lesson/<slug>` lists the pages with one mark each (✓ done with nothing wrong, `1/2` when something went wrong, "to answer", ● being taught now) and the box to continue; `#/lesson/<slug>/<n>` is one page ([`ClassPage.svelte`](../ui/src/lib/ClassPage.svelte)) with Previous and Next. The step being taught is its page, live: it grows as Claude teaches and carries the composer, and a new step takes him along if he was on the last page. Lessons happen in their class: starting or continuing one waits on the class and moves to the step being taught when it starts. **Home** (`#/`, once called Now) is everything in progress with a card for the lesson being taught; only a review or a training set, which belong to no class, runs there. A class keeps one tab whichever of its pages is open. Number keys in a title are dropped.
-- **Routes** are hashes (`#/lesson/<slug>`, `#/topics/<slug>?c=<concept>`…), listed in [`router.svelte.ts`](../ui/src/lib/router.svelte.ts).
 
 ## What a lesson can contain
 

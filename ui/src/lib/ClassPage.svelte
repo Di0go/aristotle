@@ -4,11 +4,14 @@
   // composer, and moves on to the next step when Claude starts it, if he was on it.
   import { setContext, tick } from 'svelte';
   import { actions } from './actions.ts';
+  import { asides } from './aside.svelte.ts';
   import { claude } from './claude.svelte.ts';
   import { classes } from './classes.svelte.ts';
   import { placeFigures } from './explorables/index.ts';
   import { feed } from './feed.svelte.ts';
+  import { focus } from './focus.svelte.ts';
   import { placeOf } from './library.ts';
+  import { renderMarkdown } from './markdown.ts';
   import { link } from './router.svelte.ts';
   import { pageLabel, type ClassPage } from './steps.ts';
   import Composer from './Composer.svelte';
@@ -45,6 +48,11 @@
     ),
   );
   const steps = $derived(pages?.filter((p) => p.number > 0).length ?? 0);
+  /** The questions he asked on passages of this page, oldest first. */
+  const questions = $derived.by(() => {
+    const ids = new Set([...(page?.warmup ?? []), ...(page?.items ?? [])].map((i) => i.id));
+    return feed.asides.filter((a) => a.item && ids.has(a.item));
+  });
 
   setContext('topic-slug', () => slug);
 
@@ -106,6 +114,9 @@
             >{feed.wrapping ? 'Wrapping up…' : 'Stop for today'}</button
           >
         {/if}
+        {#if !focus.on}<button class="ghost small" onclick={() => focus.toggle(true)} title="Hide everything but this step (F)"
+            >Focus</button
+          >{/if}
         {#if topic}<button class="ghost small bench-toggle" onclick={() => (benchOpen = true)}>Outline and graph</button>{/if}
       </div>
     </header>
@@ -136,6 +147,20 @@
           {figures}
           firstStep={page.number}
         />
+      {/if}
+
+      {#if questions.length}
+        <section class="questions" aria-label="Your questions on this step">
+          <p class="kicker">Your questions</p>
+          {#each questions as a (a.id)}
+            <article class="q">
+              <p class="q-q">{a.question}</p>
+              <p class="q-p">“{a.passage}”</p>
+              <div class="q-a">{@html renderMarkdown(a.answer)}</div>
+              <button class="link q-x" onclick={() => void asides.remove(a.id)}>Remove</button>
+            </article>
+          {/each}
+        </section>
       {/if}
 
       {#if live}
@@ -205,6 +230,69 @@
 
   .warmup-k {
     color: var(--muted);
+  }
+
+  .questions {
+    display: grid;
+    gap: 12px;
+    max-width: var(--measure);
+    margin: 32px auto 0;
+  }
+
+  .questions .kicker {
+    margin: 0;
+  }
+
+  .q {
+    position: relative;
+    padding: 14px 16px;
+    background: var(--b1);
+    border-radius: var(--radius-lg);
+    font-size: 0.92rem;
+    line-height: 1.6;
+  }
+
+  .q-q {
+    margin: 0 4.5rem 4px 0;
+    font-weight: 600;
+    color: var(--fg);
+  }
+
+  .q-p {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    overflow: hidden;
+    margin: 0 0 8px;
+    padding-left: 10px;
+    border-left: 2px solid var(--acc-line);
+    font-size: 0.82rem;
+    color: var(--muted);
+  }
+
+  .q-a {
+    color: var(--fg-2);
+  }
+
+  .q-a :global(p) {
+    margin: 0 0 8px;
+  }
+
+  .q-a :global(p:last-child) {
+    margin: 0;
+  }
+
+  .q-x {
+    position: absolute;
+    top: 14px;
+    right: 16px;
+    font-size: 0.78rem;
+    color: var(--faint);
+  }
+
+  .q-x:hover {
+    color: var(--wrong);
   }
 
   .step-nav {

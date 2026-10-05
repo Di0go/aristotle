@@ -101,7 +101,7 @@ export function createMcpServer(gym: Gym): McpServer {
       title: 'Read a topic',
       description:
         "Read a topic's knowledge map (every concept, its status, prerequisites, notes and check record), the last handoff, recent sessions, " +
-        'and the phrases he asked Aristotle to explain while reading it. ' +
+        'and the phrases he asked Aristotle to explain and the questions he asked on passages while reading it. ' +
         'Read it before continuing a topic.',
       inputSchema: { topic: z.string().min(1).describe('Topic slug or title') },
     },
@@ -118,12 +118,16 @@ export function createMcpServer(gym: Gym): McpServer {
       );
       const missions = gym.missions.of({ topic: t.slug });
       const praxis = missions.length ? `\n\nPraxis missions:\n${missions.map(summarizeMission).join('\n')}` : '';
+      const questions = gym.asides.of(t.slug);
+      const asides = questions.length
+        ? `\n\nQuestions he asked on passages (answered on the spot; what he wondered about):\n${questions.map((q) => `- "${q.question}" (${q.at.slice(0, 10)})`).join('\n')}`
+        : '';
       const asked = gym.glosses.of(t.slug);
       const glosses = asked.length
         ? `\n\nPhrases he selected and asked to have explained (gaps he noticed himself):\n${asked.map((g) => `- "${g.text}" (${g.at.slice(0, 10)})`).join('\n')}`
         : '';
       return text(
-        `${describeTopic(t)}\n\nRecent sessions:\n${recent.join('\n') || '(none)'}${praxis}${glosses}${roadmapContext(gym, t.slug)}`,
+        `${describeTopic(t)}\n\nRecent sessions:\n${recent.join('\n') || '(none)'}${praxis}${glosses}${asides}${roadmapContext(gym, t.slug)}`,
       );
     },
   );

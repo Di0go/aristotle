@@ -1,8 +1,10 @@
 <script lang="ts">
-  // The menu on right-clicking selected text: copy it, search for it in Aristotle, or gloss it (Claude Code
-  // explains it in a hover card, which then shows wherever the phrase appears). Without a selection, in a text
+  // The menu on right-clicking selected text: copy it, search for it in Aristotle, gloss it (Claude Code explains
+  // it in a hover card, which then shows wherever the phrase appears), or ask a question about it (answered beside
+  // the step, kept with it). Without a selection, in a text
   // box or in the terminal, or with Shift held, the browser's own menu opens instead.
   import { onMount, tick } from 'svelte';
+  import { asides } from './aside.svelte.ts';
   import { feed } from './feed.svelte.ts';
   import { glossing } from './gloss.svelte.ts';
   import { router } from './router.svelte.ts';
@@ -57,6 +59,7 @@
         run: () => gloss(text, range),
         disabled: text.length > MAX_PHRASE ? 'Select a word or a short phrase to gloss it' : undefined,
       },
+      { label: 'Ask about this', hint: 'A question', run: () => ask(text, range) },
     ];
     open = { x, y, text, items };
     await tick();
@@ -83,11 +86,25 @@
 
   /** Asks for the gloss, with the sentence around it and the topic being read, and pins its card under the selection. */
   function gloss(text: string, range: Range) {
+    void glossing.ask(text, range, elementOf(range)?.closest(BLOCK)?.textContent ?? undefined, topicHere());
+  }
+
+  /** Opens the question panel by the selection, tied to the lesson item it is in. */
+  function ask(text: string, range: Range) {
+    const el = elementOf(range);
+    const item = el?.closest<HTMLElement>('.notebook > .entry')?.id.replace(/^item-/, '') || undefined;
+    asides.start(text, range, topicHere(), item, el?.closest(BLOCK)?.textContent ?? undefined);
+  }
+
+  function elementOf(range: Range): Element | null {
     const node = range.commonAncestorContainer;
-    const host = (node instanceof Element ? node : node.parentElement)?.closest(BLOCK);
+    return node instanceof Element ? node : node.parentElement;
+  }
+
+  /** The topic being read: the page's, or the lesson running now. */
+  function topicHere(): string | undefined {
     const route = router.route;
-    const topic = route.page === 'topic' || route.page === 'lesson' || route.page === 'step' ? route.slug : (feed.liveSlug ?? undefined);
-    void glossing.ask(text, range, host?.textContent ?? undefined, topic);
+    return route.page === 'topic' || route.page === 'lesson' || route.page === 'step' ? route.slug : (feed.liveSlug ?? undefined);
   }
 
   function choose(item: Item) {

@@ -229,7 +229,7 @@
               <circle class="step-badge" cx={box.x + 22} cy={box.y} r="11" />
               <text class="step-num" x={box.x + 22} y={box.y} dominant-baseline="central" text-anchor="middle">{box.number}</text>
             {/if}
-            <a href={link.topic(slug)}>
+            <a href={link.lesson(slug)}>
               <text class="topic-title" x={box.x + (box.number ? 42 : 18)} y={box.y + 27}
                 >{fitTitle(box.title, box.w - (box.number ? 60 : 36))}</text
               >
@@ -272,7 +272,7 @@
       <span><i class="dot shaky"></i>Shaky</span>
       <span><i class="dot"></i>Not yet</span>
       <span><i class="goal-key"></i>Goal</span>
-      <span><i class="cross-key"></i>Builds on another topic</span>
+      <span><i class="cross-key"></i>Builds on another class</span>
     </div>
   {/if}
 </div>

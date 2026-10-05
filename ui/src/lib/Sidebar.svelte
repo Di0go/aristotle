@@ -1,9 +1,9 @@
 <script lang="ts">
-  // The library pane: roadmaps as folders, steps inside, and in each step's topic two folders: its Class (its
-  // pages, the intro and every step taught, with how its checks went) and its Concepts. Then loose topics.
+  // The library pane: courses as folders, their classes inside, and in each class its pages: the intro and every
+  // step taught, with how its checks went. Then the classes in no course. A class's concepts are on its page.
   import { classes } from './classes.svelte.ts';
   import { feed } from './feed.svelte.ts';
-  import { countsOf, looseTopics, markOf, outline, placeOf, stepsOf } from './library.ts';
+  import { countsOf, looseTopics, placeOf, stepsOf } from './library.ts';
   import { link, router } from './router.svelte.ts';
   import { migrateKey } from './storage.ts';
   import Grip from './Grip.svelte';
@@ -17,10 +17,7 @@
 
   let { onnavigate }: { onnavigate?: () => void } = $props();
 
-  /**
-   * Which folders are open, by key: "r:<roadmap>", "t:<topic>", and inside a topic "c:<topic>" (its class) and
-   * "k:<topic>" (its concepts). Only the ones he has toggled are stored.
-   */
+  /** Which folders are open, by key: "r:<course>" or "t:<class>". Only the ones he has toggled are stored. */
   let open = $state<Record<string, boolean>>(readOpen());
 
   const route = $derived(router.route);
@@ -36,7 +33,6 @@
     const place = placeOf(slug, roadmaps);
     if (place && !isOpen(`r:${place.roadmap.slug}`)) toggle(`r:${place.roadmap.slug}`, true);
     if (!isOpen(`t:${slug}`)) toggle(`t:${slug}`, true);
-    if (route.page === 'topic' && route.concept && !isOpen(`k:${slug}`)) toggle(`k:${slug}`, true);
   });
 
   function readOpen(): Record<string, boolean> {
@@ -63,15 +59,9 @@
     onnavigate?.();
   }
 
-  /** Roadmaps and a topic's class start open; topics and their concepts start closed. */
+  /** Courses start open; classes start closed. */
   function isOpen(key: string): boolean {
-    return open[key] ?? (key.startsWith('r:') || key.startsWith('c:'));
-  }
-
-  /** aria-current for a topic's map (no concept given) or one of its concepts: "page" when it is what is on screen. */
-  function current(slug: string, concept?: string): 'page' | undefined {
-    if (route.page !== 'topic' || route.slug !== slug) return undefined;
-    return (concept ? route.concept === concept : !route.concept) ? 'page' : undefined;
+    return open[key] ?? key.startsWith('r:');
   }
 
   /** aria-current for a topic's class (no page given) or one of its pages. */
@@ -114,68 +104,25 @@
       </ul>
     {/if}
     {#if t && isOpen(key)}
-      {@const pages = isOpen(`c:${slug}`) ? classes.pages(slug) : null}
-      <ul class="sub">
-        <li>
-          <div class="row sub-dir">
-            {@render chevron(`c:${slug}`, `the class of ${title}`)}
-            <a href={link.lesson(slug)} onclick={() => opened(`c:${slug}`)} aria-current={currentClass(slug)}
-              ><span class="name">Class</span></a
-            >
-          </div>
-          {#if isOpen(`c:${slug}`)}
-            <ul class="leaves">
-              {#if pages === null}
-                <li class="leaf-note">Loading…</li>
-              {:else if pages.length === 0}
-                <li class="leaf-note">Nothing taught yet</li>
-              {/if}
-              {#each pages ?? [] as p, i (p.number)}
-                {@const m = stepMark(p)}
-                {@const latest = i === (pages?.length ?? 0) - 1}
-                {@const now = p.live && latest && feed.liveSlug === slug}
-                <li>
-                  <a class="row leaf" href={link.step(slug, p.number)} onclick={onnavigate} aria-current={currentClass(slug, p)}>
-                    <span class="num">{p.number || ''}</span><span class="name"
-                      >{p.title ?? (p.upcoming ? 'Warming up' : pageLabel(p))}</span
-                    >
-                    {#if now}<span class="live" title="Being taught now"></span>{:else if m.text}<span class="mark {m.tone}">{m.text}</span
-                      >{/if}
-                  </a>
-                </li>
-              {/each}
-            </ul>
-          {/if}
-        </li>
-        {#if t.concepts.length}
-          <li>
-            <div class="row sub-dir">
-              {@render chevron(`k:${slug}`, `the concepts of ${title}`)}
-              <a href={link.topic(slug)} onclick={() => opened(`k:${slug}`)} aria-current={current(slug)}
-                ><span class="name">Concepts</span></a
-              >
-              <span class="count">{c.solid}/{c.total}</span>
-            </div>
-            {#if isOpen(`k:${slug}`)}
-              <ul class="leaves">
-                {#each outline(t) as concept (concept.id)}
-                  <li>
-                    <a
-                      class="row leaf concept"
-                      class:focus={t.focus === concept.id}
-                      href={link.topic(slug, concept.id)}
-                      onclick={onnavigate}
-                      data-concept="{slug}/{concept.id}"
-                      aria-current={current(slug, concept.id)}
-                    >
-                      <i class="dot {markOf(concept)}"></i><span class="name">{concept.label}</span>
-                    </a>
-                  </li>
-                {/each}
-              </ul>
-            {/if}
-          </li>
+      {@const pages = classes.pages(slug)}
+      <ul class="leaves">
+        {#if pages === null}
+          <li class="leaf-note">Loading…</li>
+        {:else if pages.length === 0}
+          <li class="leaf-note">Nothing taught yet</li>
         {/if}
+        {#each pages ?? [] as p, i (p.number)}
+          {@const m = stepMark(p)}
+          {@const now = p.live && i === (pages?.length ?? 0) - 1 && feed.liveSlug === slug}
+          <li>
+            <a class="row leaf" href={link.step(slug, p.number)} onclick={onnavigate} aria-current={currentClass(slug, p)}>
+              <span class="num">{p.number || ''}</span><span class="name">{p.title ?? (p.upcoming ? 'Warming up' : pageLabel(p))}</span>
+              {#if now}<span class="live" title="Being taught now"></span>{:else if m.text}<span class="mark {m.tone}" title={m.title}
+                  >{m.text}</span
+                >{/if}
+            </a>
+          </li>
+        {/each}
       </ul>
     {/if}
   </li>
@@ -188,8 +135,8 @@
       class="add"
       href={link.roadmaps()}
       onclick={onnavigate}
-      title="Plan a roadmap or start a topic"
-      aria-label="Plan a roadmap or start a topic"
+      title="Plan a course or start a class"
+      aria-label="Plan a course or start a class"
     >
       <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3.5v9M3.5 8h9" /></svg>
     </a>
@@ -199,7 +146,7 @@
     {#if !feed.loaded}
       <p class="note">Loading…</p>
     {:else if roadmaps.length === 0 && loose.length === 0}
-      <p class="note">Nothing here yet. Plan a roadmap or start a lesson and it shows up here.</p>
+      <p class="note">Nothing here yet. Plan a course or start a class and it shows up here.</p>
     {/if}
 
     <ul class="tree">
@@ -224,7 +171,7 @@
     </ul>
 
     {#if loose.length}
-      <p class="sec">Other topics</p>
+      <p class="sec">Other classes</p>
       <ul class="tree">
         {#each loose as t (t.slug)}
           {@render topicRow(t, t.slug, t.title)}
@@ -330,13 +277,6 @@
     margin-left: 22px;
     padding-left: 6px;
     border-left: 1px solid var(--rule);
-  }
-
-  .row.sub-dir > a {
-    padding: 3px 6px;
-    font-size: 0.8rem;
-    font-weight: 500;
-    color: var(--muted);
   }
 
   .leaf-note {
@@ -445,11 +385,6 @@
     align-items: baseline;
   }
 
-  a.row.concept.focus .name {
-    color: var(--acc);
-  }
-
-  /* Long names wrap onto a second line rather than being cut off at the pane's edge. */
   .name {
     min-width: 0;
     line-height: 1.35;

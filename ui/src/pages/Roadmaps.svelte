@@ -20,18 +20,18 @@
   /** The words on the form for each thing he can start. */
   const MAKER = {
     roadmap: {
-      title: 'Plan a roadmap',
-      help: 'Name a field or a big goal. Claude asks what you want from it, checks the field, and drafts the steps on the roadmap page for you to change. Nothing is taught until you approve it.',
+      title: 'Plan a course',
+      help: 'Name a field or a big goal. Claude asks what you want from it, checks the field, and drafts its classes on the course page for you to change. Nothing is taught until you approve it.',
       what: 'e.g. sports psychology',
       whatLabel: 'Field or goal',
       goal: 'Where you want to end up (optional)',
       submit: 'Plan it',
     },
     topic: {
-      title: 'Start a topic',
-      help: 'One topic, taught straight away. It starts with the big picture, then finds where your knowledge ends.',
+      title: 'Start a class',
+      help: 'One subject, taught straight away. It starts with the big picture, then finds where your knowledge ends.',
       what: 'e.g. how sleep consolidates memory',
-      whatLabel: 'Topic',
+      whatLabel: 'Subject',
       goal: 'What you want to be able to do (optional)',
       submit: 'Start',
     },
@@ -103,17 +103,15 @@
     <div>
       <h1 class="page-title">Library</h1>
       <p class="lib-count">
-        {plural(feed.roadmapList.length, 'roadmap')} · {plural(Object.keys(feed.topics).length, 'topic')} started · {totals.solid} of {plural(
-          totals.concepts,
-          'concept',
-        )} solid
+        {plural(feed.roadmapList.length, 'course')} · {plural(Object.keys(feed.topics).length, 'class', 'classes')} started · {totals.solid} of
+        {plural(totals.concepts, 'concept')} solid
       </p>
     </div>
     <div class="lib-actions">
-      <button class="ghost" class:on={making === 'topic'} onclick={() => open('topic')} aria-expanded={making === 'topic'}>New topic</button
+      <button class="ghost" class:on={making === 'topic'} onclick={() => open('topic')} aria-expanded={making === 'topic'}>New class</button
       >
       <button class="primary" class:on={making === 'roadmap'} onclick={() => open('roadmap')} aria-expanded={making === 'roadmap'}
-        >Plan a roadmap</button
+        >Plan a course</button
       >
     </div>
   </header>
@@ -136,13 +134,13 @@
   {/if}
 
   <div class="lib-tools">
-    <input class="field filter" type="search" bind:value={filter} placeholder="Filter roadmaps, topics and concepts" aria-label="Filter" />
+    <input class="field filter" type="search" bind:value={filter} placeholder="Filter courses, classes and concepts" aria-label="Filter" />
   </div>
 
   <!-- Roadmaps -->
   <section class="lib-section">
     <div class="sec-head">
-      <h2 class="section-title">Roadmaps</h2>
+      <h2 class="section-title">Courses</h2>
       <span class="muted">{roadmaps.length}</span>
     </div>
     {#if feed.roadmaps === null}
@@ -159,7 +157,7 @@
               {#if r.status === 'draft'}<span class="tag">draft</span>{:else}<span class="card-n">{done}/{steps.length}</span>{/if}
             </div>
             <p class="card-goal">{r.goal}</p>
-            <ol class="strip" aria-label="Steps">
+            <ol class="strip" aria-label="Classes">
               {#each steps as s (s.index)}
                 <li class={s.state} title={stepTip(s)}>
                   {#if s.state === 'started' && s.counts.total}<i style:width="{(s.counts.solid / s.counts.total) * 100}%"></i>{/if}
@@ -171,21 +169,21 @@
                 <span class="muted">Still being planned</span>
                 <a class="ghost small" href={link.roadmap(r.slug)}>Open</a>
               {:else if next}
-                <a class="card-next" href={link.topic(next.slug)}><span class="muted">Next</span> {next.index + 1} · {next.title}</a>
+                <a class="card-next" href={link.lesson(next.slug)}><span class="muted">Next</span> {next.index + 1} · {next.title}</a>
                 <a class="primary small" href={link.lesson(next.slug)}>Go</a>
               {:else}
-                <span class="muted">Every step done</span>
+                <span class="muted">Every class done</span>
               {/if}
             </div>
           </li>
         {/each}
       </ul>
     {:else if q}
-      <p class="muted">No roadmap matches “{filter}”.</p>
+      <p class="muted">No course matches “{filter}”.</p>
     {:else}
       <p class="muted empty-line">
-        No roadmaps yet. <button class="link" onclick={() => open('roadmap')}>Plan your first</button>: tell Claude what you want to get
-        good at and plan the path together.
+        No courses yet. <button class="link" onclick={() => open('roadmap')}>Plan your first</button>: tell Claude what you want to get good
+        at and plan the path together.
       </p>
     {/if}
   </section>
@@ -193,9 +191,9 @@
   <!-- Topics -->
   <section class="lib-section">
     <div class="sec-head">
-      <h2 class="section-title">Topics</h2>
+      <h2 class="section-title">Classes</h2>
       <span class="muted">{topics.length}</span>
-      <div class="sort" role="group" aria-label="Sort topics">
+      <div class="sort" role="group" aria-label="Sort classes">
         {#each SORTS as [k, label] (k)}
           <button class:on={sort === k} onclick={() => (sort = k)}>{label}</button>
         {/each}
@@ -205,7 +203,7 @@
       <div class="table-wrap">
         <table class="topics">
           <thead>
-            <tr><th>Topic</th><th>Roadmap</th><th>Progress</th><th class="r">Last studied</th></tr>
+            <tr><th>Class</th><th>Course</th><th>Progress</th><th class="r">Last studied</th></tr>
           </thead>
           <tbody>
             {#each topics as t (t.slug)}
@@ -214,7 +212,7 @@
               <tr>
                 <td>
                   <a class="t-name" href={link.lesson(t.slug)}>{t.title}</a>
-                  {#if feed.liveSlug === t.slug}<span class="live">in a lesson now</span>{/if}
+                  {#if feed.liveSlug === t.slug}<span class="live">being taught now</span>{/if}
                 </td>
                 <td class="muted"
                   >{#if place}<a href={link.roadmap(place.roadmap.slug)}>{place.roadmap.title}</a>, topic {place.index + 1}{:else}—{/if}</td
@@ -232,10 +230,10 @@
         </table>
       </div>
     {:else if q}
-      <p class="muted">No topic matches “{filter}”.</p>
+      <p class="muted">No class matches “{filter}”.</p>
     {:else}
       <p class="muted empty-line">
-        No topics yet. Start one from a roadmap step, or <button class="link" onclick={() => open('topic')}>start a topic</button> on its own.
+        No classes yet. Start one from a course, or <button class="link" onclick={() => open('topic')}>start a class</button> on its own.
       </p>
     {/if}
   </section>
