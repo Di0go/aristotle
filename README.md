@@ -28,7 +28,7 @@
 It runs on your Claude subscription. No API keys, no accounts, no cloud: everything you learn is a plain file you own.
 
 <p align="center">
-  <a href="docs/images/hero-dark.webp"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/hero-dark.webp"><img src="docs/images/hero-light.webp" alt="A lesson in Aristotle: an engraving of the heart from Gray's Anatomy with numbered markers, inside a lesson on how the heart keeps time, with the library of four subjects beside it, a knowledge map and an answered check laid over it." width="100%"></picture></a>
+  <a href="docs/images/hero-dark.webp"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/hero-dark.webp"><img src="docs/images/hero-light.webp" alt="A lesson in Aristotle: an engraving of the heart from Gray's Anatomy with numbered markers, inside a step on how the heart keeps time, with the courses in the library beside it, the panel with what the step teaches and the learner's notes, a chat with Aristotle and an answered check laid over it." width="100%"></picture></a>
 </p>
 
 ## The method
@@ -47,17 +47,17 @@ flowchart LR
 
 | | What happens | Why |
 |---|---|---|
-| **Learn** | The tutor probes what you already know, plans the territory, then teaches **one step at a time**, each followed by a quiz or a question you answer in writing. | Producing an answer is a far stronger test of understanding than recognising one. |
+| **Learn** | The tutor probes what you already know, plans the territory, then teaches **one step at a time**, each followed by a quiz or a question you answer in writing. Beside every step, a chat with Aristotle answers whatever you wonder about, without moving the lesson. | Producing an answer is a far stronger test of understanding than recognising one. |
 | **Map** | Every concept you meet goes on a knowledge map with its prerequisites, marked *not yet*, *shaky* or *solid*, with the evidence behind each mark. | You always see what you actually hold, and the tutor never builds on sand. |
 | **Review** | Each solid concept carries a spaced-repetition card ([FSRS](https://github.com/open-spaced-repetition/ts-fsrs)). When it starts to fade, you recall it from memory. | Retrieval just before forgetting is what makes knowledge last. |
 | **Train** | Problem sets on a topic, pitched just above your level, solved without help and then critiqued. Difficulty rises as you solve them cleanly. | Progressive overload, for thinking. |
-| **Praxis** | When a step of a roadmap is done, you get a **mission**: a real task that puts it to work for your own advantage, in your projects, your sport, your computer, or anywhere. You report back; the tutor checks what it can and reviews it honestly. | Knowledge you have never used is a guess. The mission is where it becomes yours, and where the map learns what really holds up. |
+| **Praxis** | Every course ends with a **mission**: a real task that puts it to work for your own advantage, in your projects, your sport, your computer, or anywhere, designed on its own when the last class is done from where you said you'd use it. You report back; the tutor checks what it can and reviews it honestly. | Knowledge you have never used is a guess. The mission is where it becomes yours, and where the map learns what really holds up. |
 
-Bigger subjects are planned as **roadmaps**: an ordered path of topics, agreed with you before any of it is taught, ending in a capstone mission that uses the whole path at once.
+Bigger subjects are planned as **courses**: an ordered path of classes, agreed with you before any of it is taught, ending in a final mission that uses the whole path at once. A class is its steps, one page each, whichever sitting taught them.
 
 ## Learn anything
 
-Any subject, at any depth. Here is one lesson from each of four roadmaps, in medicine, chemistry, physics and history. Every image is the app itself; click one to see it full size.
+Any subject, at any depth. Here is one lesson from each of four courses, in medicine, chemistry, physics and history. Every image is the app itself; click one to see it full size.
 
 ### Medicine · How the heart keeps time
 <table>
@@ -97,18 +97,24 @@ Also: step-through sequences, Mermaid diagrams, timelines on a log scale, hover 
 
 <table>
   <tr>
-    <td width="50%" valign="top"><a href="docs/images/library-dark.webp"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/library-dark.webp"><img src="docs/images/library-light.webp" alt="The library: four roadmaps in medicine, history, chemistry and physics, with their steps and progress."></picture></a><p><b>A library of roadmaps.</b> Each subject is an ordered path of topics, agreed with you before any of it is taught.</p></td>
-    <td width="50%" valign="top"><a href="docs/images/roadmap-dark.webp"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/roadmap-dark.webp"><img src="docs/images/roadmap-light.webp" alt="A roadmap, The chemistry of life: steps in order with their goals, progress and concepts."></picture></a><p><b>Roadmaps.</b> Each step has its goal and why it sits where it does. Progress is read off the knowledge maps, so it is always true.</p></td>
+    <td width="50%" valign="top"><a href="docs/images/home-dark.webp"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/home-dark.webp"><img src="docs/images/home-light.webp" alt="Home: one card for what to do now, then this week, the courses, what to review, recent answers, words looked up and missions."></picture></a><p><b>Home.</b> One card says what to do now. Around it: your week, your courses, what is coming due for review, your latest answers, the words you looked up and your missions.</p></td>
+    <td width="50%" valign="top"><a href="docs/images/class-dark.webp"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/class-dark.webp"><img src="docs/images/class-light.webp" alt="A class: where you are, its steps with how each went, and the concepts it teaches beside them."></picture></a><p><b>A class is its steps.</b> Where you are, with the one thing to do next; every step with how its checks went; and what the class teaches, solid or not yet.</p></td>
   </tr>
 </table>
 <table>
   <tr>
-    <td width="50%" valign="top"><a href="docs/images/mission-dark.webp"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/mission-dark.webp"><img src="docs/images/mission-light.webp" alt="A Praxis mission, Catch your vagal brake in the act: why it matters, what to do, the criteria for done, the debrief and the review."></picture></a><p><b>Praxis.</b> A finished step earns a mission in your own life, with a clear “done when”, your debrief and an honest review. A miss in practice sends a concept back to shaky.</p></td>
-    <td width="50%" valign="top"><a href="docs/images/search-dark.webp"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/search-dark.webp"><img src="docs/images/search-light.webp" alt="The search palette, matching concepts, steps and sessions for the word print."></picture></a><p><b>Search everything.</b> <kbd>Ctrl</kbd> <kbd>K</kbd> or <kbd>/</kbd> finds roadmaps, concepts, missions, and anything said in any session, your own answers included.</p></td>
+    <td width="50%" valign="top"><a href="docs/images/chat-dark.webp"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/chat-dark.webp"><img src="docs/images/chat-light.webp" alt="A step with the chat open beside it: the learner asks which arm makes the heart jump at the start of a climb, and Aristotle answers from the step on screen."></picture></a><p><b>Talk to Aristotle while you read.</b> The chat beside every step sees what you are reading, answers even while a question waits for you, takes <kbd>@</kbd> tags of steps and concepts, and never moves the lesson. Select a word to gloss it, or a passage to ask about it.</p></td>
+    <td width="50%" valign="top"><a href="docs/images/roadmap-dark.webp"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/roadmap-dark.webp"><img src="docs/images/roadmap-light.webp" alt="A course, The chemistry of life: its classes in order with their goals, progress and concepts."></picture></a><p><b>Courses.</b> Each class has its goal and why it sits where it does. Progress is read off the knowledge maps, so it is always true, and the course ends with its final mission.</p></td>
+  </tr>
+</table>
+<table>
+  <tr>
+    <td width="50%" valign="top"><a href="docs/images/mission-dark.webp"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/mission-dark.webp"><img src="docs/images/mission-light.webp" alt="A mission, Catch your vagal brake in the act: why it matters, what to do, the criteria for done, the debrief and the review."></picture></a><p><b>Missions.</b> A real task in your own life, with a clear “done when”, your debrief and an honest review. A miss in practice sends a concept back to shaky.</p></td>
+    <td width="50%" valign="top"><a href="docs/images/search-dark.webp"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/search-dark.webp"><img src="docs/images/search-light.webp" alt="The search palette, matching concepts, classes and missions for the word heart."></picture></a><p><b>Search everything.</b> <kbd>Ctrl</kbd> <kbd>K</kbd> or <kbd>/</kbd> finds courses, classes, concepts, missions, and anything said in any session, your own answers included.</p></td>
   </tr>
 </table>
 
-Plus a Progress page (what is fading, solid concepts over time, training levels), a replayable log of every session, light and dark themes, and Claude Code itself in a drawer at the bottom of every page.
+Plus your own notes on every step, an About you page that missions and courses are built from, a Progress page, a replayable history, focus mode (<kbd>F</kbd>), light and dark themes, and Claude Code's own terminal one keystroke away (<kbd>Ctrl</kbd> <kbd>`</kbd>), opening by itself when it needs you.
 
 ## Quick start
 
@@ -121,7 +127,7 @@ pnpm install
 pnpm start          # builds the interface and starts the server
 ```
 
-Open **http://localhost:4747** and type what you want to learn, or plan a roadmap. Aristotle starts Claude Code inside itself (in the drawer, on your own login) and the lesson begins. The first time, Claude Code asks you to trust the folder and to enable the `aristotle` MCP server: accept both.
+Open **http://localhost:4747** and type what you want to learn, or plan a course. Aristotle starts Claude Code by itself when you open it (in a terminal inside the app, on your own login), and the lesson begins. The first time, Claude Code asks you to trust the folder and to enable the `aristotle` MCP server: accept both.
 
 You can also talk to the tutor from your own terminal: run `claude` in the project folder and say `/teach <anything>`.
 
@@ -156,10 +162,10 @@ Then Aristotle lives at **https://aristotle.test**. The certificate authority is
 | Skill | For |
 |---|---|
 | `/teach <topic>` | A lesson, or `continue` where you left off |
-| `/roadmap <area>` | Plan an ordered path of topics with you |
+| `/roadmap <area>` | Plan a course with you: an ordered path of classes |
 | `/review` | Recall what is fading, across every topic |
 | `/train <topic>` | A training set at the edge of your level |
-| `/praxis` | Design a mission for a finished step or roadmap, or review your debrief |
+| `/praxis` | Design a mission (every course gets its final one on its own), or review your debrief |
 
 ## How it works
 
@@ -174,15 +180,19 @@ flowchart LR
 
 - **Claude Code is the tutor; the server is the classroom.** The server exposes its tools over [MCP](https://modelcontextprotocol.io) (`show`, `quiz`, `ask`, `update_map`, `record_practice`, `save_roadmap`, `save_mission`, `review_mission` and more), and the bridge starts it on demand. A question waits for your answer in the browser and hands it back to Claude, so the tutor reacts to what you actually wrote.
 - **The method lives in skills** (`.claude/skills/`): `teach`, `review`, `train`, `roadmap` and `praxis`. A `researcher` subagent fact-checks claims before they are taught, and an `illustrator` subagent draws diagrams and checks them rendered in both themes.
-- **Claude Code in the page.** The server can run `claude` in a pseudo-terminal and stream it to a drawer in the interface. It is the ordinary interactive Claude Code on your own subscription. Its WebSocket only accepts the app's own pages (Host and Origin checks), and the server only listens on 127.0.0.1.
+- **A second Claude beside the tutor.** The chat, glosses and questions on a passage run `claude -p` on your own login, headless and with no tools, given what you are looking at; the chat continues one session per class. The tutor reads what you asked there.
+- **Claude Code in the page.** The server runs `claude` in a pseudo-terminal and streams it to a terminal in the interface, started when you open the app. It is the ordinary interactive Claude Code on your own subscription. Its WebSocket only accepts the app's own pages (Host and Origin checks), and the server only listens on 127.0.0.1.
 - **Your data is plain files**, written atomically and readable without the app:
 
   ```
   data/
   ├── topics/      one knowledge map per topic (JSON): concepts, prerequisites, evidence, review cards
   ├── sessions/    one append-only log per session (JSON Lines), replayable
-  ├── roadmaps/    one file per roadmap
-  ├── missions/    one file per Praxis mission, with its debrief and review
+  ├── roadmaps/    one file per course
+  ├── missions/    one file per mission, with its debrief and review
+  ├── chats/       the chat beside each class
+  ├── glosses.json, asides.json, notes.json   words you looked up, questions on passages, your notes on steps
+  ├── about.md     About you, in your words
   └── profile.md   what the tutor has learned about how you learn
   ```
 
