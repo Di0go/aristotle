@@ -140,6 +140,21 @@
       const dark = document.documentElement.dataset.theme === 'dark';
       const css = getComputedStyle(document.documentElement);
       const v = (name: string) => css.getPropertyValue(name).trim();
+      /** a blended toward b by t (0-1), for hex colours: Mermaid needs plain colours, not color-mix(). */
+      const mix = (a: string, b: string, t: number) => {
+        const p = (h: string) => (h.length === 4 ? [...h.slice(1)].map((c) => parseInt(c + c, 16)) : [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16)));
+        const [x, y] = [p(a), p(b)];
+        return `#${x.map((c, i) => Math.round(c + (y[i] - c) * t).toString(16).padStart(2, '0')).join('')}`;
+      };
+      const soft = mix(v('--acc'), v('--b0'), dark ? 0.72 : 0.84);
+      // Timelines colour their sections from cScale0…11: the accent, softened, with plain text on it.
+      const scale = Object.fromEntries(
+        Array.from({ length: 12 }, (_, i) => [
+          [`cScale${i}`, i % 2 ? mix(soft, v('--b0'), 0.35) : soft],
+          [`cScaleLabel${i}`, v('--fg')],
+          [`cScaleInv${i}`, v('--acc')],
+        ]).flat(),
+      );
       mermaid.initialize({
         startOnLoad: false,
         securityLevel: 'strict',
@@ -161,6 +176,7 @@
           clusterBorder: v('--rule-strong'),
           noteBkgColor: v('--b2'),
           noteBorderColor: v('--rule-strong'),
+          ...scale,
           // Charts (xychart): lines and bars in the accent, then the semantic colours.
           xyChart: {
             plotColorPalette: [v('--acc'), v('--shaky'), v('--solid'), v('--muted')].join(', '),

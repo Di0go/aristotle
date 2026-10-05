@@ -17,7 +17,7 @@
     { id: 'asleep', label: 'Asleep', brake: 0.85, accel: 0.0 },
     { id: 'resting', label: 'Resting', brake: 0.72, accel: 0.04 },
     { id: 'called', label: 'Name called', brake: 0.25, accel: 0.06 },
-    { id: 'round', label: 'Round 3', brake: 0.0, accel: 0.85 },
+    { id: 'round', label: 'All-out effort', brake: 0.0, accel: 0.85 },
     { id: 'transplant', label: 'No nerves at all', brake: 0, accel: 0 },
   ];
 
@@ -126,14 +126,15 @@
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         ctx.clearRect(0, 0, w, h);
         // trace (top two thirds)
-        const th = h * 0.55;
+        const th = h * 0.5;
         ctx.strokeStyle = css.getPropertyValue('--rule').trim();
         ctx.lineWidth = 1;
         ctx.beginPath();
         ctx.moveTo(0, th * 0.62);
         ctx.lineTo(w, th * 0.62);
         ctx.stroke();
-        ctx.strokeStyle = css.getPropertyValue('--acc').trim();
+        const heart = css.getPropertyValue('--heart').trim();
+        ctx.strokeStyle = heart;
         ctx.lineWidth = 2;
         ctx.beginPath();
         trace.forEach((y, i) => {
@@ -144,22 +145,44 @@
         });
         ctx.stroke();
         // rate over the last 30 s (bottom)
-        const top = h * 0.66;
+        const top = h * 0.6;
         const bh = h - top - 14;
         const lo = 30;
         const hi = 210;
-        ctx.fillStyle = css.getPropertyValue('--faint').trim();
+        const faint = css.getPropertyValue('--faint').trim();
+        ctx.fillStyle = faint;
         ctx.font = `11px ${css.getPropertyValue('--sans')}`;
         ctx.fillText('heart rate, last 30 s', 0, top - 2);
-        ctx.strokeStyle = css.getPropertyValue('--fg').trim();
-        ctx.lineWidth = 1.6;
+        const yOf = (hr: number) => top + 6 + bh - ((hr - lo) / (hi - lo)) * bh;
+        // Reference lines, labelled in beats a minute, so the curve can be read.
+        ctx.strokeStyle = css.getPropertyValue('--rule').trim();
+        ctx.lineWidth = 1;
+        ctx.textAlign = 'right';
+        for (const ref of [60, 120, 180]) {
+          ctx.beginPath();
+          ctx.moveTo(0, yOf(ref));
+          ctx.lineTo(w - 28, yOf(ref));
+          ctx.stroke();
+          ctx.fillText(String(ref), w, yOf(ref) + 4);
+        }
+        ctx.textAlign = 'left';
+        const xOf = (p: { t: number }) => ((p.t - (t - 30)) / 30) * (w - 32);
+        if (history.length > 1) {
+          // The area under the curve, then the curve.
+          ctx.beginPath();
+          history.forEach((p, i) => (i === 0 ? ctx.moveTo(xOf(p), yOf(p.hr)) : ctx.lineTo(xOf(p), yOf(p.hr))));
+          ctx.lineTo(xOf(history[history.length - 1]), top + 6 + bh);
+          ctx.lineTo(xOf(history[0]), top + 6 + bh);
+          ctx.closePath();
+          ctx.globalAlpha = 0.14;
+          ctx.fillStyle = heart;
+          ctx.fill();
+          ctx.globalAlpha = 1;
+        }
+        ctx.strokeStyle = heart;
+        ctx.lineWidth = 2;
         ctx.beginPath();
-        history.forEach((p, i) => {
-          const x = ((p.t - (t - 30)) / 30) * w;
-          const y = top + 6 + bh - ((p.hr - lo) / (hi - lo)) * bh;
-          if (i === 0) ctx.moveTo(x, y);
-          else ctx.lineTo(x, y);
-        });
+        history.forEach((p, i) => (i === 0 ? ctx.moveTo(xOf(p), yOf(p.hr)) : ctx.lineTo(xOf(p), yOf(p.hr))));
         ctx.stroke();
       }
       if (!still) raf = requestAnimationFrame(frame);
@@ -229,7 +252,7 @@
   }
 
   .heart-svg path {
-    fill: var(--acc);
+    fill: var(--heart);
     opacity: 0.9;
   }
 
@@ -259,7 +282,7 @@
   .hr-canvas {
     display: block;
     width: 100%;
-    height: 190px;
+    height: 260px;
   }
 
   .hr-controls {

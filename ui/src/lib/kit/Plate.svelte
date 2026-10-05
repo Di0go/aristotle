@@ -76,11 +76,13 @@
     margin: 0 auto;
   }
 
+  /* Plates are drawn for paper: a transparent one (dark labels, no ground) gets white behind it in dark mode too. */
   .plate img {
     display: block;
     width: 100%;
     height: auto;
     border-radius: 8px;
+    background: #fff;
   }
 
   .pin {

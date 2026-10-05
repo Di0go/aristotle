@@ -18,6 +18,8 @@
   --solid: #2e8b57;
   --shaky: #b8860b;
   --wrong: #c43c3c;
+  /* A heart is red whatever the accent. */
+  --heart: #e0383f;
   --code-bg: #f3f3f3;
   --hl: rgb(245 213 71 / 0.45);
   --acc: #2f6fde;
@@ -44,6 +46,7 @@
   --solid: #5dbb85;
   --shaky: #d9a441;
   --wrong: #ef6b6b;
+  --heart: #f0525a;
   --code-bg: #282828;
   --hl: rgb(245 213 71 / 0.25);
   --acc: #6ea8ff;

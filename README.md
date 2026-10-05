@@ -57,7 +57,7 @@ Bigger subjects are planned as **roadmaps**: an ordered path of topics, agreed w
 
 ## Learn anything
 
-Any subject, at any depth. Here is one lesson from each of four roadmaps, in physiology, chemistry, physics and philosophy. Every image is the app itself; click one to see it full size.
+Any subject, at any depth. Here is one lesson from each of four roadmaps, in medicine, chemistry, physics and history. Every image is the app itself; click one to see it full size.
 
 ### Medicine · How the heart keeps time
 <table>
@@ -83,11 +83,11 @@ Any subject, at any depth. Here is one lesson from each of four roadmaps, in phy
   </tr>
 </table>
 
-### Philosophy · The four causes
+### History · The printing press
 <table>
   <tr>
-    <td width="50%" valign="top"><a href="docs/images/phil-plate-dark.webp"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/phil-plate-dark.webp"><img src="docs/images/phil-plate-light.webp" alt="A plate: the marble bust of Aristotle in Palazzo Altemps, Rome, with markers on the ancient head and the later mantle."></picture></a><p><b>Images that carry the argument.</b> A Roman copy of a Greek bronze, with a mantle added much later: one object, and already several answers to “why?”.</p></td>
-    <td width="50%" valign="top"><a href="docs/images/phil-flow-dark.webp"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/phil-flow-dark.webp"><img src="docs/images/phil-flow-light.webp" alt="A flow of Aristotle's four causes, material, formal, efficient and final, converging on the bust."></picture></a><p><b>Ideas as structure.</b> Aristotle's four kinds of answer to “why?”, built up one at a time on the same object.</p></td>
+    <td width="50%" valign="top"><a href="docs/images/hist-plate-dark.webp"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/hist-plate-dark.webp"><img src="docs/images/hist-plate-light.webp" alt="A plate: Jost Amman’s 1568 woodcut of a print shop, with markers on the compositor, the pressman, the inking, the press and the stacks of paper."></picture></a><p><b>Sources you can point at.</b> A woodcut from 1568 shows the whole process in one room: setting type, inking, pulling the press, stacking identical sheets.</p></td>
+    <td width="50%" valign="top"><a href="docs/images/hist-timeline-dark.webp"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/hist-timeline-dark.webp"><img src="docs/images/hist-timeline-light.webp" alt="A timeline from Gutenberg in the 1440s to Luther’s pamphlets in the 1520s."></picture></a><p><b>Timelines.</b> Seventy years from Gutenberg’s first Bible to the pamphlets of the Reformation, and why the speed of print changed the argument.</p></td>
   </tr>
 </table>
 
@@ -97,14 +97,14 @@ Also: step-through sequences, Mermaid diagrams, timelines on a log scale, hover 
 
 <table>
   <tr>
-    <td width="50%" valign="top"><a href="docs/images/library-dark.webp"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/library-dark.webp"><img src="docs/images/library-light.webp" alt="The library: four roadmaps in physiology, philosophy, chemistry and physics, with their steps and progress."></picture></a><p><b>A library of roadmaps.</b> Each subject is an ordered path of topics, agreed with you before any of it is taught.</p></td>
+    <td width="50%" valign="top"><a href="docs/images/library-dark.webp"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/library-dark.webp"><img src="docs/images/library-light.webp" alt="The library: four roadmaps in medicine, history, chemistry and physics, with their steps and progress."></picture></a><p><b>A library of roadmaps.</b> Each subject is an ordered path of topics, agreed with you before any of it is taught.</p></td>
     <td width="50%" valign="top"><a href="docs/images/roadmap-dark.webp"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/roadmap-dark.webp"><img src="docs/images/roadmap-light.webp" alt="A roadmap, The chemistry of life: steps in order with their goals, progress and concepts."></picture></a><p><b>Roadmaps.</b> Each step has its goal and why it sits where it does. Progress is read off the knowledge maps, so it is always true.</p></td>
   </tr>
 </table>
 <table>
   <tr>
     <td width="50%" valign="top"><a href="docs/images/mission-dark.webp"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/mission-dark.webp"><img src="docs/images/mission-light.webp" alt="A Praxis mission, Catch your vagal brake in the act: why it matters, what to do, the criteria for done, the debrief and the review."></picture></a><p><b>Praxis.</b> A finished step earns a mission in your own life, with a clear “done when”, your debrief and an honest review. A miss in practice sends a concept back to shaky.</p></td>
-    <td width="50%" valign="top"><a href="docs/images/search-dark.webp"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/search-dark.webp"><img src="docs/images/search-light.webp" alt="The search palette, matching concepts, steps and sessions for the word cause."></picture></a><p><b>Search everything.</b> <kbd>Ctrl</kbd> <kbd>K</kbd> or <kbd>/</kbd> finds roadmaps, concepts, missions, and anything said in any session, your own answers included.</p></td>
+    <td width="50%" valign="top"><a href="docs/images/search-dark.webp"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/search-dark.webp"><img src="docs/images/search-light.webp" alt="The search palette, matching concepts, steps and sessions for the word print."></picture></a><p><b>Search everything.</b> <kbd>Ctrl</kbd> <kbd>K</kbd> or <kbd>/</kbd> finds roadmaps, concepts, missions, and anything said in any session, your own answers included.</p></td>
   </tr>
 </table>
 
@@ -229,7 +229,7 @@ docs/        images for this page
 - **[amosblomqvist/learn](https://github.com/amosblomqvist/learn)**: the original setup from that video, for the pi agent. Its teaching principles and quiz design inspired this project's. No text or code is copied (the repository has no licence).
 - **[vasanthsreeram/Alvarmethod](https://github.com/vasanthsreeram/Alvarmethod)** (MIT): the port to Claude Code and other agents, and the idea of per-topic maps and resumable session files.
 - **[ts-fsrs](https://github.com/open-spaced-repetition/ts-fsrs)** for spaced repetition. The epigraph is from Aristotle's *Nicomachean Ethics*, Book II, in W. D. Ross's translation.
-- **Images in the demo lessons**, all from Wikimedia Commons: the heart, Henry Vandyke Carter for *Gray's Anatomy* (1918, public domain); the mitochondrion, Kelvinsong (CC0); the bust of Aristotle, a Roman copy after Lysippos, Palazzo Altemps (photograph in the public domain).
+- **Images in the demo lessons**, all from Wikimedia Commons: the heart, Henry Vandyke Carter for *Gray's Anatomy* (1918, public domain); the mitochondrion, Kelvinsong (CC0); the print shop, Jost Amman’s woodcut from the *Ständebuch* (1568, public domain).
 
 ## License
 
