@@ -52,9 +52,9 @@
         <span class="sep">/</span>
         <span>Concepts</span>
       </nav>
-      <h1 class="page-title">What {topic.title} teaches</h1>
+      <h1 class="page-title">{topic.title}: concepts</h1>
       <p class="page-lede">
-        {counts.solid} of {counts.total} concepts solid. Point at one to see what it builds on; click it for its record.
+        What this class teaches. {counts.solid} of {counts.total} solid; point at one to see what it builds on, click it for its record.
       </p>
     </header>
 
