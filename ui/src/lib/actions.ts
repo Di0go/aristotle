@@ -4,7 +4,7 @@
 
 import { claude } from './claude.svelte.ts';
 import { feed } from './feed.svelte.ts';
-import { link } from './router.svelte.ts';
+import { link, router } from './router.svelte.ts';
 import type { Roadmap } from '../../../shared/types.ts';
 
 export const actions = {
@@ -35,7 +35,13 @@ export const actions = {
     const step = roadmap.steps[index];
     const words = oneLine(said) ? ` I said: "${oneLine(said)}"` : '';
     const what = `"${step.title}", step ${index + 1} of my roadmap ${roadmap.slug}. Use exactly that title as the topic title. What I want from it: ${oneLine(step.goal)}.${words}`;
-    go(`/teach ${what}`, `Use the teach skill to teach me ${what}`, `Step ${index + 1} of ${roadmap.title}: ${step.title}`);
+    go(
+      `/teach ${what}`,
+      `Use the teach skill to teach me ${what}`,
+      `Step ${index + 1} of ${roadmap.title}: ${step.title}`,
+      false,
+      step.topic,
+    );
   },
   planRoadmap(area: string, goal = '') {
     const what = oneLine(area);
@@ -52,6 +58,8 @@ export const actions = {
       `/teach continue ${slug}.${words}`,
       `Use the teach skill to continue the topic ${slug} where I left off.${words}`,
       `Continuing ${feed.topics[slug]?.title ?? slug}`,
+      false,
+      slug,
     );
   },
   train(slug: string) {
@@ -108,16 +116,19 @@ function pickUp() {
 }
 
 /**
- * Lessons, reviews and training open a session, so they move to Now. Planning a roadmap or a mission is a
- * conversation: it stays on the page (where the draft appears) and opens Claude beside it.
+ * Lessons, reviews and training open a session, so they move to Now, except a class continued from its own page.
+ * Planning a roadmap or a mission is a conversation: it stays on the page (where the draft appears) and opens Claude beside it.
  */
-function go(command: string, initial: string, label: string, converse = false) {
+function go(command: string, initial: string, label: string, converse = false, topic?: string) {
   claude.run(command, initial);
   if (converse) {
     claude.toggle(true);
     return;
   }
   feed.begin(label);
+  // On the topic's own class page, stay: it becomes the live lesson when the session starts, with the class so far above.
+  const route = router.route;
+  if (topic && route.page === 'lesson' && route.slug === topic) return;
   if (location.hash !== link.now() && location.hash !== '') location.hash = link.now();
 }
 

@@ -1,6 +1,7 @@
 <script lang="ts">
   // One piece of teaching from `show` (orientation, step, plan, summary, feedback or note), labelled and rendered.
   import Markdown from './Markdown.svelte';
+  import { cleanTitle } from './sections.ts';
   import type { BlockItem } from '../../../shared/types.ts';
 
   const LABELS: Record<BlockItem['kind'], string> = {
@@ -15,7 +16,7 @@
   let { item, number = 0 }: { item: BlockItem; number?: number } = $props();
 
   /** "2. Wired and broadcast" is shown as "Wired and broadcast": the label already carries the number. */
-  const title = $derived(item.title?.replace(/^\s*(step\s*)?\d+[.:)]\s*/i, ''));
+  const title = $derived(cleanTitle(item.title));
   const label = $derived(item.kind === 'step' && number ? `Step ${number}` : (LABELS[item.kind] ?? 'Note'));
 </script>
 

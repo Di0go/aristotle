@@ -12,7 +12,7 @@
   import { formatDay, formatTime } from '../lib/format.ts';
   import { countsOf, placeOf } from '../lib/library.ts';
   import { link } from '../lib/router.svelte.ts';
-  import { openByDefault, sectionsOf } from '../lib/sections.ts';
+  import { openByDefault, sectionsOf, stepsIn } from '../lib/sections.ts';
   import Grip from '../lib/Grip.svelte';
   import LessonBench from '../lib/LessonBench.svelte';
   import LessonPart from '../lib/LessonPart.svelte';
@@ -49,7 +49,15 @@
       (sessions ?? []).flatMap((s) => s.items as { id: string; type: string }[]),
     ),
   );
-  const parts = $derived((sessions ?? []).map((s) => ({ session: s.session, sections: sectionsOf(s.items) })));
+  /** Each session's parts, with steps numbered on across the whole class. */
+  const parts = $derived.by(() => {
+    let before = 0;
+    return (sessions ?? []).map((s) => {
+      const sections = sectionsOf(s.items, before);
+      before += stepsIn(s.items);
+      return { session: s.session, sections };
+    });
+  });
   const allSections = $derived(parts.flatMap((p) => p.sections));
 
   setContext('topic-slug', () => slug);
@@ -203,7 +211,11 @@
             aria-label="Your first words to Claude"></textarea>
           <button class="primary" onclick={() => begin(text)}>{started ? 'Continue' : 'Start'}</button>
         </div>
-        <p class="composer-off">{claude.running ? 'Claude picks it up from here.' : 'This starts Claude here in Aristotle.'}</p>
+        {#if feed.starting}
+          <p class="composer-off picking-up"><span class="spinner" aria-hidden="true"></span>Claude is picking up the class…</p>
+        {:else}
+          <p class="composer-off">{claude.running ? 'Claude picks it up from here.' : 'This starts Claude here in Aristotle.'}</p>
+        {/if}
       </div>
     </div>
 
@@ -303,21 +315,15 @@
     color: var(--acc);
   }
 
-  .session-divider {
+  .picking-up {
     display: flex;
-    align-items: baseline;
-    gap: 10px;
-    max-width: var(--measure);
-    margin: 0 auto 4px;
-    padding-bottom: 8px;
-    border-bottom: 1px solid var(--rule);
-    font-size: 0.82rem;
-    font-weight: 600;
-    color: var(--fg-2);
+    align-items: center;
+    gap: 8px;
   }
 
-  .session-divider .muted {
-    font-weight: 400;
+  .picking-up .spinner {
+    width: 12px;
+    height: 12px;
   }
 
   /* On a class you are reading, the box waits at the end instead of following you down the page. */

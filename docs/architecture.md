@@ -187,6 +187,7 @@ Only for the interface (and the tests); Claude Code uses MCP.
 |---|---|
 | [`Ask.svelte`](../ui/src/lib/Ask.svelte) | An open question in a lesson: the prompt, a text box with a live maths preview, and the answer once sent. |
 | [`Block.svelte`](../ui/src/lib/Block.svelte) | One piece of teaching from `show` (orientation, step, plan, summary, feedback or note), labelled and rendered. |
+| [`ClassHistory.svelte`](../ui/src/lib/ClassHistory.svelte) | The class so far, above a live lesson: every earlier session on the topic, each part folded to one line (open any to reread it), so continuing a class never hides what came before. |
 | [`Composer.svelte`](../ui/src/lib/Composer.svelte) | Talk to Claude from Aristotle: types the message into the Claude Code running in the drawer. |
 | [`ConceptNode.svelte`](../ui/src/lib/ConceptNode.svelte) | One concept on a map: status by fill and outline, goal by an inner ring, focus by a halo. |
 | [`ConceptPanel.svelte`](../ui/src/lib/ConceptPanel.svelte) | The side panel for one concept on a map: status, what it rests on and leads to, notes, and its check record. |

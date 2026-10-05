@@ -62,7 +62,7 @@ const conceptParam = z.string().optional().describe('Id of the map concept this 
 const leadParam = z
   .object({
     markdown: z.string().min(1),
-    title: z.string().optional(),
+    title: z.string().optional().describe("The step's title alone, never numbered: Aristotle numbers steps across the whole class"),
     concept: z.string().optional(),
   })
   .optional()
@@ -473,7 +473,12 @@ export function createMcpServer(gym: Gym): McpServer {
         ' Returns immediately.',
       inputSchema: {
         markdown: z.string().min(1).describe('The content, in Markdown'),
-        title: z.string().optional().describe('A short heading'),
+        title: z
+          .string()
+          .optional()
+          .describe(
+            'A short heading, never numbered ("The fast arm", not "Step 3 · The fast arm"): Aristotle numbers steps across the whole class',
+          ),
         kind: z
           .enum(['orient', 'step', 'plan', 'summary', 'feedback', 'note'])
           .default('step')

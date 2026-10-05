@@ -27,13 +27,16 @@ const LABELS: Record<SectionKind, string> = {
   notes: 'Notes',
 };
 
-/** "2. Wired and broadcast" → "Wired and broadcast": the label carries the number. */
-const cleanTitle = (t?: string) => t?.replace(/^\s*(step\s*)?\d+[.:)]\s*/i, '') || undefined;
+/**
+ * "2. Wired and broadcast" or "Step 3 · The fast arm" → the title alone: Aristotle numbers steps across the whole
+ * class, so a number Claude wrote (often from its plan) would only disagree with it.
+ */
+export const cleanTitle = (t?: string) => t?.replace(/^\s*(step\s*)?\d+\s*[.:)·—–-]\s*/i, '') || undefined;
 
-/** The parts of a class, in order, each with its items and how its checks went. */
-export function sectionsOf(items: PublicItem[]): Section[] {
+/** The parts of a session, in order, each with its items and how its checks went; steps numbered on from `before`. */
+export function sectionsOf(items: PublicItem[], before = 0): Section[] {
   const out: Section[] = [];
-  let step = 0;
+  let step = before;
   let current: Section | undefined;
   const open = (kind: SectionKind, item: PublicItem, title?: string) => {
     if (kind === 'step') step++;
@@ -60,6 +63,11 @@ export function sectionsOf(items: PublicItem[]): Section[] {
     tally(current!, item);
   }
   return out;
+}
+
+/** How many teaching steps these items hold. */
+export function stepsIn(items: PublicItem[]): number {
+  return items.filter((i) => i.type === 'block' && i.kind === 'step').length;
 }
 
 /**
