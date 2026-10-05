@@ -8,7 +8,8 @@ import { execFile } from 'node:child_process';
 const API = 'https://commons.wikimedia.org/w/api.php';
 // Wikimedia asks every client for a descriptive User-Agent (Policy:User-Agent_policy).
 const UA = 'Aristotle/0.3 (personal learning app; https://github.com/Di0go/aristotle) node-fetch';
-const IMAGE_HOSTS = ['upload.wikimedia.org'];
+// Wikimedia serves originals from upload. and rendered thumbnails (PNG versions of SVGs, for one) from thumb.
+const IMAGE_HOSTS = ['upload.wikimedia.org', 'thumb.wikimedia.org'];
 
 export interface FoundImage {
   title: string;

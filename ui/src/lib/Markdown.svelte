@@ -161,6 +161,19 @@
           clusterBorder: v('--rule-strong'),
           noteBkgColor: v('--b2'),
           noteBorderColor: v('--rule-strong'),
+          // Charts (xychart): lines and bars in the accent, then the semantic colours.
+          xyChart: {
+            plotColorPalette: [v('--acc'), v('--shaky'), v('--solid'), v('--muted')].join(', '),
+            titleColor: v('--fg'),
+            xAxisLabelColor: v('--muted'),
+            yAxisLabelColor: v('--muted'),
+            xAxisTitleColor: v('--muted'),
+            yAxisTitleColor: v('--muted'),
+            xAxisLineColor: v('--rule-strong'),
+            yAxisLineColor: v('--rule-strong'),
+            xAxisTickColor: v('--rule-strong'),
+            yAxisTickColor: v('--rule-strong'),
+          },
         },
       });
       for (const code of blocks) {

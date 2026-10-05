@@ -6,12 +6,11 @@
 </p>
 
 <p align="center">
-  <a href="#quick-start">Quick start</a> ·
   <a href="#the-method">The method</a> ·
-  <a href="#a-tour">A tour</a> ·
-  <a href="#the-visual-kit">The visual kit</a> ·
-  <a href="#how-it-works">How it works</a> ·
-  <a href="#credits">Credits</a>
+  <a href="#learn-anything">Learn anything</a> ·
+  <a href="#around-the-lessons">Around the lessons</a> ·
+  <a href="#quick-start">Quick start</a> ·
+  <a href="#how-it-works">How it works</a>
 </p>
 
 <p align="center">
@@ -24,20 +23,13 @@
 
 ---
 
-**Aristotle is a personal tutor that lives on your machine.** [Claude Code](https://claude.com/claude-code) does the teaching; Aristotle is the room you learn in: lessons one reasoning step at a time, questions you answer in your own words, a living map of what you understand, spaced review before things fade, training sets that get harder as you do, and missions that take what you learned out into your own life.
+**Aristotle is a personal tutor that lives on your machine.** [Claude Code](https://claude.com/claude-code) does the teaching; Aristotle is the room you learn in. Lessons come one reasoning step at a time, each followed by a question you answer yourself, and they are drawn, animated and explorable rather than walls of text. A living map shows what you understand, spaced review catches what is fading, training sets get harder as you do, and missions take what you learned out into your own life.
 
 It runs on your Claude subscription. No API keys, no accounts, no cloud: everything you learn is a plain file you own.
 
-> Aristotle tutored a teenage Alexander from 343 BC. This one is more patient, and it is yours.
-
 <p align="center">
-  <a href="docs/images/hero-dark.webp"><picture>
-        <source media="(prefers-color-scheme: dark)" srcset="docs/images/hero-dark.webp">
-        <img src="docs/images/hero-light.webp" alt="A lesson in Aristotle on how the heart keeps time: an interactive figure where the heart rate jumps when the vagal brake is released, then climbs as the accelerator pushes, beside the concept being worked on and the topic outline." width="100%">
-      </picture></a>
+  <a href="docs/images/hero-dark.webp"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/hero-dark.webp"><img src="docs/images/hero-light.webp" alt="A lesson in Aristotle: an engraving of the heart from Gray's Anatomy with numbered markers, inside a lesson on how the heart keeps time, with the library of four subjects beside it, a knowledge map and an answered check laid over it." width="100%"></picture></a>
 </p>
-
-<p align="center"><sub>A live lesson. The figure is real and interactive: the tutor asked to drop the brake, then push the accelerator, and feel which one is fast.</sub></p>
 
 ## The method
 
@@ -63,91 +55,60 @@ flowchart LR
 
 Bigger subjects are planned as **roadmaps**: an ordered path of topics, agreed with you before any of it is taught, ending in a capstone mission that uses the whole path at once.
 
-## A tour
+## Learn anything
 
+Any subject, at any depth. Here is one lesson from each of four roadmaps, in physiology, chemistry, physics and philosophy. Every image is the app itself; click one to see it full size.
+
+### Medicine · How the heart keeps time
 <table>
   <tr>
-    <td width="50%" valign="top">
-      <a href="docs/images/roadmap-dark.webp"><picture>
-        <source media="(prefers-color-scheme: dark)" srcset="docs/images/roadmap-dark.webp">
-        <img src="docs/images/roadmap-light.webp" alt="A roadmap, The body under pressure: steps in order with their goals, progress and concepts, and a reviewed Praxis mission on the finished step.">
-      </picture></a>
-      <p><b>Roadmaps.</b> A path of topics, each with its goal and why it sits where it does. Progress is read off the knowledge maps, so it is always true.</p>
-    </td>
-    <td width="50%" valign="top">
-      <a href="docs/images/mission-dark.webp"><picture>
-        <source media="(prefers-color-scheme: dark)" srcset="docs/images/mission-dark.webp">
-        <img src="docs/images/mission-light.webp" alt="A Praxis mission, Catch your vagal brake in the act: why it matters, what to do, the criteria for done, the concepts it uses, and the debrief.">
-      </picture></a>
-      <p><b>Praxis.</b> A mission with a clear "done when", the concepts it puts to work, your debrief and the tutor's review. A miss in practice sends a concept back to shaky.</p>
-    </td>
-  </tr>
-  <tr>
-    <td width="50%" valign="top">
-      <a href="docs/images/topic-dark.webp"><picture>
-        <source media="(prefers-color-scheme: dark)" srcset="docs/images/topic-dark.webp">
-        <img src="docs/images/topic-light.webp" alt="A topic, How the heart keeps time: its outline in teaching order and its knowledge map as a graph of concepts and prerequisites.">
-      </picture></a>
-      <p><b>Knowledge maps.</b> Every topic as a graph of concepts and what they rest on, across topics too. Hover a concept anywhere for its card.</p>
-    </td>
-    <td width="50%" valign="top">
-      <a href="docs/images/search-dark.webp"><picture>
-        <source media="(prefers-color-scheme: dark)" srcset="docs/images/search-dark.webp">
-        <img src="docs/images/search-light.webp" alt="The search palette, matching concepts, missions, roadmap steps and sessions for the word brake.">
-      </picture></a>
-      <p><b>Search everything.</b> <kbd>Ctrl</kbd> <kbd>K</kbd> or <kbd>/</kbd> finds roadmaps, concepts, missions, and anything said in any session, your own answers included.</p>
-    </td>
+    <td width="50%" valign="top"><a href="docs/images/med-plate-dark.webp"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/med-plate-dark.webp"><img src="docs/images/med-plate-light.webp" alt="A plate: Gray's Anatomy engraving of the inside of the heart, with numbered markers for the chambers, valves and walls, inside the lesson."></picture></a><p><b>Plates.</b> Real images with numbered markers and a key, used only when their licence allows it (here Gray's Anatomy, 1918, public domain).</p></td>
+    <td width="50%" valign="top"><a href="docs/images/med-explorable-dark.webp"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/med-explorable-dark.webp"><img src="docs/images/med-explorable-light.webp" alt="An explorable: a beating heart with its trace and its rate over 30 seconds, jumping when the vagal brake is released."></picture></a><p><b>Explorables.</b> Hand-built simulations. Here you drop the vagal brake and feel the heart jump within a beat, then push the accelerator and watch it climb over seconds.</p></td>
   </tr>
 </table>
 
-## The visual kit
-
-Words alone are the weakest way to teach anything physical, spatial or timed. The tutor writes a few lines of JSON; Aristotle draws them, animates them and makes them explorable. Every figure below is from the same lesson. Click any image to see it full size; in the app, click a figure to open it large.
-
-<p align="center">
-  <a href="docs/images/kit-plate-dark.webp"><picture>
-        <source media="(prefers-color-scheme: dark)" srcset="docs/images/kit-plate-dark.webp">
-        <img src="docs/images/kit-plate-light.webp" alt="A plate: Henry Vandyke Carter's engraving of the inside of the heart from Gray's Anatomy, with seven numbered markers for the chambers, valves and walls." width="78%">
-      </picture></a>
-</p>
-<p align="center"><sub><b>Plates.</b> Real images with numbered markers and a key, taken only from files whose licence allows reuse (here, Gray's Anatomy, 1918, public domain).</sub></p>
-
+### Chemistry · How cells release energy
 <table>
   <tr>
-    <td width="50%" valign="top">
-      <a href="docs/images/kit-flow-dark.webp"><picture>
-        <source media="(prefers-color-scheme: dark)" srcset="docs/images/kit-flow-dark.webp">
-        <img src="docs/images/kit-flow-light.webp" alt="A flow: from a startle to a racing heart, brainstem to sympathetic nerves to the pacemaker, lit up step by step with signals travelling along the paths.">
-      </picture></a>
-      <p><b>Flows.</b> A pathway you walk through one step at a time, with signals moving along it: fast routes, opposing routes, slow ones.</p>
-    </td>
-    <td width="50%" valign="top">
-      <a href="docs/images/kit-balance-dark.webp"><picture>
-        <source media="(prefers-color-scheme: dark)" srcset="docs/images/kit-balance-dark.webp">
-        <img src="docs/images/kit-balance-light.webp" alt="A balance: a dial from 40 to 190 beats a minute set by two forces, the vagal brake and the sympathetic accelerator, here at 98 after a startle.">
-      </picture></a>
-      <p><b>Balances.</b> Two forces on one value, with states to step through (asleep, resting, startled, all-out) and sliders to try your own.</p>
-    </td>
-  </tr>
-  <tr>
-    <td width="50%" valign="top">
-      <a href="docs/images/kit-timeline-dark.webp"><picture>
-        <source media="(prefers-color-scheme: dark)" srcset="docs/images/kit-timeline-dark.webp">
-        <img src="docs/images/kit-timeline-light.webp" alt="A timeline on a log scale from half a second to three hours: brake released, sympathetic nerves, adrenaline and cortisol, scrubbed to 27 minutes.">
-      </picture></a>
-      <p><b>Timelines.</b> Things that happen on very different clocks, on a log scale you can play or scrub, from under a second to hours.</p>
-    </td>
-    <td width="50%" valign="top">
-      <a href="docs/images/kit-explorable-dark.webp"><picture>
-        <source media="(prefers-color-scheme: dark)" srcset="docs/images/kit-explorable-dark.webp">
-        <img src="docs/images/kit-explorable-light.webp" alt="An explorable: a beating heart with its trace, its rate over the last 30 seconds, presets and sliders for the brake, the accelerator and age.">
-      </picture></a>
-      <p><b>Explorables.</b> Hand-built simulations for the ideas that deserve one. You move the inputs, and the lesson asks what you noticed.</p>
-    </td>
+    <td width="50%" valign="top"><a href="docs/images/chem-flow-dark.webp"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/chem-flow-dark.webp"><img src="docs/images/chem-flow-light.webp" alt="A flow from glucose to ATP: glycolysis, the Krebs cycle and the electron transport chain, walked through step by step."></picture></a><p><b>Flows.</b> A pathway you walk through one step at a time, with signals moving along it, alongside the equation it unpacks.</p></td>
+    <td width="50%" valign="top"><a href="docs/images/chem-plate-dark.webp"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/chem-plate-dark.webp"><img src="docs/images/chem-plate-light.webp" alt="A plate of a mitochondrion with markers on the matrix, the cristae, ATP synthase and the outer membrane."></picture></a><p><b>Where it happens.</b> The same reaction, placed in the structure that runs it: the folds of the inner membrane are where most of the ATP is made.</p></td>
   </tr>
 </table>
 
-Plus LaTeX maths, Mermaid diagrams, step-through sequences, hover cards on every term and concept, a Progress page (what's fading, solid concepts over time, training levels), a replayable log of every session, light and dark themes, and Claude Code itself in a drawer at the bottom of every page.
+### Physics · Falling with air resistance
+<table>
+  <tr>
+    <td width="50%" valign="top"><a href="docs/images/phys-chart-dark.webp"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/phys-chart-dark.webp"><img src="docs/images/phys-chart-light.webp" alt="A chart of a skydiver's speed over 20 seconds, rising fast and levelling off near 55 metres per second."></picture></a><p><b>Charts and maths.</b> LaTeX for the equations and charts drawn from them: drag grows with the square of speed, so the curve flattens.</p></td>
+    <td width="50%" valign="top"><a href="docs/images/phys-balance-dark.webp"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/phys-balance-dark.webp"><img src="docs/images/phys-balance-light.webp" alt="A balance: drag against weight, with the dial showing the skydiver still speeding up by 4.8 m/s² five seconds into the jump."></picture></a><p><b>Balances.</b> Two forces on one value, with states to step through: just jumped, five seconds in, terminal velocity, under the canopy.</p></td>
+  </tr>
+</table>
+
+### Philosophy · The four causes
+<table>
+  <tr>
+    <td width="50%" valign="top"><a href="docs/images/phil-plate-dark.webp"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/phil-plate-dark.webp"><img src="docs/images/phil-plate-light.webp" alt="A plate: the marble bust of Aristotle in Palazzo Altemps, Rome, with markers on the ancient head and the later mantle."></picture></a><p><b>Images that carry the argument.</b> A Roman copy of a Greek bronze, with a mantle added much later: one object, and already several answers to “why?”.</p></td>
+    <td width="50%" valign="top"><a href="docs/images/phil-flow-dark.webp"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/phil-flow-dark.webp"><img src="docs/images/phil-flow-light.webp" alt="A flow of Aristotle's four causes, material, formal, efficient and final, converging on the bust."></picture></a><p><b>Ideas as structure.</b> Aristotle's four kinds of answer to “why?”, built up one at a time on the same object.</p></td>
+  </tr>
+</table>
+
+Also: step-through sequences, Mermaid diagrams, timelines on a log scale, hover cards on every term and concept, and quizzes whose wrong answers are the mistakes you would really make.
+
+## Around the lessons
+
+<table>
+  <tr>
+    <td width="50%" valign="top"><a href="docs/images/library-dark.webp"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/library-dark.webp"><img src="docs/images/library-light.webp" alt="The library: four roadmaps in physiology, philosophy, chemistry and physics, with their steps and progress."></picture></a><p><b>A library of roadmaps.</b> Each subject is an ordered path of topics, agreed with you before any of it is taught.</p></td>
+    <td width="50%" valign="top"><a href="docs/images/roadmap-dark.webp"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/roadmap-dark.webp"><img src="docs/images/roadmap-light.webp" alt="A roadmap, The chemistry of life: steps in order with their goals, progress and concepts."></picture></a><p><b>Roadmaps.</b> Each step has its goal and why it sits where it does. Progress is read off the knowledge maps, so it is always true.</p></td>
+  </tr>
+</table>
+<table>
+  <tr>
+    <td width="50%" valign="top"><a href="docs/images/mission-dark.webp"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/mission-dark.webp"><img src="docs/images/mission-light.webp" alt="A Praxis mission, Catch your vagal brake in the act: why it matters, what to do, the criteria for done, the debrief and the review."></picture></a><p><b>Praxis.</b> A finished step earns a mission in your own life, with a clear “done when”, your debrief and an honest review. A miss in practice sends a concept back to shaky.</p></td>
+    <td width="50%" valign="top"><a href="docs/images/search-dark.webp"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/search-dark.webp"><img src="docs/images/search-light.webp" alt="The search palette, matching concepts, steps and sessions for the word cause."></picture></a><p><b>Search everything.</b> <kbd>Ctrl</kbd> <kbd>K</kbd> or <kbd>/</kbd> finds roadmaps, concepts, missions, and anything said in any session, your own answers included.</p></td>
+  </tr>
+</table>
+
+Plus a Progress page (what is fading, solid concepts over time, training levels), a replayable log of every session, light and dark themes, and Claude Code itself in a drawer at the bottom of every page.
 
 ## Quick start
 
@@ -268,6 +229,7 @@ docs/        images for this page
 - **[amosblomqvist/learn](https://github.com/amosblomqvist/learn)**: the original setup from that video, for the pi agent. Its teaching principles and quiz design inspired this project's. No text or code is copied (the repository has no licence).
 - **[vasanthsreeram/Alvarmethod](https://github.com/vasanthsreeram/Alvarmethod)** (MIT): the port to Claude Code and other agents, and the idea of per-topic maps and resumable session files.
 - **[ts-fsrs](https://github.com/open-spaced-repetition/ts-fsrs)** for spaced repetition. The epigraph is from Aristotle's *Nicomachean Ethics*, Book II, in W. D. Ross's translation.
+- **Images in the demo lessons**, all from Wikimedia Commons: the heart, Henry Vandyke Carter for *Gray's Anatomy* (1918, public domain); the mitochondrion, Kelvinsong (CC0); the bust of Aristotle, a Roman copy after Lysippos, Palazzo Altemps (photograph in the public domain).
 
 ## License
 
