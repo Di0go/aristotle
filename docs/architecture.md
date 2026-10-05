@@ -204,7 +204,7 @@ Only for the interface (and the tests); Claude Code uses MCP.
 | [`Home.svelte`](../ui/src/lib/Home.svelte) | Home: a dashboard that answers what to do now (one card, one button), how he is doing (this week, his courses) and what needs him (reviews coming due, recent answers, words he looked up, missions). |
 | [`HoverCard.svelte`](../ui/src/lib/HoverCard.svelte) | One hover card for the whole app. |
 | [`LessonActivity.svelte`](../ui/src/lib/LessonActivity.svelte) | The foot of a running lesson: what is happening right now, so he never has to guess whether to wait. |
-| [`LessonBench.svelte`](../ui/src/lib/LessonBench.svelte) | The right sidebar beside a lesson: where it sits on the roadmap, the concept being taught, the plan as an outline, and the local graph around the concept. |
+| [`LessonBench.svelte`](../ui/src/lib/LessonBench.svelte) | The right sidebar beside a step: the concept being taught, the local graph around it, and the class's concepts. |
 | [`Lightbox.svelte`](../ui/src/lib/Lightbox.svelte) | Click an image or a drawing in a lesson to see it large: images in Markdown, the plate of a ```plate (with its numbered markers), inline SVG drawings and Mermaid diagrams. |
 | [`LocalGraph.svelte`](../ui/src/lib/LocalGraph.svelte) | The neighbourhood of one concept: it in the middle, what it builds on above, what builds on it below. |
 | [`Logo.svelte`](../ui/src/lib/Logo.svelte) | The mark: the peripatos, the covered walk of the Lyceum where Aristotle's school taught (and, the story goes, walked as it talked). |

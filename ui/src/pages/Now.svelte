@@ -2,7 +2,6 @@
   // Home (#/). A review or a training set running now is shown here as it grows, with the composer and its bench:
   // they belong to no class. Everything else, a live lesson included, is Home: lessons happen in their class.
   import { setContext, tick } from 'svelte';
-  import { actions } from '../lib/actions.ts';
   import { claude } from '../lib/claude.svelte.ts';
   import { placeFigures } from '../lib/explorables/index.ts';
   import { feed } from '../lib/feed.svelte.ts';
@@ -19,7 +18,6 @@
   const KIND = { learn: 'Lesson', review: 'Review', train: 'Training set' } as const;
 
   let benchOpen = $state(false);
-  let stopHint = $state(false);
   /** How many items the feed had last time we looked; plain, so reading it doesn't make the scroll effect depend on it. */
   let count = 0;
 
@@ -35,7 +33,7 @@
 
   // When Claude starts working at the end of the lesson, keep its activity card in view if he is near the bottom.
   $effect(() => {
-    if (!running || (!claude.busy && !feed.wrapping)) return;
+    if (!running || !claude.busy) return;
     const nearBottom = window.innerHeight + window.scrollY >= document.body.scrollHeight - 500;
     if (nearBottom && !feed.pending) void tick().then(() => window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }));
   });
@@ -57,11 +55,6 @@
       else window.scrollTo({ top: document.body.scrollHeight, behavior: first ? 'instant' : 'smooth' });
     });
   });
-
-  /** Asks Claude to wrap up; if Claude isn't running here, says where to tell it instead. */
-  function stop() {
-    if (!actions.stopForToday()) stopHint = true;
-  }
 </script>
 
 {#if running && feed.session}
@@ -81,17 +74,7 @@
         </nav>
         <div class="title-row">
           <h1 class="page-title">{reviewing ? 'Review' : feed.session.topic}</h1>
-          <button
-            class="ghost small stop"
-            onclick={stop}
-            disabled={feed.wrapping}
-            title="Claude updates your map and writes where to pick up next time"
-            >{feed.wrapping ? 'Wrapping up…' : 'Stop for today'}</button
-          >
         </div>
-        {#if stopHint && !claude.running}<p class="stop-hint muted">
-            Claude isn't running in Aristotle. If you're talking to it in your own terminal, tell it there to stop for today.
-          </p>{/if}
         <dl class="props">
           <dt>session</dt>
           <dd>{KIND[feed.session.kind ?? 'learn']}: {feed.session.goal}</dd>
@@ -144,15 +127,5 @@
     align-items: flex-start;
     justify-content: space-between;
     gap: 16px;
-  }
-
-  .stop {
-    flex: none;
-    margin-top: 6px;
-  }
-
-  .stop-hint {
-    margin: 8px 0 0;
-    font-size: 0.82rem;
   }
 </style>

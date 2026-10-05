@@ -1,6 +1,5 @@
 <script lang="ts">
   // The foot of a running lesson: what is happening right now, so he never has to guess whether to wait.
-  //   wrapping up    he pressed Stop; Claude is updating the map and writing the handoff
   //   working        Claude is preparing the next step (a placeholder where it will appear)
   //   your turn      a question is waiting above (nothing to add here)
   //   waiting        Claude has finished and is waiting on him: what it said, and where to answer
@@ -10,19 +9,19 @@
   let now = $state(Date.now());
 
   const secs = $derived(claude.busy ? Math.max(0, Math.round((now - claude.busySince) / 1000)) : 0);
-  const phase = $derived(feed.wrapping ? 'wrapping' : feed.pending ? 'turn' : claude.busy ? 'working' : claude.running ? 'waiting' : 'off');
+  const phase = $derived(feed.pending ? 'turn' : claude.busy ? 'working' : claude.running ? 'waiting' : 'off');
   /** " (pondering), 12 s": Claude Code's own word for it, and the seconds once there are a few. */
   const detail = $derived(`${claude.doing ? ` (${claude.doing.replace('…', '').toLowerCase()})` : ''}${secs >= 3 ? `, ${secs} s` : ''}`);
 
   // The clock only ticks while there is something to time.
   $effect(() => {
-    if (!claude.busy && !feed.wrapping) return;
+    if (!claude.busy) return;
     const t = setInterval(() => (now = Date.now()), 1000);
     return () => clearInterval(t);
   });
 </script>
 
-{#if phase === 'working' || phase === 'wrapping'}
+{#if phase === 'working'}
   <div class="activity working" aria-live="polite">
     <div class="ghost-card" aria-hidden="true">
       <span class="line w60"></span>
@@ -31,12 +30,8 @@
     </div>
     <p class="act-line">
       <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>
-      {#if phase === 'wrapping'}
-        Wrapping up: updating your map and writing where to pick up next time.
-      {:else}
-        Claude is preparing the next step{detail}.
-        {#if secs > 45}<span class="muted"> Longer steps can take a minute, especially with a figure.</span>{/if}
-      {/if}
+      Claude is preparing the next step{detail}.
+      {#if secs > 45}<span class="muted"> Longer steps can take a minute, especially with a figure.</span>{/if}
     </p>
   </div>
 {:else if phase === 'waiting' && feed.items.length}

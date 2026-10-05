@@ -18,13 +18,6 @@ export const actions = {
     if (!result.heard && !feed.items.some((i) => (i.type === 'quiz' || i.type === 'ask') && !i.answeredAt)) pickUp();
     return null;
   },
-  /** Ask Claude to wrap up: the map, then the handoff. Typed in even while it works (Claude Code queues it). */
-  stopForToday(): boolean {
-    if (!claude.running) return false;
-    feed.wrapping = true;
-    claude.say("Let's stop for today. Please wrap up now: update the map, then end the session with a handoff.");
-    return true;
-  },
   learn(topic: string, goal = '') {
     const what = oneLine(topic);
     const want = oneLine(goal) ? `. What I want from it: ${oneLine(goal)}` : '';

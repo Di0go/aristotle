@@ -755,13 +755,17 @@ async function waitForLearner(gym: Gym, id: string, extra: Extra) {
   }
 }
 
-/** What Claude gets when he doesn't answer in time: stop and wait for him. */
+/**
+ * What Claude gets when he doesn't answer in time: he has stepped away, so the sitting closes itself. There is no stop
+ * button; the question stays open, and answering it later brings Claude back to carry on.
+ */
 function notAnswered(): CallToolResult {
   const minutes = Math.round(WAIT_MS / 60_000);
   return text(
-    `No answer yet: he hasn't answered in Aristotle within ${minutes} minutes, so he has probably stepped away. ` +
-      'The question stays open there and his answer will be saved. End your turn now without asking anything else. ' +
-      'When he is back, call `collect_answers`.',
+    `No answer yet: he hasn't answered in Aristotle within ${minutes} minutes, so he has stepped away. ` +
+      'Close the sitting now, without asking him anything: a final `update_map` if this sitting changed what he holds, then ' +
+      '`end_session` with the handoff. The question stays open in Aristotle; when he answers it, you are asked to continue ' +
+      'and `collect_answers` gives you his answer. Then end your turn.',
   );
 }
 

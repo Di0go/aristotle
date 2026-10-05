@@ -63,11 +63,13 @@
   margin: 0;
 }
 
+/* The bench itself never scrolls: its content does (.bench-inner), so the resize handle on its edge stays put. */
 .bench {
   position: sticky;
   top: var(--tabs-h);
+  display: flex;
+  flex-direction: column;
   height: calc(100vh - var(--tabs-h) - var(--status-h));
-  overflow-y: auto;
   background: var(--b1);
   border-left: 1px solid var(--rule);
 }
@@ -491,6 +493,9 @@ textarea.note {
 /* The right sidebar (the bench): where he is, the local map, the plan */
 .bench-inner {
   position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
   padding: 18px 18px 32px;
   font-size: 0.86rem;
 }
@@ -530,12 +535,6 @@ textarea.note {
 .bench-count {
   font-size: 0.75rem;
   color: var(--faint);
-}
-
-.bench-goal {
-  margin: 0;
-  color: var(--fg-2);
-  line-height: 1.55;
 }
 
 .now-label {

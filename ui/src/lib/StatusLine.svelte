@@ -1,6 +1,5 @@
 <script lang="ts">
   // The small bar along the bottom: what's going on, in a few words.
-  import { actions } from './actions.ts';
   import { claude } from './claude.svelte.ts';
   import { feed } from './feed.svelte.ts';
   import { countsOf, placeOf } from './library.ts';
@@ -24,15 +23,9 @@
 
 <footer class="statusline">
   {#if dev}<span class="dev" title="The dev instance: its own port and data (.dev/), never your real library">dev</span>{/if}
-  {#if feed.pending}<span class="turn">Your turn</span>{:else if feed.wrapping}<span class="work">Wrapping up…</span
-    >{:else if live && claude.busy}<span class="work">Claude is working…</span>{/if}
+  {#if feed.pending}<span class="turn">Your turn</span>{:else if live && claude.busy}<span class="work">Claude is working…</span>{/if}
   {#if topic && counts.total}<span>{counts.solid} of {counts.total} solid</span>{/if}
   {#if place}<span>class {place.index + 1} of {place.roadmap.steps.length}</span>{/if}
-  {#if live && claude.running && !feed.wrapping}<button
-      class="stop"
-      onclick={() => actions.stopForToday()}
-      title="Claude updates your map and writes where to pick up next time">Stop for today</button
-    >{/if}
   <button class="claude" onclick={() => claude.toggle()} title="Claude (Ctrl+`)">
     <i class:on={claude.running} class:ask={claude.asking}></i>
     {claude.asking ? 'Claude is asking something' : claude.running ? 'Claude running' : 'Claude off'}
@@ -73,22 +66,6 @@
 
   .work {
     color: var(--fg-2);
-  }
-
-  .stop {
-    padding: 0 8px;
-    border: 1px solid var(--rule-strong);
-    border-radius: 4px;
-    background: none;
-    color: var(--fg-2);
-    font-size: inherit;
-    line-height: 18px;
-    cursor: pointer;
-  }
-
-  .stop:hover {
-    color: var(--fg);
-    border-color: var(--acc);
   }
 
   .claude {

@@ -119,8 +119,8 @@ He has to trust the teacher completely. One confidently delivered error poisons 
 
 ## Hopping in and out
 
-- He comes and goes as he likes. If `quiz` or `ask` returns "No answer yet", end your turn with one line. When he is back, call `collect_answers` and carry on.
-- When he stops (or the goal is reached): final `update_map`, then `end_session` with what locked in, what is shaky, and the next step, specific enough that a fresh session can resume from it alone.
+- He comes and goes as he likes, and there is no stop button: a sitting closes itself. If `quiz` or `ask` returns "No answer yet", he has stepped away: final `update_map` if anything changed, `end_session` with the handoff, and end your turn. When he answers later, Aristotle asks you to continue: `collect_answers` first, then carry on. If he asks for something else while a sitting is open (another class, a review), close this one the same way before starting it.
+- When he says he's done, steps away (no answer in time) or the goal is reached: final `update_map`, then `end_session` with what locked in, what is shaky, and the next step, specific enough that a fresh session can resume from it alone.
 
 ## Continuing
 

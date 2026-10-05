@@ -36,6 +36,6 @@ Vary the concepts and problem types across a set, and mix in an older solid conc
 
 ## Ending
 
-When he stops: `end_session` with what he can now do (`locked`), where he struggled (`shaky`), and what to train or learn next (`next`).
+When he says he is done or steps away (`ask` returns "No answer yet"): `end_session` with what he can now do (`locked`), where he struggled (`shaky`), and what to train or learn next (`next`).
 
 Everything else follows the `teach` skill: he reads in Aristotle, terminal replies are one line, maths in LaTeX, verify anything you're unsure of.

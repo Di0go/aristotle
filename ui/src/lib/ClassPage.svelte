@@ -24,7 +24,6 @@
   let { slug, number }: { slug: string; number: number } = $props();
 
   let benchOpen = $state(false);
-  let stopHint = $state(false);
   /** Items on this page last time we looked; plain, so reading it doesn't make the scroll effect depend on it. */
   let count = 0;
   /** How many pages the class had last time we looked, to tell a new step arriving from him moving between steps. */
@@ -85,11 +84,6 @@
     });
   });
 
-  /** Asks Claude to wrap up; if Claude isn't running here, says where to tell it instead. */
-  function stop() {
-    if (!actions.stopForToday()) stopHint = true;
-  }
-
   /** A page as a link label: "Step 2 · The heart beats by itself". */
   function name(p: ClassPage): string {
     return p.title ? `${pageLabel(p)} · ${p.title}` : pageLabel(p);
@@ -105,24 +99,12 @@
         {#if page}<span class="sep">/</span><span>{pageLabel(page)}{page.number ? ` of ${steps}` : ''}</span>{/if}
       </nav>
       <div class="head-tools">
-        {#if live}
-          <button
-            class="ghost small"
-            onclick={stop}
-            disabled={feed.wrapping}
-            title="Claude updates your map and writes where to pick up next time"
-            >{feed.wrapping ? 'Wrapping up…' : 'Stop for today'}</button
-          >
-        {/if}
         {#if !focus.on}<button class="ghost small" onclick={() => focus.toggle(true)} title="Hide everything but this step (F)"
             >Focus</button
           >{/if}
         {#if topic}<button class="ghost small bench-toggle" onclick={() => (benchOpen = true)}>Outline and graph</button>{/if}
       </div>
     </header>
-    {#if stopHint && !claude.running}<p class="stop-hint muted">
-        Claude isn't running in Aristotle. If you're talking to it in your own terminal, tell it there to stop for today.
-      </p>{/if}
 
     {#if pages === null}
       <p class="muted center">Loading the class…</p>
@@ -209,12 +191,6 @@
     display: flex;
     gap: 8px;
     flex: none;
-  }
-
-  .stop-hint {
-    max-width: var(--measure);
-    margin: -16px auto 20px;
-    font-size: 0.82rem;
   }
 
   .center {

@@ -1,8 +1,8 @@
 <script lang="ts">
-  // The right sidebar beside a lesson: where it sits on the roadmap, the concept being taught, the plan as
-  // an outline, and the local graph around the concept. The answer to "what are we doing, and why now?".
+  // The right sidebar beside a step: the concept being taught, the local graph around it, and the class's concepts.
+  // The course and the class's goal are not repeated here: the tree and the class page have them.
   import { feed } from './feed.svelte.ts';
-  import { countsOf, markOf, outline, placeOf, splitRef, stepsOf } from './library.ts';
+  import { countsOf, markOf, outline, splitRef } from './library.ts';
   import { link } from './router.svelte.ts';
   import LocalGraph from './LocalGraph.svelte';
   import StatusBar from './StatusBar.svelte';
@@ -10,8 +10,6 @@
 
   let { topic, onclose }: { topic: Topic; onclose?: () => void } = $props();
 
-  const place = $derived(placeOf(topic.slug, feed.roadmapList));
-  const steps = $derived(place ? stepsOf(place.roadmap, feed.topics) : []);
   const concepts = $derived(outline(topic));
   const counts = $derived(countsOf(topic));
   const focus = $derived(topic.concepts.find((c) => c.id === topic.focus) ?? null);
@@ -73,23 +71,4 @@
       <StatusBar {counts} fading={counts.fading} />
     </section>
   {/if}
-
-  {#if place}
-    <section class="bench-section">
-      <h3 class="bench-title"><a href={link.roadmap(place.roadmap.slug)}>{place.roadmap.title}</a></h3>
-      <ol class="route">
-        {#each steps as s (s.index)}
-          <li class="route-step {s.state}" class:here={s.index === place.index}>
-            <i class="dot {s.state}"></i>
-            <a href={link.lesson(s.slug)}>{s.title}</a>
-          </li>
-        {/each}
-      </ol>
-    </section>
-  {/if}
-
-  <section class="bench-section">
-    <h3 class="bench-title">What this class is for</h3>
-    <p class="bench-goal">{topic.goal}</p>
-  </section>
 </div>

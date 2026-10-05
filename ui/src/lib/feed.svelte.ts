@@ -22,8 +22,6 @@ class LiveFeed {
   topics = $state<Record<string, Topic>>({});
   /** False until the first full load, so pages can tell "loading" from "none". */
   loaded = $state(false);
-  /** He asked to stop for today; cleared when the session ends. */
-  wrapping = $state(false);
   /**
    * A lesson asked for from here, to be taken to once it starts: a topic's slug, or "*" when its topic isn't known
    * yet (a new one). Whichever page sees it start takes him there and clears it.
@@ -133,7 +131,6 @@ class LiveFeed {
     if (event.type === 'session') {
       const changed = event.session.id !== this.session?.id;
       this.session = event.session;
-      if (event.session.endedAt) this.wrapping = false;
       if (changed) {
         this.items = [];
         this.starting = null;
