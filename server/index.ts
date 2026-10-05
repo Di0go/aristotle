@@ -242,13 +242,29 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ro
 
   // The chat beside a lesson: his message, with where he is; the answer streams over the live feed as it is written.
   if (req.method === 'GET' && route.startsWith('/api/chats/')) return json(res, 200, gym.chats.get(tail('/api/chats/')));
+  if (req.method === 'DELETE' && route.startsWith('/api/chats/')) {
+    // DELETE /api/chats/<thread>/answer stops the answer being written; DELETE /api/chats/<thread> clears the chat.
+    const rest = tail('/api/chats/');
+    if (rest.endsWith('/answer')) return json(res, 200, { stopped: gym.chats.cancel(rest.slice(0, -'/answer'.length)) });
+    await gym.chats.clear(rest);
+    return json(res, 200, { ok: true });
+  }
   if (req.method === 'POST' && route.startsWith('/api/chats/')) {
-    const body = (await readJson(req)) as { text?: unknown; where?: unknown; page?: unknown; step?: unknown } | null;
+    const body = (await readJson(req)) as {
+      text?: unknown;
+      where?: unknown;
+      page?: unknown;
+      step?: unknown;
+      mentions?: unknown;
+      tags?: unknown;
+    } | null;
     if (typeof body?.text !== 'string') return json(res, 400, { error: 'Missing text' });
     const str = (v: unknown) => (typeof v === 'string' ? v : undefined);
     const thread = tail('/api/chats/');
     try {
-      const answer = await gym.chats.send(thread, body.text, chatContext(thread, str(body.where), str(body.page), str(body.step)));
+      const context = chatContext(thread, str(body.where), str(body.page), str(body.step), str(body.mentions));
+      const tags = Array.isArray(body.tags) ? body.tags.filter((t): t is string => typeof t === 'string') : [];
+      const answer = await gym.chats.send(thread, body.text, context, tags);
       return json(res, 200, answer);
     } catch (err) {
       if (err instanceof ChatError) return json(res, 400, { error: err.message });
@@ -275,7 +291,7 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ro
  * What the chat is told with each of his messages: where he is, what is on his screen, what he holds in the class,
  * his notes on the step and what he says about himself. Fresh every time, so it is never out of date.
  */
-function chatContext(thread: string, where?: string, page?: string, step?: string): string {
+function chatContext(thread: string, where?: string, page?: string, step?: string, mentions?: string): string {
   const topic = gym.topics.get(thread);
   const parts = [`Where he is now: ${where ?? (topic ? `the class ${topic.title}` : 'outside any class (Home, the map…)')}`];
   if (topic) {
@@ -286,6 +302,7 @@ function chatContext(thread: string, where?: string, page?: string, step?: strin
     );
   }
   if (page) parts.push(`What is on his screen:\n${page}`);
+  if (mentions) parts.push(`What he tagged with @ in his message:\n${mentions.slice(0, 8000)}`);
   const note = step && topic ? gym.notes.of(topic.slug).find((n) => n.step === step) : undefined;
   if (note) parts.push(`His own notes on this step:\n${note.text}`);
   const about = gym.notes.about().trim();

@@ -175,6 +175,9 @@ class LiveFeed {
       const list = this.chats[event.thread];
       if (list && !list.some((m) => m.id === event.message.id)) list.push(event.message);
       if (event.message.role === 'assistant') delete this.chatDrafts[event.thread];
+    } else if (event.type === 'chat-cleared') {
+      this.chats[event.thread] = [];
+      delete this.chatDrafts[event.thread];
     } else if (event.type === 'chat-delta') {
       this.chatDrafts[event.thread] = { id: event.id, text: event.text };
     } else {

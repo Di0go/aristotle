@@ -839,4 +839,18 @@ test('the chat beside a class sees where he is, keeps the conversation, and the 
     /said in the chat beside this class[\s\S]*Why does it beat on its own\?/,
   );
   assert.equal((await say({ text: '   ' })).status, 400);
+
+  // A tag goes with the message as context, and the message keeps it to show as a chip.
+  const tagged = (await (
+    await say({ text: 'And @The pacemaker?', mentions: 'Concept "The pacemaker" (solid)', tags: ['@The pacemaker'] })
+  ).json()) as ChatMessage;
+  assert.match(tagged.text, /What he tagged with @ in his message:\nConcept "The pacemaker"/);
+  assert.deepEqual((await get<ChatMessage[]>('/api/chats/chatted-topic'))[2].mentions, ['@The pacemaker']);
+  // Nothing is being written, so there is nothing to stop; clearing starts the chat over.
+  assert.equal(
+    ((await (await fetch(`${BASE}/api/chats/chatted-topic/answer`, { method: 'DELETE' })).json()) as { stopped: boolean }).stopped,
+    false,
+  );
+  assert.equal((await fetch(`${BASE}/api/chats/chatted-topic`, { method: 'DELETE' })).status, 200);
+  assert.deepEqual(await get<ChatMessage[]>('/api/chats/chatted-topic'), []);
 });

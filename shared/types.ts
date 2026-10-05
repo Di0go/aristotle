@@ -125,7 +125,9 @@ export type FeedEvent =
   /** A message in a chat, his or Aristotle's, once it is complete. */
   | { type: 'chat'; thread: string; message: ChatMessage }
   /** Aristotle's answer as it is being written: the text so far. */
-  | { type: 'chat-delta'; thread: string; id: string; text: string };
+  | { type: 'chat-delta'; thread: string; id: string; text: string }
+  /** A chat was started over. */
+  | { type: 'chat-cleared'; thread: string };
 
 // Knowledge maps
 
@@ -460,6 +462,10 @@ export interface ChatMessage {
   role: 'user' | 'assistant';
   text: string;
   at: string;
+  /** He stopped this answer while it was being written: this is as far as it got. */
+  stopped?: boolean;
+  /** What he tagged with @ in this message, as it reads in the text ("@Step 2 · …"), to show as chips. */
+  mentions?: string[];
 }
 
 /** One conversation: a class's (by its slug), or "home" for talk away from any class. */

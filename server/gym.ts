@@ -84,6 +84,7 @@ export class Gym {
     notes.events.on('about', (about) => feed.events.emit('event', { type: 'about', about }));
     chats.events.on('message', (thread, message) => feed.events.emit('event', { type: 'chat', thread, message }));
     chats.events.on('delta', (d) => feed.events.emit('event', { type: 'chat-delta', ...d }));
+    chats.events.on('cleared', (thread) => feed.events.emit('event', { type: 'chat-cleared', thread }));
     feed.events.on('event', () => this.backup.schedule());
     this.backup.schedule(30_000);
   }

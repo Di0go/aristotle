@@ -14,6 +14,8 @@ import { slugify } from './slug.ts';
 import type { ChatMessage, ChatThread } from '../shared/types.ts';
 
 const TIMEOUT_MS = 180_000;
+/** Marks, between the runner and send(), an answer he stopped. */
+const STOPPED = '\u0000stopped';
 const MAX_MESSAGE = 8000;
 const MAX_CONTEXT = 12_000;
 /** A neutral folder for its sessions: no project's CLAUDE.md, the same one every time so sessions can resume. */
@@ -27,7 +29,8 @@ const SYSTEM =
   'longer when he wants depth. If he is working something out, help him think rather than handing it over, and never give ' +
   'away the answer to a check he has not answered yet: give hints and questions instead. Say plainly when you are not sure ' +
   "or when something is contested. Plain Markdown; maths as $...$. Answer in the language he writes in. Don't teach the " +
-  "lesson's next step or change his map; if he wants that, tell him the lesson will get there.";
+  "lesson's next step or change his map; if he wants that, tell him the lesson will get there. " +
+  'He can tag a step, a concept or a class with @ ("@Step 2 · …"); what he tagged comes with his message: use it.';
 
 export class ChatError extends Error {}
 
@@ -41,8 +44,10 @@ export interface ChatDelta {
 export class Chats {
   private threads = new Map<string, ChatThread>();
   private busy = new Set<string>();
+  /** The Claude Code answering in each thread right now, so he can stop it. */
+  private running = new Map<string, { kill: () => void; stopped: boolean }>();
   private saving = new Map<string, Promise<void>>();
-  readonly events = new EventEmitter<{ message: [string, ChatMessage]; delta: [ChatDelta] }>();
+  readonly events = new EventEmitter<{ message: [string, ChatMessage]; delta: [ChatDelta]; cleared: [string] }>();
 
   static async load(): Promise<Chats> {
     const store = new Chats();
@@ -60,8 +65,27 @@ export class Chats {
     return this.threads.get(threadId(thread))?.messages ?? [];
   }
 
+  /** Stops the answer being written in a thread; what was written so far is kept, marked stopped. */
+  cancel(thread: string): boolean {
+    const run = this.running.get(threadId(thread));
+    if (!run) return false;
+    run.stopped = true;
+    run.kill();
+    return true;
+  }
+
+  /** Starts a thread over: its messages and its Claude Code session are forgotten. */
+  async clear(thread: string) {
+    const id = threadId(thread);
+    this.cancel(id);
+    const t: ChatThread = { thread: id, messages: [] };
+    this.threads.set(id, t);
+    await this.write(t);
+    this.events.emit('cleared', id);
+  }
+
   /** His message, then Aristotle's answer, streamed as it is written (`delta` events) and kept. */
-  async send(thread: string, text: string, context: string): Promise<ChatMessage> {
+  async send(thread: string, text: string, context: string, mentions: string[] = []): Promise<ChatMessage> {
     const id = threadId(thread);
     const body = text.trim().slice(0, MAX_MESSAGE);
     if (!body) throw new ChatError('Write something first');
@@ -70,7 +94,14 @@ export class Chats {
     try {
       const t = this.threads.get(id) ?? { thread: id, messages: [] };
       this.threads.set(id, t);
-      const mine: ChatMessage = { id: randomUUID(), role: 'user', text: body, at: new Date().toISOString() };
+      const tagged = mentions.filter((m) => body.includes(m)).slice(0, 20);
+      const mine: ChatMessage = {
+        id: randomUUID(),
+        role: 'user',
+        text: body,
+        at: new Date().toISOString(),
+        ...(tagged.length ? { mentions: tagged } : {}),
+      };
       t.messages.push(mine);
       this.events.emit('message', id, mine);
       await this.write(t);
@@ -81,14 +112,21 @@ export class Chats {
       try {
         answer = await this.ask(t, request, (so) => this.events.emit('delta', { thread: id, id: answerId, text: so }));
       } catch (err) {
-        if (!(err instanceof ChatError) || !t.session) throw err;
+        if (!(err instanceof ChatError) || !t.session || this.running.get(id)?.stopped) throw err;
         // The saved session is gone (Claude Code's own store was cleared): start a new one, with the recent talk.
         t.session = undefined;
         answer = await this.ask(t, `${recap(t.messages.slice(0, -1))}${request}`, (so) =>
           this.events.emit('delta', { thread: id, id: answerId, text: so }),
         );
       }
-      const theirs: ChatMessage = { id: answerId, role: 'assistant', text: answer, at: new Date().toISOString() };
+      const stopped = answer.endsWith(STOPPED);
+      const theirs: ChatMessage = {
+        id: answerId,
+        role: 'assistant',
+        text: stopped ? answer.slice(0, -STOPPED.length).trim() : answer,
+        at: new Date().toISOString(),
+        ...(stopped ? { stopped: true } : {}),
+      };
       t.messages.push(theirs);
       this.events.emit('message', id, theirs);
       await this.write(t);
@@ -128,6 +166,8 @@ export class Chats {
       () =>
         new Promise<string>((resolve, reject) => {
           const child = spawn(file, rest, { cwd: CWD, stdio: ['pipe', 'pipe', 'pipe'], timeout: TIMEOUT_MS, env: claudeEnv() });
+          const run = { kill: () => child.kill('SIGTERM'), stopped: false };
+          this.running.set(t.thread, run);
           let buffer = '';
           let text = '';
           let plain = '';
@@ -157,7 +197,13 @@ export class Chats {
           child.stderr.on('data', (d) => (err += d));
           child.on('error', (e) => reject(new ChatError(`Could not start Claude Code: ${e.message}`)));
           child.on('close', (code, signal) => {
+            if (this.running.get(t.thread) === run) this.running.delete(t.thread);
             const answer = (text || plain + buffer).trim();
+            // Stopped by him: keep what was written (the session may not have it, so it is started over next time).
+            if (run.stopped) {
+              t.session = code === 0 ? session : undefined;
+              return resolve(`${answer}${STOPPED}`);
+            }
             if (code === 0 && answer) {
               t.session = session;
               return resolve(answer);

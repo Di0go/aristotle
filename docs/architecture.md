@@ -126,6 +126,7 @@ Only for the interface (and the tests); Claude Code uses MCP.
 | `GET` | `/api/about` |
 | `PUT` | `/api/about` |
 | `GET` | `/api/chats/…` |
+| `DELETE` | `/api/chats/…` |
 | `POST` | `/api/chats/…` |
 | `GET` | `/api/sessions` |
 | `GET` | `/api/sessions/…` |
