@@ -2,6 +2,7 @@
   // The thin strip on the far left: the main places, Claude, and the look settings.
   import { claude } from './claude.svelte.ts';
   import { feed } from './feed.svelte.ts';
+  import { focus } from './focus.svelte.ts';
   import { link, router } from './router.svelte.ts';
   import { searchBox } from './search.svelte.ts';
   import { ACCENTS, theme } from './theme.svelte.ts';
@@ -66,6 +67,10 @@
     <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4.5 6l4 4-4 4M10.5 14.5h5" /></svg>
     <span class="lbl">Claude</span>
     {#if claude.asking && !claude.open}<i class="pip turn"></i>{:else if claude.running}<i class="pip quiet"></i>{/if}
+  </button>
+  <button class="rib" onclick={() => focus.toggle(true)} title="Focus: hide everything but the page (F)">
+    <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 7.5V4h3.5M12.5 4H16v3.5M16 12.5V16h-3.5M7.5 16H4v-3.5" /></svg>
+    <span class="lbl">Focus</span>
   </button>
   <div class="settings-wrap">
     <button
