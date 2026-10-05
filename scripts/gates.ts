@@ -1,5 +1,5 @@
 // Every check a change must pass, in one command: the same list runs in the pre-push hook, in CI and before
-// a release. Cheapest first, so a failure shows up fast.
+// a release. Cheapest first, so a failure shows up fast; the build comes before the tests, which serve its pages.
 //
 //   pnpm gates            everything
 //   pnpm gates --quick    the fast ones only (the pre-commit hook): docs, lint, types
@@ -14,8 +14,8 @@ const gates: { name: string; command: string[]; quick?: boolean }[] = [
   { name: 'docs are current', command: ['node', 'scripts/docs.ts', '--check'], quick: true },
   { name: 'lint and format', command: ['pnpm', 'exec', 'biome', 'check', '.'], quick: true },
   { name: 'types', command: ['pnpm', 'run', '--silent', 'check'], quick: true },
-  { name: 'tests', command: ['pnpm', 'run', '--silent', 'test'] },
   { name: 'build', command: ['pnpm', 'run', '--silent', 'build'] },
+  { name: 'tests', command: ['pnpm', 'run', '--silent', 'test'] },
 ];
 
 for (const gate of gates.filter((g) => !quick || g.quick)) {

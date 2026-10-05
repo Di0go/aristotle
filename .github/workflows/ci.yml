@@ -16,5 +16,7 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: pnpm
+      # rsvg-convert, which preview_svg uses to render drawings (and its test checks).
+      - run: sudo apt-get install -y --no-install-recommends librsvg2-bin
       - run: pnpm install --frozen-lockfile
       - run: pnpm gates

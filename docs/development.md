@@ -4,7 +4,7 @@ Aristotle is meant to be changed by the person using it: you notice something wh
 
 ## Setup
 
-You need Node.js 24 or newer (`.nvmrc`), [pnpm](https://pnpm.io) and [Claude Code](https://claude.com/claude-code).
+You need Node.js 24 or newer (`.nvmrc`), [pnpm](https://pnpm.io) and [Claude Code](https://claude.com/claude-code). The tests also need `rsvg-convert` (librsvg), which `preview_svg` uses to render drawings.
 
 ```sh
 pnpm install     # also points Git at .githooks/ (the gates run on commit and push)
@@ -63,7 +63,7 @@ Claude Code in the drawer runs in the release copy, so lessons use the released 
 
 ## Gates
 
-`pnpm gates` runs every check, cheapest first: generated docs current, Biome (lint and format), types, the tests, the build. The same list runs:
+`pnpm gates` runs every check, cheapest first: generated docs current, Biome (lint and format), types, the build, then the tests (which serve the built pages). The same list runs:
 
 - on **commit**, quick ones only (`pnpm gates --quick`, [`.githooks/pre-commit`](../.githooks/pre-commit));
 - on **push** ([`.githooks/pre-push`](../.githooks/pre-push));
