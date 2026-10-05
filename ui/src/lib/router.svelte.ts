@@ -1,4 +1,4 @@
-// Hash routing: #/, #/progress, #/map, #/roadmaps, #/roadmaps/<slug>, #/lesson/<slug>, #/topics, #/topics/<slug>?c=<concept>, #/log, #/log/<session>, #/praxis, #/praxis/<mission>.
+// Hash routing: #/, #/progress, #/map, #/roadmaps, #/roadmaps/<slug>, #/lesson/<slug>?p=<part>, #/topics, #/topics/<slug>?c=<concept>, #/log, #/log/<session>, #/praxis, #/praxis/<mission>.
 
 export type Route =
   | { page: 'now' }
@@ -8,7 +8,8 @@ export type Route =
   | { page: 'roadmap'; slug: string }
   | { page: 'topics' }
   | { page: 'topic'; slug: string; concept?: string }
-  | { page: 'lesson'; slug: string }
+  /** `part`: a part of the class to open and show (a step's key, from the library tree). */
+  | { page: 'lesson'; slug: string; part?: string }
   | { page: 'log' }
   | { page: 'session'; id: string }
   | { page: 'praxis' }
@@ -37,7 +38,7 @@ export const link = {
   topics: () => '#/topics',
   topic: (slug: string, concept?: string) => `#/topics/${encodeURIComponent(slug)}${concept ? `?c=${encodeURIComponent(concept)}` : ''}`,
   /** The class itself: every step so far, readable without starting anything. */
-  lesson: (slug: string) => `#/lesson/${encodeURIComponent(slug)}`,
+  lesson: (slug: string, part?: string) => `#/lesson/${encodeURIComponent(slug)}${part ? `?p=${encodeURIComponent(part)}` : ''}`,
   log: () => '#/log',
   session: (id: string) => `#/log/${encodeURIComponent(id)}`,
   praxis: () => '#/praxis',
@@ -50,7 +51,7 @@ function parse(hash: string): Route {
   const params = new URLSearchParams(query);
   if (parts[0] === 'topics' && parts[1]) return { page: 'topic', slug: parts[1], concept: params.get('c') ?? undefined };
   if (parts[0] === 'topics') return { page: 'topics' };
-  if (parts[0] === 'lesson' && parts[1]) return { page: 'lesson', slug: parts[1] };
+  if (parts[0] === 'lesson' && parts[1]) return { page: 'lesson', slug: parts[1], part: params.get('p') ?? undefined };
   if (parts[0] === 'roadmaps' && parts[1]) return { page: 'roadmap', slug: parts[1] };
   if (parts[0] === 'roadmaps') return { page: 'roadmaps' };
   if (parts[0] === 'log' && parts[1]) return { page: 'session', id: parts[1] };

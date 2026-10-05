@@ -1,5 +1,7 @@
 <script lang="ts">
-  // The library pane: roadmaps as folders, steps inside, each step's concepts inside that, then loose topics.
+  // The library pane: roadmaps as folders, steps inside, and in each step's topic two folders: its Class (every
+  // step taught, numbered across sessions, with how its checks went) and its Concepts. Then loose topics.
+  import { classes, type ClassStep } from './classes.svelte.ts';
   import { feed } from './feed.svelte.ts';
   import { countsOf, looseTopics, markOf, outline, placeOf, stepsOf } from './library.ts';
   import { link, router } from './router.svelte.ts';
@@ -14,21 +16,25 @@
 
   let { onnavigate }: { onnavigate?: () => void } = $props();
 
-  /** Which folders are open, by key: "r:<roadmap>" or "t:<topic>". Only the ones he has toggled are stored. */
+  /**
+   * Which folders are open, by key: "r:<roadmap>", "t:<topic>", and inside a topic "c:<topic>" (its class) and
+   * "k:<topic>" (its concepts). Only the ones he has toggled are stored.
+   */
   let open = $state<Record<string, boolean>>(readOpen());
 
   const route = $derived(router.route);
   const roadmaps = $derived(feed.roadmapList);
   const loose = $derived(looseTopics(feed.topics, roadmaps));
-  const currentTopic = $derived(route.page === 'topic' ? route.slug : (feed.liveSlug ?? undefined));
+  const currentTopic = $derived(route.page === 'topic' || route.page === 'lesson' ? route.slug : (feed.liveSlug ?? undefined));
 
   // Open the way down to whatever is on screen.
   $effect(() => {
-    const slug = route.page === 'topic' ? route.slug : undefined;
+    const slug = route.page === 'topic' || route.page === 'lesson' ? route.slug : undefined;
     if (!slug) return;
     const place = placeOf(slug, roadmaps);
     if (place && !isOpen(`r:${place.roadmap.slug}`)) toggle(`r:${place.roadmap.slug}`, true);
     if (!isOpen(`t:${slug}`)) toggle(`t:${slug}`, true);
+    if (route.page === 'topic' && route.concept && !isOpen(`k:${slug}`)) toggle(`k:${slug}`, true);
   });
 
   function readOpen(): Record<string, boolean> {
@@ -49,15 +55,31 @@
     }
   }
 
-  /** Roadmaps start open; topics start closed. */
+  /** Roadmaps and a topic's class start open; topics and their concepts start closed. */
   function isOpen(key: string): boolean {
-    return open[key] ?? key.startsWith('r:');
+    return open[key] ?? (key.startsWith('r:') || key.startsWith('c:'));
   }
 
-  /** aria-current for a topic's row (no concept given) or one of its concepts: "page" when it is what is on screen. */
+  /** aria-current for a topic's map (no concept given) or one of its concepts: "page" when it is what is on screen. */
   function current(slug: string, concept?: string): 'page' | undefined {
     if (route.page !== 'topic' || route.slug !== slug) return undefined;
     return (concept ? route.concept === concept : !route.concept) ? 'page' : undefined;
+  }
+
+  /** aria-current for a topic's class row (no part given) or one of its steps. */
+  function currentClass(slug: string, part?: string): 'page' | undefined {
+    if (route.page !== 'lesson' || route.slug !== slug) return undefined;
+    return (part ? route.part === part : !route.part) ? 'page' : undefined;
+  }
+
+  /** How a step's checks went, in a few characters: right out of graded, written, or what is left to answer. */
+  function tally(s: ClassStep): { text: string; tone: '' | 'all' | 'todo' } {
+    const c = s.checks;
+    const graded = c.right + c.wrong + c.dontKnow;
+    if (c.unanswered) return { text: 'to answer', tone: 'todo' };
+    if (graded) return { text: `${c.right}/${graded}`, tone: c.right === graded ? 'all' : '' };
+    if (c.written) return { text: '✓', tone: 'all' };
+    return { text: '', tone: '' };
   }
 </script>
 
@@ -78,8 +100,8 @@
   {@const key = `t:${slug}`}
   <li>
     <div class="row" class:here={currentTopic === slug} class:unstarted={!t}>
-      {#if t && t.concepts.length}{@render chevron(key, title)}{:else}<span class="chev-space"></span>{/if}
-      <a href={link.topic(slug)} onclick={onnavigate} aria-current={current(slug)}>
+      {#if t}{@render chevron(key, title)}{:else}<span class="chev-space"></span>{/if}
+      <a href={link.lesson(slug)} onclick={onnavigate} aria-current={currentClass(slug)}>
         <span class="name">{number !== undefined ? `${number} · ` : ''}{title}</span>
       </a>
       {#if feed.liveSlug === slug}
@@ -88,22 +110,62 @@
         <span class="count">{c.solid}/{c.total}</span>
       {/if}
     </div>
-    {#if t && isOpen(key) && t.concepts.length}
-      <ul class="concepts">
-        {#each outline(t) as concept (concept.id)}
+    {#if t && isOpen(key)}
+      {@const steps = isOpen(`c:${slug}`) ? classes.steps(slug) : null}
+      <ul class="sub">
+        <li>
+          <div class="row sub-dir">
+            {@render chevron(`c:${slug}`, `the class of ${title}`)}
+            <a href={link.lesson(slug)} onclick={onnavigate}><span class="name">Class</span></a>
+          </div>
+          {#if isOpen(`c:${slug}`)}
+            <ul class="leaves">
+              {#if steps === null}
+                <li class="leaf-note">Loading…</li>
+              {:else if steps.length === 0}
+                <li class="leaf-note">No steps yet</li>
+              {/if}
+              {#each steps ?? [] as s (s.key)}
+                {@const m = tally(s)}
+                {@const now = s.live && s === steps?.at(-1)}
+                <li>
+                  <a class="row leaf" href={link.lesson(slug, s.key)} onclick={onnavigate} aria-current={currentClass(slug, s.key)}>
+                    <span class="num">{s.number}</span><span class="name">{s.title ?? `Step ${s.number}`}</span>
+                    {#if now}<span class="live" title="Being taught now"></span>{:else if m.text}<span class="mark {m.tone}">{m.text}</span
+                      >{/if}
+                  </a>
+                </li>
+              {/each}
+            </ul>
+          {/if}
+        </li>
+        {#if t.concepts.length}
           <li>
-            <a
-              class="row concept"
-              class:focus={t.focus === concept.id}
-              href={link.topic(slug, concept.id)}
-              onclick={onnavigate}
-              data-concept="{slug}/{concept.id}"
-              aria-current={current(slug, concept.id)}
-            >
-              <i class="dot {markOf(concept)}"></i><span class="name">{concept.label}</span>
-            </a>
+            <div class="row sub-dir">
+              {@render chevron(`k:${slug}`, `the concepts of ${title}`)}
+              <a href={link.topic(slug)} onclick={onnavigate} aria-current={current(slug)}><span class="name">Concepts</span></a>
+              <span class="count">{c.solid}/{c.total}</span>
+            </div>
+            {#if isOpen(`k:${slug}`)}
+              <ul class="leaves">
+                {#each outline(t) as concept (concept.id)}
+                  <li>
+                    <a
+                      class="row leaf concept"
+                      class:focus={t.focus === concept.id}
+                      href={link.topic(slug, concept.id)}
+                      onclick={onnavigate}
+                      data-concept="{slug}/{concept.id}"
+                      aria-current={current(slug, concept.id)}
+                    >
+                      <i class="dot {markOf(concept)}"></i><span class="name">{concept.label}</span>
+                    </a>
+                  </li>
+                {/each}
+              </ul>
+            {/if}
           </li>
-        {/each}
+        {/if}
       </ul>
     {/if}
   </li>
@@ -248,10 +310,58 @@
     border-left: 1px solid var(--rule);
   }
 
-  .concepts {
+  .sub {
+    margin-left: 22px;
+    padding-left: 2px;
+    border-left: 1px solid var(--rule);
+  }
+
+  .leaves {
     margin-left: 22px;
     padding-left: 6px;
     border-left: 1px solid var(--rule);
+  }
+
+  .row.sub-dir > a {
+    padding: 3px 6px;
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: var(--muted);
+  }
+
+  .leaf-note {
+    padding: 3px 6px;
+    font-size: 0.8rem;
+    color: var(--faint);
+  }
+
+  .num {
+    flex: none;
+    min-width: 1.1em;
+    font-size: 0.74rem;
+    color: var(--faint);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .mark {
+    flex: none;
+    margin-left: auto;
+    font-size: 0.72rem;
+    color: var(--faint);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .mark.all {
+    color: var(--solid);
+  }
+
+  .mark.todo {
+    color: var(--acc);
+  }
+
+  .leaf .live {
+    margin: 0 4px 0 auto;
+    align-self: center;
   }
 
   .row {
@@ -305,7 +415,7 @@
     color: var(--faint);
   }
 
-  a.row.concept {
+  a.row.leaf {
     min-height: 25px;
     padding: 3px 6px;
     font-size: 0.83rem;

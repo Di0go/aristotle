@@ -23,12 +23,13 @@ Styles for one component live in its `<style>` block; the files above are for wh
 ┌ribbon┬ sidebar (library tree)  ┬ tabs ────────────────────────────┐
 │      │ roadmap                 │ page                     │ bench │
 │      │  └ step (a topic)       │ (lesson, map, roadmap…)  │ (map, │
-│      │     └ concept           │                          │ outline)
+│      │     ├ Class › steps     │                          │ outline)
+│      │     └ Concepts          │                          │
 └──────┴─────────────────────────┴ status line ─────────────────────┘
                                    terminal drawer (Claude Code, Ctrl+`)
 ```
 
-- **Sidebar**: the library as a tree, roadmap > step > concept ([`Sidebar.svelte`](../ui/src/lib/Sidebar.svelte), [`library.ts`](../ui/src/lib/library.ts)).
+- **Sidebar**: the library as a tree, roadmap > step (a topic) > two folders: **Class**, every step taught, numbered across sessions, with how its checks went (right out of graded, ✓ written, "to answer", a dot for the step being taught now), and **Concepts**, the map's concepts ([`Sidebar.svelte`](../ui/src/lib/Sidebar.svelte), [`library.ts`](../ui/src/lib/library.ts), [`classes.svelte.ts`](../ui/src/lib/classes.svelte.ts)). A topic opens its class; a step opens the class at that step (`#/lesson/<slug>?p=<step>`), unfolded and scrolled to, in the live lesson too; Concepts opens the map.
 - **Tabs**: one per page visited, eight at most, remembered per browser ([`tabs.svelte.ts`](../ui/src/lib/tabs.svelte.ts)).
 - **Search**: Ctrl+K or `/`, answered by the server ([`server/search.ts`](../server/search.ts)) over the library, missions and session text.
 - **Hover cards** on terms and concept links ([`HoverCard.svelte`](../ui/src/lib/HoverCard.svelte)); a **lightbox** for images and figures.

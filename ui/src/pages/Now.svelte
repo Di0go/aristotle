@@ -3,6 +3,7 @@
   import { setContext, tick } from 'svelte';
   import { actions } from '../lib/actions.ts';
   import { claude } from '../lib/claude.svelte.ts';
+  import { classes } from '../lib/classes.svelte.ts';
   import { placeFigures } from '../lib/explorables/index.ts';
   import { feed } from '../lib/feed.svelte.ts';
   import { countsOf, placeOf } from '../lib/library.ts';
@@ -56,6 +57,14 @@
       if (target) target.scrollIntoView({ behavior: first ? 'instant' : 'smooth', block: 'start' });
       else window.scrollTo({ top: document.body.scrollHeight, behavior: first ? 'instant' : 'smooth' });
     });
+  });
+
+  // A step of this session picked in the library tree: bring it into view.
+  $effect(() => {
+    const key = classes.reveal;
+    if (!key || !feed.items.some((i) => i.id === key)) return;
+    classes.reveal = null;
+    void tick().then(() => document.getElementById(`item-${key}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
   });
 
   /** Asks Claude to wrap up; if Claude isn't running here, says where to tell it instead. */

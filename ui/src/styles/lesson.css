@@ -845,3 +845,9 @@ textarea.note {
   margin-top: 28px;
   color: var(--acc);
 }
+
+/* A part or entry brought into view (from the contents or the library tree) lands below the sticky tab bar. */
+.part,
+.notebook > .entry {
+  scroll-margin-top: 64px;
+}

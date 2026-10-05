@@ -41,6 +41,7 @@
   const pageProps = $derived.by((): Record<string, unknown> => {
     const r = router.route;
     if (r.page === 'topic') return { slug: r.slug, concept: r.concept };
+    if (r.page === 'lesson') return { slug: r.slug, part: r.part };
     if ('slug' in r) return { slug: r.slug };
     if ('id' in r) return { id: r.id };
     return {};

@@ -2,6 +2,8 @@
   // The class so far, above a live lesson: every earlier session on the topic, each part folded to one line
   // (open any to reread it), so continuing a class never hides what came before. Tells the live lesson how many
   // steps came before, so its steps are numbered on from them.
+  import { tick } from 'svelte';
+  import { classes } from './classes.svelte.ts';
   import { placeFigures } from './explorables/index.ts';
   import { topicSessions } from './feed.svelte.ts';
   import { formatDay } from './format.ts';
@@ -48,6 +50,15 @@
     return () => {
       gone = true;
     };
+  });
+
+  // A part picked in the library tree that is in an earlier session: open it and bring it into view.
+  $effect(() => {
+    const key = classes.reveal;
+    if (!key || !parts.some((p) => p.sections.some((s) => s.key === key))) return;
+    classes.reveal = null;
+    opened = new Set([...opened, key]);
+    void tick().then(() => document.getElementById(`part-${key}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
   });
 
   function toggle(key: string) {

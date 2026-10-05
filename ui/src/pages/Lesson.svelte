@@ -7,6 +7,7 @@
   import { setContext, tick } from 'svelte';
   import { actions } from '../lib/actions.ts';
   import { claude } from '../lib/claude.svelte.ts';
+  import { classes } from '../lib/classes.svelte.ts';
   import { placeFigures } from '../lib/explorables/index.ts';
   import { feed, topicSessions } from '../lib/feed.svelte.ts';
   import { formatDay, formatTime } from '../lib/format.ts';
@@ -19,7 +20,7 @@
   import Now from './Now.svelte';
   import type { PublicItem, Session } from '../../../shared/types.ts';
 
-  let { slug }: { slug: string } = $props();
+  let { slug, part }: { slug: string; part?: string } = $props();
 
   let sessions = $state<{ session: Session; items: PublicItem[] }[] | null>(null);
   let text = $state('');
@@ -81,6 +82,20 @@
 
   $effect(() => {
     if (opened === null && sessions) opened = openByDefault(allSections);
+  });
+
+  // A part picked in the library tree: open it and bring it into view, here or in the live lesson.
+  // Once per pick, so folding and unfolding afterwards never scrolls him back to it.
+  let shown: string | undefined;
+  $effect(() => {
+    if (!part || part === shown) return;
+    if (live) {
+      shown = part;
+      classes.reveal = part;
+    } else if (opened && allSections.some((s) => s.key === part)) {
+      shown = part;
+      void jump(part);
+    }
   });
 
   function isOpen(key: string): boolean {

@@ -210,13 +210,14 @@ Only for the interface (and the tests); Claude Code uses MCP.
 | [`Ribbon.svelte`](../ui/src/lib/Ribbon.svelte) | The thin strip on the far left: the main places, Claude, and the look settings. |
 | [`Search.svelte`](../ui/src/lib/Search.svelte) | The search palette: everything he has (roadmaps, steps, topics, concepts, missions, and what was said in every session), searched on the server as he types. |
 | [`Sequence.svelte`](../ui/src/lib/Sequence.svelte) | A process he steps through, one frame at a time: written as a ```sequence block, frames split by "---". |
-| [`Sidebar.svelte`](../ui/src/lib/Sidebar.svelte) | The library pane: roadmaps as folders, steps inside, each step's concepts inside that, then loose topics. |
+| [`Sidebar.svelte`](../ui/src/lib/Sidebar.svelte) | The library pane: roadmaps as folders, steps inside, and in each step's topic two folders: its Class (every step taught, numbered across sessions, with how its checks went) and its Concepts. |
 | [`StartPanel.svelte`](../ui/src/lib/StartPanel.svelte) | Start a lesson on anything, without the terminal. |
 | [`StatusBar.svelte`](../ui/src/lib/StatusBar.svelte) | A thin bar of solid, shaky and not-yet counts (and fading), with an optional legend. |
 | [`StatusLine.svelte`](../ui/src/lib/StatusLine.svelte) | The small bar along the bottom: what's going on, in a few words. |
 | [`TabBar.svelte`](../ui/src/lib/TabBar.svelte) | The open pages, as tabs above the page. |
 | [`TerminalDrawer.svelte`](../ui/src/lib/TerminalDrawer.svelte) | Claude Code's terminal, docked at the bottom of every page. |
 | [`actions.ts`](../ui/src/lib/actions.ts) | Starting things from the interface: each action asks the Claude Code running in Aristotle to run a skill. |
+| [`classes.svelte.ts`](../ui/src/lib/classes.svelte.ts) | Each topic's class as an outline of its steps, for the library tree: past sessions loaded on first use and kept, the live session read from the feed as it grows. |
 | [`claude.svelte.ts`](../ui/src/lib/claude.svelte.ts) | The connection to Claude Code running inside Aristotle (server/terminal.ts). |
 | [`feed.svelte.ts`](../ui/src/lib/feed.svelte.ts) | Live copy of the server's state, kept current over Server-Sent Events. |
 | [`format.ts`](../ui/src/lib/format.ts) | Dates, times, durations and plurals, written the way the interface shows them. |
@@ -224,7 +225,7 @@ Only for the interface (and the tests); Claude Code uses MCP.
 | [`layout.ts`](../ui/src/lib/layout.ts) | Graph layout shared by the topic maps and the map of everything. |
 | [`library.ts`](../ui/src/lib/library.ts) | The hierarchy everything hangs on: roadmaps hold steps, a step is a topic, a topic holds concepts. |
 | [`markdown.ts`](../ui/src/lib/markdown.ts) | Markdown with LaTeX maths, sanitised. |
-| [`router.svelte.ts`](../ui/src/lib/router.svelte.ts) | Hash routing: #/, #/progress, #/map, #/roadmaps, #/roadmaps/<slug>, #/lesson/<slug>, #/topics, #/topics/<slug>?c=<concept>, #/log, #/log/<session>, #/praxis, #/praxis/<mission>. |
+| [`router.svelte.ts`](../ui/src/lib/router.svelte.ts) | Hash routing: #/, #/progress, #/map, #/roadmaps, #/roadmaps/<slug>, #/lesson/<slug>?p=<part>, #/topics, #/topics/<slug>?c=<concept>, #/log, #/log/<session>, #/praxis, #/praxis/<mission>. |
 | [`search.svelte.ts`](../ui/src/lib/search.svelte.ts) | Whether the search palette is open: Ctrl+K or / anywhere, the ribbon's search button, or "Search" on selected text. |
 | [`sections.ts`](../ui/src/lib/sections.ts) | Splits a session's items into the parts of a class (orientation, probe, plan, each step with its checks, summary) and tallies each part's checks, so a long class can be read as an outline and opened part by part. |
 | [`storage.ts`](../ui/src/lib/storage.ts) | Browser storage helpers: moving a setting saved under the app's old name (Mind Gym) to its new key. |
