@@ -11,7 +11,7 @@ The roadmap lives in Aristotle (the Roadmaps page), and `save_roadmap` puts it t
 
 ## Steps
 
-1. **Pin down what it's for.** `list_roadmaps` and `list_topics` first: he may be changing a roadmap that exists, or have topics that already cover part of the path. Then ask what he wants at the end, concretely: what he will be able to do, explain or decide. "Neuroscience" is a field; "understand what my brain does under pressure in a fight, well enough to train it" is a goal. Ask in the terminal, one or two questions at a time. If he has notes elsewhere that bear on it (he may point you to them), read them.
+1. **Pin down what it's for.** `read_about` (what he wrote about himself), `list_roadmaps` and `list_topics` first: he may be changing a roadmap that exists, or have topics that already cover part of the path. Then ask what he wants at the end, concretely: what he will be able to do, explain or decide. "Neuroscience" is a field; "understand what my brain does under pressure in a fight, well enough to train it" is a goal. Ask in the terminal, one or two questions at a time. Ask too **where he will use it** (his sport, his job, a project, his days), unless About you already says: save that as `use` on the roadmap. The course's final mission is built from it. If he has notes elsewhere that bear on it (he may point you to them), read them.
 2. **Scope the field** with the `researcher` subagent: the main areas, which ones rest on which, the standard way the field is taught, and where the evidence is weak or contested. Don't plan from memory.
 3. **Draft the path**, 3 to 8 steps. Each step is one topic: big enough to need a few sessions and its own map, small enough to have one clear goal. For each step:
    - `title`: the topic's name, as it will appear in Topics. Plain, specific, no numbering.
@@ -29,7 +29,7 @@ Same tool, same slug. Read it first with `get_roadmap`. Keep the titles of steps
 
 ## Principles
 
-- Every step ends in practice: once a step is done it gets a Praxis mission, and the finished roadmap a capstone (the `praxis` skill). When choosing steps, favour ones that can be put to work in his life; the `why` can say where.
+- Every course ends in practice: its **final mission** (a capstone, to the `praxis` skill) is the last item of every course, designed on its own as soon as the last class is done. A mission for a single step only when he asks. When choosing steps, favour ones that can be put to work where he said he'll use it; the `why` can say where.
 - A roadmap is a plan, not a contract. He hops in and out; there are no dates, deadlines or schedules on it.
 - Fewer, sharper steps beat a long syllabus. If it needs more than 8, it's two roadmaps.
 - Be honest about the field: if part of it is shaky science (much of pop psychology is), say so in that step's `why`, and plan to teach it as contested.

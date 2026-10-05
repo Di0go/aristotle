@@ -1,4 +1,4 @@
-// Hash routing: #/, #/progress, #/map, #/roadmaps, #/roadmaps/<slug>, #/lesson/<slug>, #/lesson/<slug>/<step>, #/topics, #/topics/<slug>?c=<concept>, #/log, #/log/<session>, #/praxis, #/praxis/<mission>.
+// Hash routing: #/, #/progress, #/map, #/roadmaps, #/roadmaps/<slug>, #/lesson/<slug>, #/lesson/<slug>/<step>, #/topics, #/topics/<slug>?c=<concept>, #/log, #/log/<session>, #/praxis, #/praxis/<mission>, #/about.
 
 export type Route =
   | { page: 'now' }
@@ -14,7 +14,8 @@ export type Route =
   | { page: 'log' }
   | { page: 'session'; id: string }
   | { page: 'praxis' }
-  | { page: 'mission'; id: string };
+  | { page: 'mission'; id: string }
+  | { page: 'about' };
 
 class Router {
   route = $state<Route>(parse(location.hash));
@@ -46,6 +47,7 @@ export const link = {
   session: (id: string) => `#/log/${encodeURIComponent(id)}`,
   praxis: () => '#/praxis',
   mission: (id: string) => `#/praxis/${encodeURIComponent(id)}`,
+  about: () => '#/about',
 };
 
 function parse(hash: string): Route {
@@ -63,6 +65,7 @@ function parse(hash: string): Route {
   if (parts[0] === 'praxis' && parts[1]) return { page: 'mission', id: parts[1] };
   if (parts[0] === 'praxis') return { page: 'praxis' };
   if (parts[0] === 'progress') return { page: 'progress' };
+  if (parts[0] === 'about') return { page: 'about' };
   if (parts[0] === 'map') return { page: 'map' };
   return { page: 'now' };
 }

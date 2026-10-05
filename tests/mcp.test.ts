@@ -27,6 +27,7 @@ import type {
   SessionSummary,
   Aside,
   Gloss,
+  StepNote,
   Topic,
   TopicSummary,
 } from '../shared/types.ts';
@@ -184,6 +185,7 @@ test('lists the tools', async () => {
     'list_topics',
     'preview_svg',
     'quiz',
+    'read_about',
     'record_practice',
     'review_mission',
     'save_mission',
@@ -751,4 +753,57 @@ test('a question on a passage is answered with its paragraph, kept with its step
   assert.equal((await post({ passage: 'x', question: '  ' })).status, 400);
   assert.equal((await fetch(`${BASE}/api/asides/${aside.id}`, { method: 'DELETE' })).status, 200);
   assert.deepEqual(await get<Aside[]>('/api/asides'), []);
+});
+
+test('his notes on a step and his About you page are kept, and read by the tutor', async () => {
+  const put = (route: string, body: unknown) =>
+    fetch(`${BASE}${route}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  assert.match(textOf(await call('read_about')), /not written anything/);
+  assert.equal((await put('/api/about', { text: 'I fight kickboxing and write software.' })).status, 200);
+  assert.match(textOf(await call('read_about')), /kickboxing/);
+
+  await call('start_session', { topic: 'Noted topic', goal: 'Take notes' });
+  await call('show', { kind: 'step', title: 'The pacemaker', markdown: 'It fires on its own.' });
+  const step = (await get<FeedState>('/api/state')).items.at(-1)!;
+  assert.equal(
+    (await put('/api/notes', { topic: 'noted-topic', step: step.id, text: 'Like a metronome.', title: 'Step 1 · The pacemaker' })).status,
+    200,
+  );
+  assert.equal((await get<StepNote[]>('/api/notes')).find((n) => n.step === step.id)?.text, 'Like a metronome.');
+  assert.match(
+    textOf(await call('get_topic', { topic: 'noted-topic' })),
+    /His own notes on steps[\s\S]*Step 1 · The pacemaker: Like a metronome\./,
+  );
+  // An emptied notebook is removed.
+  await put('/api/notes', { topic: 'noted-topic', step: step.id, text: '  ' });
+  assert.equal(
+    (await get<StepNote[]>('/api/notes')).some((n) => n.step === step.id),
+    false,
+  );
+  assert.equal((await put('/api/notes', { topic: 'x' })).status, 400);
+});
+
+test('a course keeps where he will use it, and says so to the tutor', async () => {
+  const saved = textOf(
+    await call('save_roadmap', {
+      title: 'Used course',
+      goal: 'Something to use',
+      status: 'draft',
+      use: 'In my sparring rounds',
+      steps: [{ title: 'Used step', goal: 'Know it' }],
+    }),
+  );
+  assert.match(saved, /Where he will use it: In my sparring rounds/);
+  // Saving again without `use` keeps it.
+  const again = textOf(
+    await call('save_roadmap', {
+      roadmap: 'used-course',
+      title: 'Used course',
+      goal: 'Something to use',
+      status: 'active',
+      steps: [{ title: 'Used step', goal: 'Know it' }],
+    }),
+  );
+  assert.match(again, /Where he will use it: In my sparring rounds/);
+  assert.equal((await get<Roadmap>('/api/roadmaps/used-course')).use, 'In my sparring rounds');
 });

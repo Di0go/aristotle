@@ -10,6 +10,8 @@ data/
 ├── missions/<id>.json        one file per Praxis mission
 ├── glosses.json              the phrases he asked to have explained, with their glosses
 ├── asides.json               his questions on passages of a lesson, with Claude's answers
+├── notes.json                his notebook on each step, in his words
+├── about.md                  About you: what he does and wants, in his words
 └── profile.md                what the tutor has learned about how he learns (written by the skills)
 ```
 
@@ -44,7 +46,7 @@ Quiz items keep the right answers and explanations; the interface only receives 
 
 ## Roadmaps and missions
 
-`roadmaps/<slug>.json` is a `Roadmap`: title, goal, status (`draft` or `active`) and ordered steps, each a topic by slug with its own goal and why. A step's progress is not stored: it is read from its topic's map.
+`roadmaps/<slug>.json` is a `Roadmap`: title, goal, status (`draft` or `active`), `use` (where he will use it, in his words; its final mission is built from it) and ordered steps, each a topic by slug with its own goal and why. A step's progress is not stored: it is read from its topic's map.
 
 `missions/<id>.json` is a `Mission`: scope (`step`, `capstone` or `topic`), the roadmap and topic it follows, the brief, criteria and concepts, and later his `debrief` and Claude's review with a verdict per criterion. Reviewing a mission records evidence on its concepts.
 
@@ -55,6 +57,10 @@ Quiz items keep the right answers and explanations; the interface only receives 
 ## Questions on a passage
 
 `asides.json` is an array of `Aside`: a question he asked about a passage he selected ("Ask about this"), the passage, Claude Code's answer, the topic, and the feed item the passage was in (so the step's page can show it), with when. Rewritten whole and atomically on every change ([`asides.ts`](../server/asides.ts)); `get_topic` lists a topic's questions for the tutor.
+
+## His words: step notes and About you
+
+`notes.json` is an array of `StepNote`: the topic, the id of the step's block, the step's title when he wrote it, his text and when; an emptied notebook is removed. `about.md` is his About you page as plain text. Both are written only from the interface ([`notes.ts`](../server/notes.ts)); `get_topic` lists a topic's notes, `read_about` returns About you.
 
 ## Backup
 

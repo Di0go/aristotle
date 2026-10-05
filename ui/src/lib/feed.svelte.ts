@@ -4,6 +4,7 @@ import {
   isInteractive,
   type FeedEvent,
   type Aside,
+  type StepNote,
   type FeedState,
   type Gloss,
   type Mission,
@@ -40,6 +41,10 @@ class LiveFeed {
   glosses = $state<Gloss[]>([]);
   /** Every question he asked on a passage, updated live. */
   asides = $state<Aside[]>([]);
+  /** His notebook on every step, updated live. */
+  notes = $state<StepNote[]>([]);
+  /** What he wrote on his About you page. */
+  about = $state('');
 
   /** The first question still waiting for the learner, if any. Once a session has ended, nothing is. */
   pending = $derived(this.session?.endedAt ? null : (this.items.find((i) => isInteractive(i) && !i.answeredAt) ?? null));
@@ -120,6 +125,8 @@ class LiveFeed {
     const missions = await getJson<Mission[]>('/api/missions');
     this.glosses = await getJson<Gloss[]>('/api/glosses');
     this.asides = await getJson<Aside[]>('/api/asides');
+    this.notes = await getJson<StepNote[]>('/api/notes');
+    this.about = (await getJson<{ text: string }>('/api/about')).text;
     this.topics = Object.fromEntries(topics.map((t) => [t.slug, t]));
     this.roadmaps = Object.fromEntries(roadmaps.map((r) => [r.slug, r]));
     this.missions = Object.fromEntries(missions.map((m) => [m.id, m]));
@@ -147,6 +154,10 @@ class LiveFeed {
       this.glosses = event.glosses;
     } else if (event.type === 'asides') {
       this.asides = event.asides;
+    } else if (event.type === 'notes') {
+      this.notes = event.notes;
+    } else if (event.type === 'about') {
+      this.about = event.about;
     } else {
       this.upsert(event.item);
     }

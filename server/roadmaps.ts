@@ -12,6 +12,7 @@ export interface RoadmapInput {
   title: string;
   goal: string;
   status: Roadmap['status'];
+  use?: string;
   steps: { title: string; goal: string; why?: string; topic?: string }[];
 }
 
@@ -66,6 +67,7 @@ export class Roadmaps {
       title: input.title,
       goal: input.goal,
       status: input.status,
+      ...((input.use ?? existing?.use) ? { use: input.use ?? existing?.use } : {}),
       created: existing?.created ?? now,
       updated: now,
       steps,
@@ -101,6 +103,7 @@ export function describeRoadmap(roadmap: Roadmap, topics: (slug: string) => Topi
   return [
     `# ${roadmap.title} (${roadmap.slug})${roadmap.status === 'draft' ? ' [DRAFT: not approved yet]' : ''}`,
     `Goal: ${roadmap.goal}`,
+    roadmap.use ? `Where he will use it: ${roadmap.use}` : 'Where he will use it: (not asked yet: ask him, and save it with `use`)',
     `\nSteps, in order:`,
     lines.join('\n') || '(none)',
   ].join('\n');

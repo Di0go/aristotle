@@ -13,6 +13,7 @@
   import Home from '../lib/Home.svelte';
   import LessonActivity from '../lib/LessonActivity.svelte';
   import LessonBench from '../lib/LessonBench.svelte';
+  import { bench } from '../lib/bench.svelte.ts';
   import ReviewPanel from '../lib/ReviewPanel.svelte';
 
   const KIND = { learn: 'Lesson', review: 'Review', train: 'Training set' } as const;
@@ -58,7 +59,7 @@
 </script>
 
 {#if running && feed.session}
-  <div class="lesson" class:with-bench={topic || reviewing}>
+  <div class="lesson" class:with-bench={(topic || reviewing) && !bench.hidden}>
     <div class="lesson-main">
       <header class="lesson-head">
         <nav class="crumbs" aria-label="Where this is">
@@ -85,10 +86,10 @@
           {#if topic && counts.total}<dt>progress</dt>
             <dd>{counts.solid} of {counts.total} concepts solid</dd>{/if}
         </dl>
-        {#if topic || reviewing}
-          <button class="ghost small bench-toggle" onclick={() => (benchOpen = true)}
-            >{reviewing ? 'The queue' : 'Outline and graph'}</button
-          >
+        {#if (topic || reviewing) && bench.hidden}
+          <button class="ghost small" onclick={() => bench.toggle(false)}>« Panel</button>
+        {:else if topic || reviewing}
+          <button class="ghost small bench-toggle" onclick={() => (benchOpen = true)}>{reviewing ? 'The queue' : 'About this'}</button>
         {/if}
       </header>
 
@@ -104,7 +105,7 @@
       <Composer />
     </div>
 
-    {#if reviewing || topic}
+    {#if (reviewing || topic) && !bench.hidden}
       <aside class="bench" class:open={benchOpen} aria-label={reviewing ? 'Review queue' : 'Where this lesson sits'}>
         {#if reviewing}
           <div class="bench-inner"><ReviewPanel onclose={() => (benchOpen = false)} /></div>

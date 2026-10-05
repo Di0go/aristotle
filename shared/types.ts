@@ -117,7 +117,11 @@ export type FeedEvent =
   /** Every gloss, after one is added or removed. */
   | { type: 'glosses'; glosses: Gloss[] }
   /** Every question he asked on a passage, after one is added or removed. */
-  | { type: 'asides'; asides: Aside[] };
+  | { type: 'asides'; asides: Aside[] }
+  /** His notes on every step, after one changes. */
+  | { type: 'notes'; notes: StepNote[] }
+  /** His own words about himself (the About you page), after he edits them. */
+  | { type: 'about'; about: string };
 
 // Knowledge maps
 
@@ -220,6 +224,8 @@ export interface Roadmap {
   goal: string;
   /** draft: still being planned with him; active: approved, being followed. */
   status: 'draft' | 'active';
+  /** Where he will use it, in his words (his sport, his job, a project): what its final mission is built from. */
+  use?: string;
   created: string;
   updated: string;
   steps: RoadmapStep[];
@@ -428,4 +434,17 @@ export interface AsideBody {
   context?: string;
   topic?: string;
   item?: string;
+}
+
+// His notes on a step, and his About you page
+
+/** What he wrote in a step's notebook (the panel beside the step): his own, kept with that step. */
+export interface StepNote {
+  topic: string;
+  /** The id of the step's block in its session log. */
+  step: string;
+  /** The step's title when he wrote it ("Step 2 · The heart beats by itself"), for reading the note elsewhere. */
+  title?: string;
+  text: string;
+  updated: string;
 }

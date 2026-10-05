@@ -221,6 +221,24 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ro
     return removed ? json(res, 200, { ok: true }) : json(res, 404, { error: 'No such question' });
   }
 
+  // His own words: a notebook per step, and his About you page.
+  if (req.method === 'GET' && route === '/api/notes') return json(res, 200, gym.notes.all());
+  if (req.method === 'PUT' && route === '/api/notes') {
+    const body = (await readJson(req)) as { topic?: unknown; step?: unknown; text?: unknown; title?: unknown } | null;
+    if (typeof body?.topic !== 'string' || typeof body.step !== 'string' || typeof body.text !== 'string') {
+      return json(res, 400, { error: 'Missing topic, step or text' });
+    }
+    const title = typeof body.title === 'string' ? body.title : undefined;
+    return json(res, 200, { note: await gym.notes.write(body.topic, body.step, body.text, title) });
+  }
+  if (req.method === 'GET' && route === '/api/about') return json(res, 200, { text: gym.notes.about() });
+  if (req.method === 'PUT' && route === '/api/about') {
+    const body = (await readJson(req)) as { text?: unknown } | null;
+    if (typeof body?.text !== 'string') return json(res, 400, { error: 'Missing text' });
+    await gym.notes.setAbout(body.text);
+    return json(res, 200, { text: gym.notes.about() });
+  }
+
   // History, progress and search
   if (req.method === 'GET' && route === '/api/sessions') return json(res, 200, await gym.listSessions());
   if (req.method === 'GET' && route.startsWith('/api/sessions/')) {

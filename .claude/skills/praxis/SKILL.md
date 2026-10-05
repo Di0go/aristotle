@@ -9,8 +9,8 @@ Aristotle split knowing that (*theoria*) from doing (*praxis*); he held that we 
 
 ## When
 
-- **After a step**: when every goal concept of a roadmap step is solid. The roadmap page and Praxis offer it then; the `teach` skill mentions it in one line when a step finishes. One mission per step.
-- **A capstone at the end of a roadmap**: bigger, and it uses the whole path at once.
+- **The final mission of every roadmap (a capstone)**: the last item of every course, shown from the start. It is designed **on its own** as soon as the last step is done: the `teach` skill starts it as it closes that step, and Aristotle asks you (`/praxis capstone <roadmap>`, "on your own") if that didn't happen. Bigger, and it uses the whole path at once. Don't propose it in the terminal: design it, save it, and say in one line that it's up.
+- **After a single step**: only when he asks. One mission per step.
 - **A topic outside any roadmap**, or whenever he asks: scope `topic`.
 - **Reviewing**: when he has written a debrief (`list_missions` with status `debriefed`).
 
@@ -19,14 +19,14 @@ He can come at it from the interface (it asks you with `/praxis step N of <roadm
 ## Designing a mission
 
 1. **Read what it should use.** `get_roadmap` and `get_topic` (the step's topic; for a capstone, every step's). Note the goal concepts, the solid ones, what was shaky, and any missions already set (don't repeat one).
-2. **Look for where it lands in his life.** You can read his machine, so look before you guess:
+2. **Look for where it lands in his life.** First what he told Aristotle himself: `read_about` (his About you page) and, for a roadmap, its "Where he will use it" (`get_roadmap`). Those come first and are enough on their own for anyone. Then, for Diogo, you can also read his machine, so look before you guess:
    - `data/profile.md`, and your memory notes on him.
    - His projects: `ls ~/Projects`, then the READMEs, notes and recent `git log` of the ones that look related. `~/Projects/Machine` holds his kickboxing (training, fights, recovery; it also holds health notes, so use only what the mission needs).
    - His computer and tools, when the topic is technical.
    Look for a real decision, problem, habit or project where this knowledge **gives him an edge**: something he does anyway, done better, or something he wants and can now reach.
 3. **When nothing of his fits, set one anyway.** Don't force a link that isn't there. A mission in the open world still counts: build a small thing, run an experiment on himself, observe and measure something out there, predict and then check, or teach it to someone and note where they get stuck. Say plainly that it isn't tied to his life (the `arena` is "anywhere").
 4. **Pitch it right.** Just past comfortable, like training: it needs the concepts, not a recap of them. A step mission fits in a day or a few sittings; a capstone can take a week or two. It must be safe: nothing that risks his health, his money, his work or other people. In training, stay within what his coach would sign off; flag anything physical that needs his coach.
-5. **Propose it in the terminal first**, in a few lines: the idea, the arena, why it pays off. If there are two good options (one in his life, one in the open), offer both and let him pick. Then `save_mission`:
+5. **For a mission he asked for, propose it in the terminal first** (a final mission is designed on its own: skip straight to `save_mission` with the best option, and name the other in its `why` if there was a close second), in a few lines: the idea, the arena, why it pays off. If there are two good options (one in his life, one in the open), offer both and let him pick. Then `save_mission`:
    - `title`: an imperative, specific (not "Apply X").
    - `why`: the advantage, in his terms. What does he get from it?
    - `brief`: the situation, the task, constraints, and what to bring back (numbers, a file, a commit, a log, a recording). Write it so he can do it without asking. Use [[concept]] links and hover terms like a lesson. No hints about how to solve it: that's the struggle.

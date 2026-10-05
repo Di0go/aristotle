@@ -7,6 +7,7 @@
   import { focus } from './lib/focus.svelte.ts';
   import { link, router } from './lib/router.svelte.ts';
   import { searchBox } from './lib/search.svelte.ts';
+  import './lib/automatic.svelte.ts';
   import './lib/tabs.svelte.ts';
   import './lib/theme.svelte.ts';
   import AskPanel from './lib/AskPanel.svelte';
@@ -36,6 +37,7 @@
     session: () => import('./pages/SessionView.svelte') as never,
     praxis: () => import('./pages/Praxis.svelte') as never,
     mission: () => import('./pages/Mission.svelte') as never,
+    about: () => import('./pages/About.svelte') as never,
   };
 
   let railOpen = $state(false);

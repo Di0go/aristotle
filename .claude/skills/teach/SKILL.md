@@ -128,7 +128,7 @@ He has to trust the teacher completely. One confidently delivered error poisons 
 
 Solid concepts come due for review over time ("fading"). Reviewing them is the `review` skill's job and training on a topic is the `train` skill's; when he finishes a lesson and things are fading, you can mention `/review` in one line.
 
-When a lesson makes every goal concept of a roadmap step solid, the step is done: tell him in one line that it's ready for a Praxis mission (`/praxis`, or the button on the roadmap). The `praxis` skill designs it with him; don't start it unasked.
+When a lesson makes every goal concept of a roadmap step solid, the step is done. If it was the **last** step of its roadmap, the course's final mission comes next on its own: use the `praxis` skill to design the capstone right away (it saves it without asking him first), then tell him in one line that it's up. A mission for a single step only when he asks for one.
 
 ## Show, don't only tell
 

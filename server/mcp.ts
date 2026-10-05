@@ -122,13 +122,31 @@ export function createMcpServer(gym: Gym): McpServer {
       const asides = questions.length
         ? `\n\nQuestions he asked on passages (answered on the spot; what he wondered about):\n${questions.map((q) => `- "${q.question}" (${q.at.slice(0, 10)})`).join('\n')}`
         : '';
+      const written = gym.notes.of(t.slug);
+      const notebook = written.length
+        ? `\n\nHis own notes on steps (his words, kept beside the step):\n${written.map((n) => `- ${n.title ?? gym.feed.stepTitleOf(n.step) ?? 'a step'}: ${n.text.replace(/\s+/g, ' ').slice(0, 300)}`).join('\n')}`
+        : '';
       const asked = gym.glosses.of(t.slug);
       const glosses = asked.length
         ? `\n\nPhrases he selected and asked to have explained (gaps he noticed himself):\n${asked.map((g) => `- "${g.text}" (${g.at.slice(0, 10)})`).join('\n')}`
         : '';
       return text(
-        `${describeTopic(t)}\n\nRecent sessions:\n${recent.join('\n') || '(none)'}${praxis}${glosses}${asides}${roadmapContext(gym, t.slug)}`,
+        `${describeTopic(t)}\n\nRecent sessions:\n${recent.join('\n') || '(none)'}${praxis}${glosses}${asides}${notebook}${roadmapContext(gym, t.slug)}`,
       );
+    },
+  );
+
+  mcp.registerTool(
+    'read_about',
+    {
+      title: 'Read About you',
+      description:
+        "Read what he wrote about himself on Aristotle's About you page: what he does, his projects, his sport or work, what he wants. " +
+        'Read it before planning a roadmap or designing a mission, so they fit his life; it is his own word and comes before anything you infer.',
+    },
+    async () => {
+      const about = gym.notes.about().trim();
+      return text(about || 'He has not written anything on his About you page yet. Ask him what you need, in a line, when it matters.');
     },
   );
 
@@ -190,6 +208,12 @@ export function createMcpServer(gym: Gym): McpServer {
         title: z.string().min(1).describe('e.g. "The fighting mind"'),
         goal: z.string().min(1).describe('What the whole path is for, in a sentence or two'),
         status: z.enum(['draft', 'active']).default('draft'),
+        use: z
+          .string()
+          .optional()
+          .describe(
+            'Where he will use what this course teaches, in his words (his sport, his job, a project). Ask him while planning; the final mission is built from it. Kept when omitted.',
+          ),
         steps: z
           .array(
             z.object({
@@ -203,9 +227,9 @@ export function createMcpServer(gym: Gym): McpServer {
           .max(20),
       },
     },
-    async ({ roadmap, title, goal, status, steps }) => {
+    async ({ roadmap, title, goal, status, use, steps }) => {
       if (roadmap && !gym.roadmaps.get(roadmap)) return error(`No roadmap "${roadmap}" to replace; omit \`roadmap\` to create one.`);
-      const { roadmap: r, created } = await gym.roadmaps.save({ title, goal, status, steps }, roadmap);
+      const { roadmap: r, created } = await gym.roadmaps.save({ title, goal, status, use, steps }, roadmap);
       return text(
         `Roadmap ${created ? 'created' : 'updated'} (${URL_CLEAN}/#/roadmaps/${r.slug}):\n${describeRoadmap(r, (slug) => gym.topics.get(slug))}`,
       );

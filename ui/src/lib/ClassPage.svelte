@@ -8,6 +8,7 @@
   import { claude } from './claude.svelte.ts';
   import { classes } from './classes.svelte.ts';
   import { placeFigures } from './explorables/index.ts';
+  import { bench } from './bench.svelte.ts';
   import { feed } from './feed.svelte.ts';
   import { focus } from './focus.svelte.ts';
   import { placeOf } from './library.ts';
@@ -90,7 +91,7 @@
   }
 </script>
 
-<div class="lesson" class:with-bench={topic}>
+<div class="lesson" class:with-bench={topic && !bench.hidden}>
   <div class="lesson-main">
     <header class="page-head-row">
       <nav class="crumbs" aria-label="Where this is">
@@ -102,7 +103,11 @@
         {#if !focus.on}<button class="ghost small" onclick={() => focus.toggle(true)} title="Hide everything but this step (F)"
             >Focus</button
           >{/if}
-        {#if topic}<button class="ghost small bench-toggle" onclick={() => (benchOpen = true)}>Outline and graph</button>{/if}
+        {#if topic && bench.hidden}<button class="ghost small" onclick={() => bench.toggle(false)} title="Show the panel beside the step"
+            >« Panel</button
+          >{/if}
+        {#if topic && !bench.hidden}<button class="ghost small bench-toggle" onclick={() => (benchOpen = true)}>About this step</button
+          >{/if}
       </div>
     </header>
 
@@ -163,9 +168,9 @@
     {/if}
   </div>
 
-  {#if topic}
-    <aside class="bench" class:open={benchOpen} aria-label="Where this class sits">
-      <LessonBench {topic} onclose={() => (benchOpen = false)} />
+  {#if topic && !bench.hidden}
+    <aside class="bench" class:open={benchOpen} aria-label="About this step">
+      <LessonBench {topic} {page} onclose={() => (benchOpen = false)} />
       <Grip name="--side-w" side="left" min={220} max={480} initial={280} label="Resize the sidebar" />
     </aside>
     <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->

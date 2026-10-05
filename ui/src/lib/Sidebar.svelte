@@ -164,6 +164,28 @@
               {#each steps as s (s.index)}
                 {@render topicRow(s.topic, s.slug, s.title, s.index + 1)}
               {/each}
+              {#if r.status === 'active'}
+                {@const final = feed.missionList.find((m) => m.scope === 'capstone' && m.roadmap === r.slug && m.status !== 'dropped')}
+                {@const left = steps.filter((s) => s.state !== 'done').length}
+                <li>
+                  <a
+                    class="row leaf final"
+                    class:ready={!final && left === 0}
+                    href={final ? link.mission(final.id) : link.roadmap(r.slug)}
+                    onclick={onnavigate}
+                    aria-current={final && route.page === 'mission' && route.id === final.id ? 'page' : undefined}
+                  >
+                    <span class="num">★</span><span class="name">Final mission</span>
+                    <span class="mark" class:done={final?.status === 'reviewed'} class:todo={final?.status === 'open'}
+                      >{final
+                        ? { open: 'to do', debriefed: 'to review', reviewed: '✓', dropped: '' }[final.status]
+                        : left === 0
+                          ? 'designing'
+                          : `after ${left} more`}</span
+                    >
+                  </a>
+                </li>
+              {/if}
             </ul>
           {/if}
         </li>
@@ -308,6 +330,19 @@
     font-size: 0.72rem;
     color: var(--faint);
     font-variant-numeric: tabular-nums;
+  }
+
+  a.row.final {
+    margin-left: 18px;
+    color: var(--muted);
+  }
+
+  a.row.final .num {
+    color: var(--shaky);
+  }
+
+  a.row.final.ready .name {
+    color: var(--fg);
   }
 
   .mark.done {

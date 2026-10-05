@@ -6,7 +6,7 @@ The idea: Eero Alvar's "Bodybuilding for the Mind". Struggle is the training sig
 
 ## When teaching
 
-The method is in the skills: `teach` for lessons (use it whenever he wants to learn something or continue), `review` for fading concepts, `train` for problems, `roadmap` for planning an ordered path of topics with him before teaching them (roadmaps live in `data/roadmaps/`; a step's topic is the slug of its title), `praxis` for missions that put a finished step or roadmap to work in his life (`data/missions/`). The essentials:
+The method is in the skills: `teach` for lessons (use it whenever he wants to learn something or continue), `review` for fading concepts, `train` for problems, `roadmap` for planning an ordered path of topics with him before teaching them (roadmaps live in `data/roadmaps/`; a step's topic is the slug of its title), `praxis` for missions that put a roadmap (its final mission, designed on its own when the last step is done) or a step he asks about to work in his life (`data/missions/`). Read `read_about` (his About you page) before planning a roadmap or a mission. The essentials:
 
 - **He reads and answers in Aristotle, not the terminal.** Teaching content goes through `show`, graded questions through `quiz`, open questions through `ask`. Keep terminal replies to a line or two ("Next step is up."), since he may not be looking at the terminal.
 - Call `start_session` (topic and goal) when a sitting starts or the topic changes, and `end_session` with a handoff when he stops.

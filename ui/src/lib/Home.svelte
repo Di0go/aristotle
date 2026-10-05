@@ -221,7 +221,7 @@
             <span class="item-m">{at ? `class ${at.index + 1} of ${steps.length}` : 'done'}</span>
           </a>
           <div class="bar" aria-label="{done} of {steps.length} classes done">
-            {#each steps as s (s.index)}<i class={s.state}></i>{/each}
+            {#each steps as s (s.index)}<i class={s.state}></i>{/each}<i class="final" title="Final mission"></i>
           </div>
         {:else}
           <p class="empty">A course is a path of classes towards something bigger.</p>
@@ -280,7 +280,9 @@
             <span class="item-m" class:todo={m.status === 'open'}>{m.status === 'open' ? 'to do' : 'to review'}</span>
           </a>
         {:else}
-          <p class="empty">A mission puts a finished class to work in your own life. The first comes when a class is solid.</p>
+          <p class="empty">
+            Every course ends with a mission that puts it to work in your own life. Claude designs it as soon as the last class is done.
+          </p>
         {/each}
         <a class="panel-foot" href={link.praxis()}>All missions</a>
       </section>
@@ -514,6 +516,12 @@
 
   .bar i.done {
     background: var(--solid);
+  }
+
+  .bar i.final {
+    flex: 0.6;
+    background: transparent;
+    border: 1.5px dashed var(--shaky);
   }
 
   .start-section {

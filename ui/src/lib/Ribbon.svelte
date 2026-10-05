@@ -7,8 +7,9 @@
   import { searchBox } from './search.svelte.ts';
   import { ACCENTS, theme } from './theme.svelte.ts';
 
-  /** The five places, each with its icon (20×20, stroked) and its name under it. Everything else is reached from them. */
+  /** The places, each with its icon (20×20, stroked) and its name under it. Everything else is reached from them. */
   const HOME = 'M4 4.5h12v11H4zM7 8.5h6M7 11.5h4';
+  const YOU = 'M10 4a3 3 0 1 0 0 6a3 3 0 1 0 0-6M4.5 16.5c.8-3 3-4.5 5.5-4.5s4.7 1.5 5.5 4.5';
   const COURSES = 'M4 4h3.5v12H4zM8.5 4H12v12H8.5zM13.2 4.6l3.2-.9 3 11.6-3.2.9z';
   const MAP = 'M5 6.5a1.8 1.8 0 1 0 0-.01M15 5.5a1.8 1.8 0 1 0 0-.01M10 15a1.8 1.8 0 1 0 0-.01M6.8 6.3l6.4-.8M6 8.2l3 5.2M14 7.2l-3 5.9';
 
@@ -53,6 +54,11 @@
     <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M8.5 3.5a5 5 0 1 0 0 10a5 5 0 1 0 0-10M12.2 12.2l4.3 4.3" /></svg>
     <span class="lbl">Search</span>
   </button>
+
+  <a class="rib" class:on={route.page === 'about'} href={link.about()} aria-current={route.page === 'about' ? 'page' : undefined}>
+    <svg viewBox="0 0 20 20" aria-hidden="true"><path d={YOU} /></svg>
+    <span class="lbl">You</span>
+  </a>
 
   <span class="space"></span>
 

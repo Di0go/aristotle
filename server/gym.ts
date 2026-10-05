@@ -8,6 +8,7 @@ import { Asides } from './asides.ts';
 import { Glosses } from './glosses.ts';
 import { Feed, readSession, SessionCache, summarizeSession, type SessionRecord } from './feed.ts';
 import { Missions } from './missions.ts';
+import { Notes } from './notes.ts';
 import type { Outcome } from './reviews.ts';
 import { Roadmaps } from './roadmaps.ts';
 import { slugify } from './slug.ts';
@@ -49,22 +50,26 @@ export class Gym {
   readonly missions: Missions;
   readonly glosses: Glosses;
   readonly asides: Asides;
+  readonly notes: Notes;
   readonly backup = new Backup();
   private summaries = new SessionCache((record) => summarizeSession(record));
   private statusChanges = new SessionCache((record) => statusChanges(record));
 
-  constructor(feed: Feed, topics: Topics, roadmaps: Roadmaps, missions: Missions, glosses: Glosses, asides: Asides) {
+  constructor(feed: Feed, topics: Topics, roadmaps: Roadmaps, missions: Missions, glosses: Glosses, asides: Asides, notes: Notes) {
     this.feed = feed;
     this.topics = topics;
     this.roadmaps = roadmaps;
     this.missions = missions;
     this.glosses = glosses;
     this.asides = asides;
+    this.notes = notes;
     topics.events.on('topic', (topic) => feed.events.emit('event', { type: 'topic', topic }));
     roadmaps.events.on('roadmap', (roadmap) => feed.events.emit('event', { type: 'roadmap', roadmap }));
     missions.events.on('mission', (mission) => feed.events.emit('event', { type: 'mission', mission }));
     glosses.events.on('glosses', (list) => feed.events.emit('event', { type: 'glosses', glosses: list }));
     asides.events.on('asides', (list) => feed.events.emit('event', { type: 'asides', asides: list }));
+    notes.events.on('notes', (list) => feed.events.emit('event', { type: 'notes', notes: list }));
+    notes.events.on('about', (about) => feed.events.emit('event', { type: 'about', about }));
     feed.events.on('event', () => this.backup.schedule());
     this.backup.schedule(30_000);
   }
@@ -77,6 +82,7 @@ export class Gym {
       await Missions.load(),
       await Glosses.load(),
       await Asides.load(),
+      await Notes.load(),
     );
   }
 

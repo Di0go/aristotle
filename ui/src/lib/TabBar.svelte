@@ -26,6 +26,7 @@
     roadmap: 'M5 16V4M5 4.5h9l-2 3 2 3H5',
     praxis: TARGET,
     mission: TARGET,
+    about: 'M10 4a3 3 0 1 0 0 6a3 3 0 1 0 0-6M4.5 16.5c.8-3 3-4.5 5.5-4.5s4.7 1.5 5.5 4.5',
   };
 
   // Read through the router so it updates on every navigation; location itself is not reactive.
@@ -58,6 +59,8 @@
         return `${topicTitle(r.slug)}: ${r.number ? `step ${r.number}` : 'intro'}`;
       case 'praxis':
         return 'Missions';
+      case 'about':
+        return 'About you';
       case 'mission':
         return feed.missions?.[r.id]?.title ?? 'Mission';
       case 'session': {

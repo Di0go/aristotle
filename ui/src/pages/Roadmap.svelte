@@ -43,6 +43,7 @@
       <nav class="crumbs"><a href={link.roadmaps()}>Courses</a><span class="sep">/</span><span>Course</span></nav>
       <h1 class="page-title">{roadmap.title}</h1>
       <p class="page-lede">{roadmap.goal}</p>
+      {#if roadmap.use}<p class="use"><span class="muted">Where you'll use it:</span> {roadmap.use}</p>{/if}
       <div class="head-actions">
         {#if roadmap.status === 'draft'}
           <button class="primary" onclick={() => actions.editRoadmap(slug)}>Keep planning with Claude</button>
@@ -110,21 +111,18 @@
         <li class="route-item capstone" class:done={capstone?.status === 'reviewed'}>
           <div class="rail-col" aria-hidden="true"><span class="node">★</span></div>
           <div class="step-card">
-            <div class="step-head"><h2>Capstone</h2></div>
+            <div class="step-head"><h2>Final mission</h2></div>
             {#if capstone}
               {@render missionLine(capstone)}
             {:else}
               <p class="step-goal">
-                A bigger mission that uses the whole course at once, in your own life. It opens once every class is done{done ===
-                steps.length
-                  ? '.'
-                  : `: ${steps.length - done} to go.`}
+                {#if done === steps.length}
+                  Every class is done: Claude is designing it now, from where you said you'll use this course.
+                {:else}
+                  A real task that puts the whole course to work in your own life. Claude designs it on its own as soon as the last class is
+                  done ({steps.length - done} to go).
+                {/if}
               </p>
-              {#if done === steps.length}
-                <div class="step-actions">
-                  <button class="primary small" onclick={() => actions.capstone(roadmap)}>Design the capstone with Claude</button>
-                </div>
-              {/if}
             {/if}
           </div>
         </li>
@@ -141,6 +139,13 @@
 </div>
 
 <style>
+  .use {
+    max-width: 44rem;
+    margin: 8px 0 0;
+    font-size: 0.92rem;
+    color: var(--fg-2);
+  }
+
   .progress-note {
     font-size: 0.83rem;
     margin-left: 6px;
