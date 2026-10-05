@@ -1,16 +1,19 @@
 <script lang="ts">
-  import { placeFigures } from '../lib/explorables/index.ts';
   // The class for one topic, open to read: every step, figure and answer from all its sessions, in order.
   // Nothing starts by going here. Claude starts only when he interacts: writes in the box at the foot, or
   // presses Continue. If a lesson on this topic is running right now, this is that live lesson.
-  import { setContext } from 'svelte';
+  // Each session is split into parts (sections.ts) that fold to one line, with a contents list at the top,
+  // so a long class reads as an outline: only where to pick up and the last summary start open.
+  import { setContext, tick } from 'svelte';
+  import { placeFigures } from '../lib/explorables/index.ts';
   import { feed } from '../lib/feed.svelte.ts';
   import { link } from '../lib/router.svelte.ts';
   import { actions } from '../lib/actions.ts';
   import { claude } from '../lib/claude.svelte.ts';
   import { countsOf, placeOf } from '../lib/library.ts';
   import { formatDay, formatTime } from '../lib/format.ts';
-  import FeedList from '../lib/FeedList.svelte';
+  import LessonPart from '../lib/LessonPart.svelte';
+  import { openByDefault, sectionsOf } from '../lib/sections.ts';
   import LessonBench from '../lib/LessonBench.svelte';
   import Grip from '../lib/Grip.svelte';
   import Now from './Now.svelte';
@@ -47,6 +50,29 @@
 
   /** Each figure placed once, after the first step (in any session) on a concept it explains. */
   const figures = $derived(placeFigures(slug, (sessions ?? []).flatMap((s) => s.items as { id: string; type: string }[])));
+
+  const parts = $derived((sessions ?? []).map((s) => ({ session: s.session, sections: sectionsOf(s.items) })));
+  const allSections = $derived(parts.flatMap((p) => p.sections));
+
+  /** Which parts are open; set once the class loads, then only by him. */
+  let opened = $state<Set<string> | null>(null);
+  $effect(() => {
+    if (opened === null && sessions) opened = openByDefault(allSections);
+  });
+  const isOpen = (key: string) => opened?.has(key) ?? false;
+  function toggle(key: string) {
+    const next = new Set(opened);
+    if (!next.delete(key)) next.add(key);
+    opened = next;
+  }
+  const setAll = (open: boolean) => (opened = new Set(open ? allSections.map((s) => s.key) : []));
+
+  /** From the contents: open the part and bring it into view. */
+  async function jump(key: string) {
+    if (!isOpen(key)) toggle(key);
+    await tick();
+    document.getElementById(`part-${key}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
 
   /** Interacting is what starts the class: his words go to Claude as the first thing it hears. */
   function begin(said = '') {
@@ -95,12 +121,34 @@
       {:else if sessions === null}
         <p class="muted center">Loading the class…</p>
       {:else}
-        {#each sessions as s, i (s.session.id)}
+        <nav class="contents" aria-label="Contents">
+          <div class="contents-head">
+            <span>Contents</span>
+            <button class="link" onclick={() => setAll(true)}>Open all</button>
+            <button class="link" onclick={() => setAll(false)}>Fold all</button>
+          </div>
+          {#each parts as p, i (p.session.id)}
+            {#if parts.length > 1}<p class="contents-session">Session {i + 1}</p>{/if}
+            <ol>
+              {#each p.sections as sec (sec.key)}
+                <li class:todo={sec.checks.unanswered > 0}>
+                  <button class="link" onclick={() => jump(sec.key)}>
+                    <span class="c-label">{sec.label}</span>{#if sec.title}<span class="c-title">{sec.title}</span>{/if}
+                  </button>
+                </li>
+              {/each}
+            </ol>
+          {/each}
+        </nav>
+
+        {#each parts as p, i (p.session.id)}
           <div class="session-divider">
             <span>Session {i + 1}</span>
-            <span class="muted">{formatDay(s.session.startedAt)}, {formatTime(s.session.startedAt)}{s.session.kind === 'train' ? ' · training' : s.session.kind === 'review' ? ' · review' : ''}</span>
+            <span class="muted">{formatDay(p.session.startedAt)}, {formatTime(p.session.startedAt)}{p.session.kind === 'train' ? ' · training' : p.session.kind === 'review' ? ' · review' : ''}</span>
           </div>
-          <FeedList items={s.items} readonly figures={figures} />
+          {#each p.sections as sec (sec.key)}
+            <LessonPart section={sec} open={isOpen(sec.key)} ontoggle={() => toggle(sec.key)} {figures} />
+          {/each}
         {/each}
       {/if}
 
@@ -144,12 +192,84 @@
     margin: 0 auto;
   }
 
+  .contents {
+    max-width: var(--measure);
+    margin: 0 auto 40px;
+    font-size: 0.86rem;
+  }
+
+  .contents-head {
+    display: flex;
+    gap: 14px;
+    align-items: baseline;
+    margin-bottom: 8px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--muted);
+  }
+
+  .contents-head span {
+    margin-right: auto;
+  }
+
+  .contents-head .link {
+    font-weight: 400;
+  }
+
+  .contents-session {
+    margin: 10px 0 4px;
+    font-size: 0.78rem;
+    color: var(--faint);
+  }
+
+  .contents ol {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    columns: 2 18rem;
+    column-gap: 32px;
+  }
+
+  .contents li {
+    break-inside: avoid;
+  }
+
+  .contents li .link {
+    display: flex;
+    gap: 8px;
+    width: 100%;
+    padding: 3px 0;
+    color: var(--fg-2);
+    text-align: left;
+    text-decoration: none;
+  }
+
+  .contents li .link:hover .c-title {
+    color: var(--acc);
+  }
+
+  .c-label {
+    flex: none;
+    min-width: 4.5em;
+    color: var(--faint);
+  }
+
+  .c-title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .contents li.todo .c-label {
+    color: var(--acc);
+  }
+
   .session-divider {
     display: flex;
     align-items: baseline;
     gap: 10px;
     max-width: var(--measure);
-    margin: 0 auto 28px;
+    margin: 0 auto 4px;
     padding-bottom: 8px;
     border-bottom: 1px solid var(--rule);
     font-size: 0.82rem;

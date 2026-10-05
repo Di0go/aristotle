@@ -813,3 +813,10 @@ textarea.note {
 .notebook > .entry-map:first-child {
   margin-top: 0;
 }
+
+/* On a class read back: the other options of an answered question, folded behind a link. */
+.more-options {
+  margin: 4px 0 0 12px;
+  font-size: 0.8rem;
+  color: var(--faint);
+}

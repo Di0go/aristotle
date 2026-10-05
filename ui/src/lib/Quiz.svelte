@@ -1,4 +1,5 @@
 <script lang="ts">
+  // A graded multiple-choice check: options, "I don't know", a note per question, and right or wrong once answered.
   import type { PublicQuizItem } from '../../../shared/types.ts';
   import { feed } from './feed.svelte.ts';
   import Markdown from './Markdown.svelte';
@@ -13,6 +14,11 @@
   let error = $state<string | null>(null);
 
   const answered = $derived(Boolean(item.answeredAt));
+  // Read back later, an answered question shows only his pick and the right one; the rest wait behind a link.
+  const compact = $derived(answered && readonly);
+  let showAll = $state<boolean[]>([]);
+  const shown = (qi: number, oi: number | null) =>
+    !compact || showAll[qi] || item.responses?.[qi]?.choice === oi || (oi !== null && item.questions[qi].correct === oi);
   const ready = $derived(item.questions.every((_, i) => picks[i] !== undefined));
   const current = $derived(item.questions.findIndex((_, i) => picks[i] === undefined));
 
@@ -62,6 +68,7 @@
       <ol class="options">
         {#each q.options as option, oi (oi)}
           {@const chosen = answered ? r?.choice === oi : picks[qi] === oi}
+          {#if shown(qi, oi)}
           <li>
             <button
               class="option"
@@ -76,7 +83,9 @@
               {#if answered && q.correct === oi}<span class="verdict-mark" aria-label="right answer">✓</span>{:else if answered && chosen}<span class="verdict-mark" aria-label="your answer, wrong">✗</span>{:else}<kbd class="key">{oi + 1}</kbd>{/if}
             </button>
           </li>
+          {/if}
         {/each}
+        {#if shown(qi, null)}
         <li>
           <button
             class="option dont-know"
@@ -89,7 +98,11 @@
             <kbd class="key">0</kbd>
           </button>
         </li>
+        {/if}
       </ol>
+      {#if compact && !showAll[qi]}
+        <button class="link more-options" onclick={() => (showAll[qi] = true)}>Show all {q.options.length + 1} options</button>
+      {/if}
 
       {#if answered && r}
         <div class="explanation" class:is-right={r.correct}>

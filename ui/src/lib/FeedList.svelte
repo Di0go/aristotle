@@ -14,16 +14,19 @@
     pendingId = null,
     readonly = false,
     figures = {},
+    firstStep = 1,
   }: {
     items: PublicItem[];
     pendingId?: string | null;
     readonly?: boolean;
     /** Interactive figures to place after an item (by item id), where the step they explain is. */
     figures?: Record<string, Explorable[]>;
+    /** The number of the first teaching step here, when this is one part of a longer class. */
+    firstStep?: number;
   } = $props();
 
   const numbers = $derived.by(() => {
-    let step = 0;
+    let step = firstStep - 1;
     return items.map((item) => (item.type === 'block' && item.kind === 'step' ? ++step : 0));
   });
 </script>
