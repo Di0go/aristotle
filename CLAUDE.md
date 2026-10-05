@@ -25,6 +25,6 @@ The method is in the skills: `teach` for lessons (use it whenever he wants to le
 - When installed, `aristotle.service` (systemd user service, `scripts/install-service.sh`) runs the server at login; `server/control.ts` goes through systemd when it is enabled.
 - `pnpm check` (types), `pnpm test` (end to end: real server, MCP client, HTTP answers), `pnpm start` (build the interface and restart the server), `pnpm app status|start|stop|restart`.
 - After changing server code run `pnpm app restart`; after changing the interface run `pnpm build`.
-- The server backs up `data/` to the private GitHub repo by itself (`server/backup.ts`); don't commit `data/` by hand.
+- `data/` is not part of the app's repo (it is git-ignored): it is its own Git repository, local only for now. The server commits it by itself after quiet periods and pushes only if that repository has a remote (`server/backup.ts`, `DATA_BACKUP=off` disables it). Never add `data/` to the app's repo.
 - `data/` is his learning history. Never delete or rewrite it by hand. Session logs (`data/sessions/`) are append-only JSON Lines; topic maps (`data/topics/`) change only through the server.
 - Run `pnpm check` and `pnpm test` before calling a change done.

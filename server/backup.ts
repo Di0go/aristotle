@@ -1,14 +1,16 @@
-// Backs up data/ to GitHub: once learning activity has been quiet for a while (or a session ends),
-// commit whatever changed under data/ and push. Only data/ is ever committed here.
+// Versions data/ in its own Git repository, kept apart from the code so his learning history never
+// lands in the app's repo. Once activity has been quiet for a while (or a session ends), commit whatever
+// changed; if that repository has a remote (one he set up, private), push it too.
+// Off when data/ isn't a Git repository, or with DATA_BACKUP=off. Setup: README, "Your data".
 
 import { execFile } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { promisify } from 'node:util';
-import { DATA_DIR, ROOT } from './config.ts';
+import { DATA_DIR } from './config.ts';
 
 const run = promisify(execFile);
-const git = (...args: string[]) => run('git', args, { cwd: ROOT, timeout: 60_000 });
+const git = (...args: string[]) => run('git', args, { cwd: DATA_DIR, timeout: 60_000 });
 
 /** Quiet time after the last change before backing up. */
 const QUIET_MS = 10 * 60_000;
@@ -29,9 +31,7 @@ export class Backup {
 
   constructor() {
     this.enabled =
-      process.env.GYM_BACKUP !== 'off' &&
-      path.resolve(DATA_DIR) === path.join(ROOT, 'data') &&
-      existsSync(path.join(ROOT, '.git'));
+      process.env.DATA_BACKUP !== 'off' && existsSync(path.join(DATA_DIR, '.git'));
     this.status = { enabled: this.enabled, pending: false };
   }
 
@@ -55,14 +55,14 @@ export class Backup {
     }
     this.running = true;
     try {
-      const { stdout } = await git('status', '--porcelain', '--', 'data');
+      const { stdout } = await git('status', '--porcelain');
       if (stdout.trim()) {
-        await git('add', '--all', '--', 'data');
-        await git('commit', '--quiet', '-m', `Data: ${describe(stdout)}`, '--', 'data');
+        await git('add', '--all');
+        await git('commit', '--quiet', '-m', `Data: ${describe(stdout)}`);
       }
-      const branch = (await git('rev-parse', '--abbrev-ref', 'HEAD')).stdout.trim();
+      // Pushed only when he has given the data repository a remote to track.
       const upstream = await git('rev-parse', '--abbrev-ref', '@{u}').catch(() => null);
-      if (branch === 'main' && upstream) {
+      if (upstream) {
         const ahead = Number((await git('rev-list', '--count', '@{u}..HEAD')).stdout.trim());
         if (ahead > 0) await git('push', '--quiet');
       }
@@ -81,21 +81,25 @@ export class Backup {
   }
 }
 
-/** "differential-forms, how-the-internet-works, 2 sessions, roadmap fighting-mind" from `git status --porcelain` output. */
+/** "differential-forms, 2 sessions, roadmap fighting-mind, mission x" from `git status --porcelain` output. */
 function describe(porcelain: string): string {
   const topics = new Set<string>();
   const roadmaps = new Set<string>();
+  const missions = new Set<string>();
   let sessions = 0;
   for (const line of porcelain.split('\n')) {
     const file = line.slice(3).trim();
-    const topic = /data\/topics\/([^/]+)\.json$/.exec(file);
+    const topic = /^topics\/([^/]+)\.json$/.exec(file);
     if (topic) topics.add(topic[1]);
-    const roadmap = /data\/roadmaps\/([^/]+)\.json$/.exec(file);
+    const roadmap = /^roadmaps\/([^/]+)\.json$/.exec(file);
     if (roadmap) roadmaps.add(roadmap[1]);
-    if (/data\/sessions\//.test(file)) sessions++;
+    const mission = /^missions\/([^/]+)\.json$/.exec(file);
+    if (mission) missions.add(mission[1]);
+    if (/^sessions\//.test(file)) sessions++;
   }
   const parts = [...topics];
   if (sessions) parts.push(`${sessions} session${sessions === 1 ? '' : 's'}`);
   for (const r of roadmaps) parts.push(`roadmap ${r}`);
+  for (const m of missions) parts.push(`mission ${m}`);
   return parts.length ? parts.join(', ') : 'backup';
 }

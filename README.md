@@ -9,6 +9,7 @@
   <a href="#quick-start">Quick start</a> ·
   <a href="#the-method">The method</a> ·
   <a href="#a-tour">A tour</a> ·
+  <a href="#the-visual-kit">The visual kit</a> ·
   <a href="#how-it-works">How it works</a> ·
   <a href="#credits">Credits</a>
 </p>
@@ -30,11 +31,13 @@ It runs on your Claude subscription. No API keys, no accounts, no cloud: everyth
 > Aristotle tutored a teenage Alexander from 343 BC. This one is more patient, and it is yours.
 
 <p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/images/lesson-dark.webp">
-    <img src="docs/images/lesson-light.webp" alt="A lesson in Aristotle: one step on the dot product, with formulas, a key callout and a check, and beside it the concept being worked on, its local graph and the topic's outline." width="100%">
-  </picture>
+  <a href="docs/images/hero-dark.webp"><picture>
+        <source media="(prefers-color-scheme: dark)" srcset="docs/images/hero-dark.webp">
+        <img src="docs/images/hero-light.webp" alt="A lesson in Aristotle on how the heart keeps time: an interactive figure where the heart rate jumps when the vagal brake is released, then climbs as the accelerator pushes, beside the concept being worked on and the topic outline." width="100%">
+      </picture></a>
 </p>
+
+<p align="center"><sub>A live lesson. The figure is real and interactive: the tutor asked to drop the brake, then push the accelerator, and feel which one is fast.</sub></p>
 
 ## The method
 
@@ -65,39 +68,86 @@ Bigger subjects are planned as **roadmaps**: an ordered path of topics, agreed w
 <table>
   <tr>
     <td width="50%" valign="top">
-      <picture>
+      <a href="docs/images/roadmap-dark.webp"><picture>
         <source media="(prefers-color-scheme: dark)" srcset="docs/images/roadmap-dark.webp">
-        <img src="docs/images/roadmap-light.webp" alt="A roadmap: steps in order, each with its goal, progress and concepts, and a Praxis mission on the finished step.">
-      </picture>
+        <img src="docs/images/roadmap-light.webp" alt="A roadmap, The body under pressure: steps in order with their goals, progress and concepts, and a reviewed Praxis mission on the finished step.">
+      </picture></a>
       <p><b>Roadmaps.</b> A path of topics, each with its goal and why it sits where it does. Progress is read off the knowledge maps, so it is always true.</p>
     </td>
     <td width="50%" valign="top">
-      <picture>
+      <a href="docs/images/mission-dark.webp"><picture>
         <source media="(prefers-color-scheme: dark)" srcset="docs/images/mission-dark.webp">
-        <img src="docs/images/mission-light.webp" alt="A Praxis mission: why it matters, what to do, the criteria for done, the concepts it uses, and the debrief.">
-      </picture>
+        <img src="docs/images/mission-light.webp" alt="A Praxis mission, Catch your vagal brake in the act: why it matters, what to do, the criteria for done, the concepts it uses, and the debrief.">
+      </picture></a>
       <p><b>Praxis.</b> A mission with a clear "done when", the concepts it puts to work, your debrief and the tutor's review. A miss in practice sends a concept back to shaky.</p>
     </td>
   </tr>
   <tr>
     <td width="50%" valign="top">
-      <picture>
+      <a href="docs/images/topic-dark.webp"><picture>
         <source media="(prefers-color-scheme: dark)" srcset="docs/images/topic-dark.webp">
-        <img src="docs/images/topic-light.webp" alt="A topic: its outline in teaching order and its knowledge map as a graph of concepts and prerequisites.">
-      </picture>
+        <img src="docs/images/topic-light.webp" alt="A topic, How the heart keeps time: its outline in teaching order and its knowledge map as a graph of concepts and prerequisites.">
+      </picture></a>
       <p><b>Knowledge maps.</b> Every topic as a graph of concepts and what they rest on, across topics too. Hover a concept anywhere for its card.</p>
     </td>
     <td width="50%" valign="top">
-      <picture>
+      <a href="docs/images/search-dark.webp"><picture>
         <source media="(prefers-color-scheme: dark)" srcset="docs/images/search-dark.webp">
-        <img src="docs/images/search-light.webp" alt="The search palette, matching concepts, missions, roadmap steps and sessions.">
-      </picture>
+        <img src="docs/images/search-light.webp" alt="The search palette, matching concepts, missions, roadmap steps and sessions for the word brake.">
+      </picture></a>
       <p><b>Search everything.</b> <kbd>Ctrl</kbd> <kbd>K</kbd> or <kbd>/</kbd> finds roadmaps, concepts, missions, and anything said in any session, your own answers included.</p>
     </td>
   </tr>
 </table>
 
-And more: lessons with LaTeX maths, Mermaid, step-through sequences and a kit of animated figures (forces in balance, timelines, signal flows, annotated real images); interactive *explorables*; a Progress page with what's fading, solid concepts over time and training levels; a full, replayable log of every session; light and dark themes; and Claude Code itself in a drawer at the bottom of every page.
+## The visual kit
+
+Words alone are the weakest way to teach anything physical, spatial or timed. The tutor writes a few lines of JSON; Aristotle draws them, animates them and makes them explorable. Every figure below is from the same lesson. Click any image to see it full size; in the app, click a figure to open it large.
+
+<p align="center">
+  <a href="docs/images/kit-plate-dark.webp"><picture>
+        <source media="(prefers-color-scheme: dark)" srcset="docs/images/kit-plate-dark.webp">
+        <img src="docs/images/kit-plate-light.webp" alt="A plate: Henry Vandyke Carter's engraving of the inside of the heart from Gray's Anatomy, with seven numbered markers for the chambers, valves and walls." width="78%">
+      </picture></a>
+</p>
+<p align="center"><sub><b>Plates.</b> Real images with numbered markers and a key, taken only from files whose licence allows reuse (here, Gray's Anatomy, 1918, public domain).</sub></p>
+
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <a href="docs/images/kit-flow-dark.webp"><picture>
+        <source media="(prefers-color-scheme: dark)" srcset="docs/images/kit-flow-dark.webp">
+        <img src="docs/images/kit-flow-light.webp" alt="A flow: from a startle to a racing heart, brainstem to sympathetic nerves to the pacemaker, lit up step by step with signals travelling along the paths.">
+      </picture></a>
+      <p><b>Flows.</b> A pathway you walk through one step at a time, with signals moving along it: fast routes, opposing routes, slow ones.</p>
+    </td>
+    <td width="50%" valign="top">
+      <a href="docs/images/kit-balance-dark.webp"><picture>
+        <source media="(prefers-color-scheme: dark)" srcset="docs/images/kit-balance-dark.webp">
+        <img src="docs/images/kit-balance-light.webp" alt="A balance: a dial from 40 to 190 beats a minute set by two forces, the vagal brake and the sympathetic accelerator, here at 98 after a startle.">
+      </picture></a>
+      <p><b>Balances.</b> Two forces on one value, with states to step through (asleep, resting, startled, all-out) and sliders to try your own.</p>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <a href="docs/images/kit-timeline-dark.webp"><picture>
+        <source media="(prefers-color-scheme: dark)" srcset="docs/images/kit-timeline-dark.webp">
+        <img src="docs/images/kit-timeline-light.webp" alt="A timeline on a log scale from half a second to three hours: brake released, sympathetic nerves, adrenaline and cortisol, scrubbed to 27 minutes.">
+      </picture></a>
+      <p><b>Timelines.</b> Things that happen on very different clocks, on a log scale you can play or scrub, from under a second to hours.</p>
+    </td>
+    <td width="50%" valign="top">
+      <a href="docs/images/kit-explorable-dark.webp"><picture>
+        <source media="(prefers-color-scheme: dark)" srcset="docs/images/kit-explorable-dark.webp">
+        <img src="docs/images/kit-explorable-light.webp" alt="An explorable: a beating heart with its trace, its rate over the last 30 seconds, presets and sliders for the brake, the accelerator and age.">
+      </picture></a>
+      <p><b>Explorables.</b> Hand-built simulations for the ideas that deserve one. You move the inputs, and the lesson asks what you noticed.</p>
+    </td>
+  </tr>
+</table>
+
+Plus LaTeX maths, Mermaid diagrams, step-through sequences, hover cards on every term and concept, a Progress page (what's fading, solid concepts over time, training levels), a replayable log of every session, light and dark themes, and Claude Code itself in a drawer at the bottom of every page.
 
 ## Quick start
 
@@ -175,7 +225,25 @@ flowchart LR
   └── profile.md   what the tutor has learned about how you learn
   ```
 
-  Optionally, the server commits `data/` and pushes it to a private Git remote after quiet periods (`GYM_BACKUP=off` disables it).
+  `data/` is never part of this repository (it is in `.gitignore`), so your learning history stays yours.
+
+### Keep a history of your data, and back it up
+
+Make `data/` a Git repository of its own and the server versions it for you: after ten quiet minutes, or when a session ends, it commits whatever changed. Add a remote and it pushes too. Without a remote, the history stays on your machine.
+
+```sh
+cd data
+git init -b main
+git add -A && git commit -m "My learning history"
+
+# Optional: back it up to a repository of your own. Make it PRIVATE: it holds everything you studied and wrote.
+git remote add origin git@github.com:<you>/<your-private-data-repo>.git
+git push -u origin main
+
+cd .. && pnpm app restart
+```
+
+To pause it, start the server with `DATA_BACKUP=off`. To stop backing up to the remote, `git -C data remote remove origin`. Your files keep working either way; Git only adds their history.
 
 <details>
 <summary><b>Project layout</b></summary>

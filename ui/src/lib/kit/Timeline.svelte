@@ -128,7 +128,8 @@
         {@const pk = pos(secs(lane.peak))}
         <circle class="peak" class:on={head.current >= pk} cx={x(pk)} cy={y + 12} r="5" />
       {/if}
-      {#if lane.note && active}<text class="lane-note" x={x(a)} y={y + 33}>{lane.note}</text>{/if}
+      <!-- A lane in the right half has its note end where the bar ends, so the note stays inside the figure. -->
+      {#if lane.note && active}<text class="lane-note" x={a > 0.5 ? x(b) : x(a)} text-anchor={a > 0.5 ? 'end' : 'start'} y={y + 33}>{lane.note}</text>{/if}
     {/each}
 
     <line class="head" x1={x(head.current)} y1={TOP - 10} x2={x(head.current)} y2={height - 34} />
