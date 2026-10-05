@@ -4,6 +4,7 @@ import {
   isInteractive,
   type FeedEvent,
   type FeedState,
+  type Mission,
   type PublicItem,
   type Roadmap,
   type Session,
@@ -26,6 +27,8 @@ class LiveFeed {
   topicVersion = $state(0);
   /** Every roadmap, by slug, updated live. Null until loaded. */
   roadmaps = $state<Record<string, Roadmap> | null>(null);
+  /** Every Praxis mission, by id, updated live. Null until loaded. */
+  missions = $state<Record<string, Mission> | null>(null);
 
   /** The first question still waiting for the learner, if any. Once a session has ended, nothing is. */
   pending = $derived(this.session?.endedAt ? null : (this.items.find((i) => isInteractive(i) && !i.answeredAt) ?? null));
@@ -48,10 +51,28 @@ class LiveFeed {
     this.connected = true;
     const all = (await (await fetch('/api/map')).json()) as Topic[];
     const roadmaps = (await (await fetch('/api/roadmaps')).json()) as Roadmap[];
+    const missions = (await (await fetch('/api/missions')).json()) as Mission[];
     this.topics = Object.fromEntries(all.map((t) => [t.slug, t]));
     this.roadmaps = Object.fromEntries(roadmaps.map((r) => [r.slug, r]));
+    this.missions = Object.fromEntries(missions.map((m) => [m.id, m]));
     this.loaded = true;
     this.topicVersion++;
+  }
+
+  /** Missions, newest first. */
+  missionList = $derived(Object.values(this.missions ?? {}).sort((a, b) => b.created.localeCompare(a.created)));
+
+  /** Sends his debrief, or drops or restores a mission. Returns an error message, or null. */
+  async mission(id: string, body: { action: 'debrief'; text: string } | { action: 'drop' | 'restore' }): Promise<string | null> {
+    const res = await fetch(`/api/missions/${encodeURIComponent(id)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    if (!res.ok) return (data as { error?: string }).error ?? 'Could not save it';
+    this.missions = { ...this.missions, [id]: data as Mission };
+    return null;
   }
 
   /** Roadmaps, most recently changed first. */
@@ -80,6 +101,8 @@ class LiveFeed {
       this.topicVersion++;
     } else if (event.type === 'roadmap') {
       this.roadmaps = { ...this.roadmaps, [event.roadmap.slug]: event.roadmap };
+    } else if (event.type === 'mission') {
+      this.missions = { ...this.missions, [event.mission.id]: event.mission };
     } else {
       this.upsert(event.item);
     }

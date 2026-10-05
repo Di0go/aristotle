@@ -93,7 +93,7 @@
 
 <div class="files">
   <div class="vault">
-    <a class="vault-name" href={link.roadmaps()} onclick={onnavigate}><svg class="mark" viewBox="0 0 32 32" aria-hidden="true"><path d="M22.6 9.2 A9 9 0 1 0 25 16.2" fill="none" stroke="var(--acc)" stroke-width="3.2" stroke-linecap="round" /><circle cx="16" cy="16" r="2.6" fill="currentColor" /></svg>mind-gym</a>
+    <a class="vault-name" href={link.roadmaps()} onclick={onnavigate}><svg class="mark" viewBox="0 0 32 32" aria-hidden="true"><path d="M22.6 9.2 A9 9 0 1 0 25 16.2" fill="none" stroke="var(--acc)" stroke-width="3.2" stroke-linecap="round" /><circle cx="16" cy="16" r="2.6" fill="currentColor" /></svg>aristotle</a>
     <a class="add" href={link.roadmaps()} onclick={onnavigate} title="Plan a roadmap or start a topic" aria-label="Plan a roadmap or start a topic">
       <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3.5v9M3.5 8h9" /></svg>
     </a>

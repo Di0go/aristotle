@@ -18,6 +18,7 @@
   const topic = $derived(feed.topics[slug] ?? null);
   const counts = $derived(countsOf(topic ?? undefined));
   const place = $derived(placeOf(slug, feed.roadmapList));
+  const missions = $derived(feed.missionList.filter((m) => m.topic === slug && m.scope !== 'capstone' && m.status !== 'dropped'));
   const step = $derived(place ? place.roadmap.steps[place.index] : null);
   const chosen = $derived(topic?.concepts.find((c) => c.id === selected) ?? null);
   const ordered = $derived(topic ? outline(topic) : []);
@@ -64,6 +65,13 @@
         <a class="primary" href={link.lesson(slug)}>Go to the class</a>
         {#if counts.solid >= 2}<button class="ghost" onclick={() => actions.train(slug)}>Train on it</button>{/if}
         {#if counts.fading}<button class="ghost" onclick={() => actions.review(slug)}>Review {counts.fading} fading</button>{/if}
+        {#each missions as m (m.id)}
+          <a class="ghost" href={link.mission(m.id)}>Praxis: {m.title}</a>
+        {:else}
+          {#if counts.solid >= 2}
+            <button class="ghost" onclick={() => (place ? actions.stepMission(place.roadmap, place.index) : actions.topicMission(slug))}>Get a Praxis mission</button>
+          {/if}
+        {/each}
       </div>
     </header>
 

@@ -8,6 +8,8 @@
   import TabBar from './lib/TabBar.svelte';
   import StatusLine from './lib/StatusLine.svelte';
   import HoverCard from './lib/HoverCard.svelte';
+  import Search from './lib/Search.svelte';
+  import { searchBox } from './lib/search.svelte.ts';
   import './lib/tabs.svelte.ts';
   import { link, router } from './lib/router.svelte.ts';
   import Now from './pages/Now.svelte';
@@ -24,6 +26,8 @@
     lesson: () => import('./pages/Lesson.svelte') as never,
     log: () => import('./pages/Log.svelte') as never,
     session: () => import('./pages/SessionView.svelte') as never,
+    praxis: () => import('./pages/Praxis.svelte') as never,
+    mission: () => import('./pages/Mission.svelte') as never,
   };
   /** What the current page is told: its slug or id, and for a topic the selected concept. */
   const pageProps = $derived.by((): Record<string, unknown> => {
@@ -66,8 +70,11 @@
       <button onclick={() => (railOpen = true)} aria-label="Open the library">
         <svg viewBox="0 0 18 18" aria-hidden="true"><path d="M3 5h12M3 9h12M3 13h12" /></svg>
       </button>
-      <a class="mobile-brand" href={link.now()}><svg class="mobile-mark" viewBox="0 0 32 32" aria-hidden="true"><path d="M22.6 9.2 A9 9 0 1 0 25 16.2" fill="none" stroke="var(--acc)" stroke-width="3.2" stroke-linecap="round" /><circle cx="16" cy="16" r="2.6" fill="currentColor" /></svg>mind-gym</a>
+      <a class="mobile-brand" href={link.now()}><svg class="mobile-mark" viewBox="0 0 32 32" aria-hidden="true"><path d="M22.6 9.2 A9 9 0 1 0 25 16.2" fill="none" stroke="var(--acc)" stroke-width="3.2" stroke-linecap="round" /><circle cx="16" cy="16" r="2.6" fill="currentColor" /></svg>aristotle</a>
       {#if feed.pending}<a class="turn" href={link.now()}>Your turn</a>{/if}
+      <button class="mobile-search" onclick={() => searchBox.toggle(true)} aria-label="Search">
+        <svg viewBox="0 0 18 18" aria-hidden="true"><path d="M7.5 3a4.5 4.5 0 1 0 0 9a4.5 4.5 0 1 0 0-9M10.8 10.8l4 4" /></svg>
+      </button>
     </header>
     <TabBar />
     <main class="page-area">
@@ -80,7 +87,7 @@
             <m.default {...pageProps} />
           {/key}
         {:catch}
-          <div class="page"><div class="empty-state"><h2>The gym was updated</h2><p>This page needs the new version. <button class="link" onclick={() => location.reload()}>Reload</button></p></div></div>
+          <div class="page"><div class="empty-state"><h2>Aristotle was updated</h2><p>This page needs the new version. <button class="link" onclick={() => location.reload()}>Reload</button></p></div></div>
         {/await}
       {/if}
     </main>
@@ -89,6 +96,7 @@
 </div>
 
 <HoverCard />
+<Search />
 
 {#if claude.mounted}
   <TerminalDrawer />

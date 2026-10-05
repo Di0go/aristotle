@@ -1,25 +1,33 @@
 #!/usr/bin/env bash
-# Makes the certificate for https://gym.test, as the user (no root), in .gym/tls.
+# Makes the certificate for https://aristotle.test, as the user (no root), in .gym/tls.
 #
-# Same pattern as playground.test on this machine: the gym gets its own certificate authority, and that
-# authority carries nameConstraints, so it can only ever sign gym.test, even if its key leaves this folder.
+# Same pattern as playground.test on this machine: Aristotle gets its own certificate authority, and that
+# authority carries nameConstraints, so it can only ever sign aristotle.test, even if its key leaves this folder.
 # Browsers trust it once scripts/setup-hostname.sh has added it to the system trust store (p11-kit).
 #
 #   bash scripts/tls.sh
 #
-# Safe to run again: it keeps the authority and issues a fresh server certificate. Restart the gym after.
+# Safe to run again: it keeps the authority (unless it was made for another name) and issues a fresh server
+# certificate. Restart Aristotle after.
 set -euo pipefail
 
-NAME=${GYM_HOSTNAME:-gym.test}
+NAME=${GYM_HOSTNAME:-aristotle.test}
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 TLS=${GYM_TLS_DIR:-$ROOT/.gym/tls}
 mkdir -p "$TLS"
 chmod 700 "$TLS"
 cd "$TLS"
 
+# An authority made for another name (the app was gym.test once) can't sign this one: retire it. Its
+# certificate stays as retired-ca.crt so setup-hostname.sh can take it out of the trust store.
+if [[ -f ca.crt ]] && ! openssl x509 -in ca.crt -noout -ext nameConstraints | grep -q "DNS:$NAME\b"; then
+  mv ca.crt retired-ca.crt
+  rm -f ca.key ca.srl installed
+fi
+
 if [[ ! -f ca.key ]]; then
   openssl req -x509 -newkey rsa:3072 -nodes -days 3650 -keyout ca.key -out ca.crt \
-    -subj "/CN=Mind Gym CA ($NAME only)" \
+    -subj "/CN=Aristotle CA ($NAME only)" \
     -addext "basicConstraints=critical,CA:TRUE,pathlen:0" \
     -addext "keyUsage=critical,keyCertSign,cRLSign" \
     -addext "nameConstraints=critical,permitted;DNS:$NAME" 2>/dev/null

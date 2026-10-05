@@ -213,6 +213,14 @@ body.resizing {
     height: 20px;
   }
 
+  .mobile-bar .mobile-search {
+    margin-left: auto;
+  }
+
+  .mobile-bar .turn + .mobile-search {
+    margin-left: 0;
+  }
+
   .mobile-bar .turn {
     margin-left: auto;
     padding: 2px 8px;

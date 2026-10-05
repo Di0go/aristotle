@@ -117,7 +117,7 @@
           ></textarea>
           <button class="primary" onclick={() => begin(text)}>{started ? 'Continue' : 'Start'}</button>
         </div>
-        <p class="composer-off">{claude.running ? 'Claude picks it up from here.' : 'This starts Claude here in the gym.'}</p>
+        <p class="composer-off">{claude.running ? 'Claude picks it up from here.' : 'This starts Claude here in Aristotle.'}</p>
       </div>
     </div>
 

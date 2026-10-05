@@ -1,6 +1,6 @@
 {
-  "enabledMcpjsonServers": ["gym"],
+  "enabledMcpjsonServers": ["aristotle"],
   "permissions": {
-    "allow": ["mcp__gym", "WebSearch", "WebFetch"]
+    "allow": ["mcp__aristotle", "WebSearch", "WebFetch"]
   }
 }

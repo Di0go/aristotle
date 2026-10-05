@@ -126,7 +126,7 @@
           <TableView columns={['Day', 'Solid concepts']} rows={progress.solid.map((p) => [longDay(p.day), p.count])} />
         </div>
       {:else}
-        <p class="muted">The line starts after your second day with the gym.</p>
+        <p class="muted">The line starts after your second day with Aristotle.</p>
       {/if}
     </section>
 

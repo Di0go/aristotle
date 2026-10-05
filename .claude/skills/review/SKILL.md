@@ -1,6 +1,6 @@
 ---
 name: review
-description: Spaced review in the Mind Gym. Practises the concepts that are fading (solid once, now due) across all of Diogo's topics, by making him recall and apply them in writing. Use when he types /review, asks to review or practise what he has learned, or asks what is fading.
+description: Spaced review in Aristotle. Practises the concepts that are fading (solid once, now due) across all of Diogo's topics, by making him recall and apply them in writing. Use when he types /review, asks to review or practise what he has learned, or asks what is fading.
 ---
 
 # Review
@@ -27,4 +27,4 @@ Interleave topics rather than finishing one before the next: mixing makes each r
 
 When he stops or the list is done: `end_session` with what held (`locked`), what slipped (`shaky`), and what to do next (`next`: a lesson to repair something, or nothing).
 
-Everything else follows the `teach` skill: he reads in the gym, terminal replies are one line, maths in LaTeX, verify anything you're unsure of.
+Everything else follows the `teach` skill: he reads in Aristotle, terminal replies are one line, maths in LaTeX, verify anything you're unsure of.

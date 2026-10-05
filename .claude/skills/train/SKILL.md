@@ -1,6 +1,6 @@
 ---
 name: train
-description: Training sets in the Mind Gym. Gives Diogo problems on a topic just above what he holds solidly, to solve without help, then critiques them; difficulty rises as he solves them cleanly (progressive overload). Use when he types /train, asks for practice problems or exercises, or wants to work a topic harder.
+description: Training sets in Aristotle. Gives Diogo problems on a topic just above what he holds solidly, to solve without help, then critiques them; difficulty rises as he solves them cleanly (progressive overload). Use when he types /train, asks for practice problems or exercises, or wants to work a topic harder.
 ---
 
 # Train
@@ -38,4 +38,4 @@ Vary the concepts and problem types across a set, and mix in an older solid conc
 
 When he stops: `end_session` with what he can now do (`locked`), where he struggled (`shaky`), and what to train or learn next (`next`).
 
-Everything else follows the `teach` skill: he reads in the gym, terminal replies are one line, maths in LaTeX, verify anything you're unsure of.
+Everything else follows the `teach` skill: he reads in Aristotle, terminal replies are one line, maths in LaTeX, verify anything you're unsure of.

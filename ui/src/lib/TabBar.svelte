@@ -31,6 +31,10 @@
         return feed.topics[r.slug]?.title ?? r.slug;
       case 'lesson':
         return `${feed.topics[r.slug]?.title ?? feed.roadmapList.flatMap((m) => m.steps).find((s) => s.topic === r.slug)?.title ?? r.slug}: class`;
+      case 'praxis':
+        return 'Praxis';
+      case 'mission':
+        return feed.missions?.[r.id]?.title ?? 'Mission';
       case 'session': {
         const date = /^(\d{4}-\d{2}-\d{2})/.exec(r.id)?.[1];
         return `Session${date ? `, ${formatDay(date)}` : ''}`;

@@ -315,10 +315,12 @@ export function describeTopic(topic: Topic): string {
     const wrong = ev.filter((e) => e.result === 'wrong').length;
     const dk = ev.filter((e) => e.result === 'dont-know').length;
     const asks = ev.filter((e) => e.kind === 'ask').length;
-    const practice = ev.filter((e) => e.kind === 'practice');
+    const practice = ev.filter((e) => e.kind === 'practice' && e.practice !== 'mission');
+    const applied = ev.filter((e) => e.practice === 'mission');
     const record =
       (ev.length ? ` | checks: ${right} right, ${wrong} wrong, ${dk} don't know, ${asks} written` : '') +
-      (practice.length ? ` | practice: ${practice.map((e) => e.result).join(' ')}` : '');
+      (practice.length ? ` | practice: ${practice.map((e) => e.result).join(' ')}` : '') +
+      (applied.length ? ` | used in Praxis: ${applied.map((e) => e.result).join(' ')}` : '');
     const fading = isFading(c);
     const review = c.review && c.status === 'solid' ? ` | review ${fading ? 'OVERDUE since' : 'due'} ${c.review.due.slice(0, 10)}` : '';
     const flags = [c.goal ? 'GOAL' : '', topic.focus === c.id ? 'FOCUS' : '', fading ? 'FADING' : ''].filter(Boolean).join(', ');

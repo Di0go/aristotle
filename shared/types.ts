@@ -98,7 +98,8 @@ export interface Evidence {
   kind: 'quiz' | 'ask' | 'practice';
   /** Quiz answers and practice. */
   result?: 'right' | 'partial' | 'wrong' | 'dont-know';
-  practice?: 'recall' | 'problem';
+  /** mission: a Praxis mission, used for real outside the app. */
+  practice?: 'recall' | 'problem' | 'mission';
   /** Training problems: difficulty on the topic's 1-10 scale. */
   difficulty?: number;
 }
@@ -199,6 +200,38 @@ export function stepState(topic: Pick<Topic, 'concepts'> | undefined): StepState
   return goals.length > 0 && goals.every((c) => c.status === 'solid') ? 'done' : 'started';
 }
 
+// Praxis: missions that take what he learned out of the app and into his life (his projects, his training,
+// his computer, or anywhere else), each closed by his debrief and Claude's review.
+
+/** step: after a roadmap step; capstone: the end of a roadmap; topic: a topic outside any roadmap. */
+export type MissionScope = 'step' | 'capstone' | 'topic';
+/** open: to do; debriefed: he reported back, waiting for Claude's review; reviewed: closed; dropped: abandoned. */
+export type MissionStatus = 'open' | 'debriefed' | 'reviewed' | 'dropped';
+export type MissionVerdict = 'achieved' | 'partly' | 'missed';
+
+export interface Mission {
+  id: string;
+  title: string;
+  scope: MissionScope;
+  roadmap?: string;
+  topic?: string;
+  /** Where it happens: one of his projects, his training, his computer, or "anywhere". */
+  arena: string;
+  /** What to do, in Markdown. */
+  brief: string;
+  /** What it gets him: the advantage of being able to do this. */
+  why: string;
+  /** Done when: observable results he can report on. */
+  criteria: string[];
+  /** The concepts it puts to use, as "topic/id". */
+  concepts: string[];
+  status: MissionStatus;
+  created: string;
+  updated: string;
+  debrief?: { at: string; text: string };
+  review?: { at: string; verdict: MissionVerdict; markdown: string };
+}
+
 export interface MapChange {
   id: string;
   label: string;
@@ -286,11 +319,27 @@ export type FeedEvent =
   | { type: 'session'; session: Session }
   | { type: 'item'; item: PublicItem }
   | { type: 'topic'; topic: Topic }
-  | { type: 'roadmap'; roadmap: Roadmap };
+  | { type: 'roadmap'; roadmap: Roadmap }
+  | { type: 'mission'; mission: Mission };
 
 export interface QuizAnswerBody {
   id: string;
   picks: { choice: number | null; note?: string }[];
+}
+
+export type SearchKind = 'roadmap' | 'step' | 'topic' | 'concept' | 'mission' | 'session';
+
+export interface SearchHit {
+  kind: SearchKind;
+  title: string;
+  /** Where it sits, e.g. the roadmap of a step or the topic of a concept. */
+  context?: string;
+  /** Text around the first match. */
+  snippet?: string;
+  /** Roadmap, topic or session id, and mission id. */
+  slug?: string;
+  concept?: string;
+  id?: string;
 }
 
 export interface AskAnswerBody {

@@ -1,4 +1,4 @@
-// Start, stop and check the Mind Gym server. Used by the bridge and by `pnpm gym <command>`.
+// Start, stop and check the Aristotle server. Used by the bridge and by `pnpm app <command>`.
 // Never writes to stdout: the bridge's stdout is Claude Code's MCP channel.
 
 import { spawn, spawnSync } from 'node:child_process';
@@ -14,7 +14,7 @@ export const LOG_FILE = path.join(STATE_DIR, 'server.log');
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /** The systemd user service from scripts/install-service.sh, when installed. */
-const SERVICE = 'mind-gym.service';
+const SERVICE = 'aristotle.service';
 const systemctl = (...args: string[]) => spawnSync('systemctl', ['--user', ...args, SERVICE], { stdio: 'ignore' }).status === 0;
 export const serviceEnabled = () => systemctl('is-enabled', '--quiet');
 

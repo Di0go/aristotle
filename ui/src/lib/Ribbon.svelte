@@ -5,17 +5,20 @@
   import { theme, ACCENTS } from './theme.svelte.ts';
   import { link, router } from './router.svelte.ts';
   import { countsOf } from './library.ts';
+  import { searchBox } from './search.svelte.ts';
 
   let settings = $state(false);
 
   const route = $derived(router.route);
-  const section = $derived(route.page === 'session' ? 'log' : route.page);
+  const section = $derived(route.page === 'session' ? 'log' : route.page === 'mission' ? 'praxis' : route.page);
   const live = $derived(Boolean(feed.session && !feed.session.endedAt));
+  const waiting = $derived(feed.missionList.some((m) => m.status === 'open'));
   const fading = $derived(Object.values(feed.topics).reduce((n, t) => n + countsOf(t).fading, 0));
 
   const PLACES = [
     { page: 'now', label: 'Now', href: link.now(), icon: 'M4 4.5h12v11H4zM7 8.5h6M7 11.5h4' },
     { page: 'map', label: 'Map', href: link.map(), icon: 'M5 6.5a1.8 1.8 0 1 0 0-.01M15 5.5a1.8 1.8 0 1 0 0-.01M10 15a1.8 1.8 0 1 0 0-.01M6.8 6.3l6.4-.8M6 8.2l3 5.2M14 7.2l-3 5.9' },
+    { page: 'praxis', label: 'Praxis', href: link.praxis(), icon: 'M10 3.5a6.5 6.5 0 1 0 0 13a6.5 6.5 0 1 0 0-13M10 6.5a3.5 3.5 0 1 0 0 7a3.5 3.5 0 1 0 0-7M10 9.4a.6.6 0 1 0 0 1.2a.6.6 0 1 0 0-1.2' },
     { page: 'progress', label: 'Progress', href: link.progress(), icon: 'M4.5 16V10M10 16V4.5M15.5 16v-4' },
     { page: 'log', label: 'Log', href: link.log(), icon: 'M10 3.5a6.5 6.5 0 1 0 0 13a6.5 6.5 0 1 0 0-13M10 6.8V10l2.4 1.8' },
   ] as const;
@@ -28,11 +31,16 @@
 <svelte:window onkeydown={onWindowKey} />
 
 <nav class="ribbon" aria-label="Places">
+  <button class="rib" class:on={searchBox.open} onclick={() => searchBox.toggle()} title="Search (Ctrl+K)" aria-label="Search">
+    <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M8.5 3.5a5 5 0 1 0 0 10a5 5 0 1 0 0-10M12.2 12.2l4.3 4.3" /></svg>
+  </button>
+  <span class="gap"></span>
   {#each PLACES as p (p.page)}
     <a class="rib" class:on={section === p.page} href={p.href} title={p.label} aria-label={p.label} aria-current={section === p.page ? 'page' : undefined}>
       <svg viewBox="0 0 20 20" aria-hidden="true"><path d={p.icon} /></svg>
       {#if p.page === 'now' && feed.pending}<i class="pip turn" title="Your turn"></i>{:else if p.page === 'now' && live}<i class="pip"></i>{/if}
       {#if p.page === 'progress' && fading}<i class="pip"></i>{/if}
+      {#if p.page === 'praxis' && waiting}<i class="pip quiet" title="Missions to do"></i>{/if}
     </a>
   {/each}
   <a class="rib" class:on={section === 'roadmaps' || section === 'roadmap' || section === 'topics'} href={link.roadmaps()} title="Library" aria-label="Library">
@@ -85,6 +93,10 @@
 
   .space {
     flex: 1;
+  }
+
+  .gap {
+    height: 6px;
   }
 
   .rib {

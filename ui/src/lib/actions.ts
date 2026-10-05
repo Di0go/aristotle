@@ -1,4 +1,4 @@
-// Starting things from the interface: each action asks the Claude Code running in the gym to run a skill.
+// Starting things from the interface: each action asks the Claude Code running in Aristotle to run a skill.
 // A running Claude gets the slash command; a fresh one starts with the same request in words, because an
 // opening message that begins with "/" is left in the input box instead of being sent.
 
@@ -56,6 +56,25 @@ export const actions = {
   },
   train(slug: string) {
     go(`/train ${slug}`, `Use the train skill: a training set on the topic ${slug}.`, `Training: ${feed.topics[slug]?.title ?? slug}`);
+  },
+  /** Praxis is a conversation (which arena, what fits his life), so it stays on the page with Claude beside it. */
+  stepMission(roadmap: Roadmap, index: number) {
+    const step = roadmap.steps[index];
+    go(
+      `/praxis step ${index + 1} of ${roadmap.slug} (topic ${step.topic})`,
+      `Use the praxis skill: design a mission for step ${index + 1} of my roadmap ${roadmap.slug} (topic ${step.topic}).`,
+      `A mission for ${step.title}`,
+      true,
+    );
+  },
+  topicMission(slug: string) {
+    go(`/praxis topic ${slug}`, `Use the praxis skill: design a mission for the topic ${slug}.`, 'A Praxis mission', true);
+  },
+  capstone(roadmap: Roadmap) {
+    go(`/praxis capstone ${roadmap.slug}`, `Use the praxis skill: design the capstone mission for my roadmap ${roadmap.slug}.`, `The capstone of ${roadmap.title}`, true);
+  },
+  reviewMission(id: string) {
+    go(`/praxis review ${id}`, `Use the praxis skill: review my debrief of the mission ${id}.`, 'Reviewing a mission', true);
   },
   review(slug?: string) {
     go(

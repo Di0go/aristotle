@@ -6,6 +6,7 @@ import path from 'node:path';
 import { Backup } from './backup.ts';
 import { SESSIONS_DIR } from './config.ts';
 import { Feed, readSession, sessionFiles, summarizeSession } from './feed.ts';
+import { Missions } from './missions.ts';
 import type { Outcome } from './reviews.ts';
 import { slugify } from './slug.ts';
 import { Roadmaps } from './roadmaps.ts';
@@ -15,6 +16,8 @@ import type {
   Concept,
   Handoff,
   MapChange,
+  Mission,
+  MissionVerdict,
   Progress,
   QuizItem,
   ReviewQueue,
@@ -33,23 +36,26 @@ export class Gym {
   readonly feed: Feed;
   readonly topics: Topics;
   readonly roadmaps: Roadmaps;
+  readonly missions: Missions;
   readonly backup = new Backup();
   private summaries = new Map<string, { mtime: number; summary: SessionSummary | null }>();
   /** The map changes in each session log, cached by modification time like the summaries. */
   private mapChanges = new Map<string, { mtime: number; changes: { at: string; key: string; to?: string; removed?: boolean }[] }>();
 
-  constructor(feed: Feed, topics: Topics, roadmaps: Roadmaps) {
+  constructor(feed: Feed, topics: Topics, roadmaps: Roadmaps, missions: Missions) {
     this.feed = feed;
     this.topics = topics;
     this.roadmaps = roadmaps;
+    this.missions = missions;
     topics.events.on('topic', (topic) => feed.events.emit('event', { type: 'topic', topic }));
     roadmaps.events.on('roadmap', (roadmap) => feed.events.emit('event', { type: 'roadmap', roadmap }));
+    missions.events.on('mission', (mission) => feed.events.emit('event', { type: 'mission', mission }));
     feed.events.on('event', () => this.backup.schedule());
     this.backup.schedule(30_000);
   }
 
   static async load(): Promise<Gym> {
-    return new Gym(await Feed.load(), await Topics.load(), await Roadmaps.load());
+    return new Gym(await Feed.load(), await Topics.load(), await Roadmaps.load(), await Missions.load());
   }
 
   /** The current session's topic, if it has one on the map. */
@@ -170,6 +176,43 @@ export class Gym {
       lines.push(`Training level for ${slug}: ${from === to ? `stays at ${to}` : `${from} → ${to}`}/10.`);
     }
     return lines;
+  }
+
+  /**
+   * Closes a mission with Claude's review. Each concept result counts as practice (kind "mission"), so it
+   * moves review schedules like any other; outside a session the evidence points at the mission instead.
+   */
+  async reviewMission(id: string, verdict: MissionVerdict, markdown: string, results: { concept: string; outcome: Outcome }[]) {
+    const mission = this.missions.get(id);
+    if (!mission) throw new Error(`No mission "${id}".`);
+    const at = new Date().toISOString();
+    const session = this.feed.session && !this.feed.session.endedAt ? this.feed.session.id : `mission:${mission.id}`;
+    const lines: string[] = [];
+    const changes = new Map<string, MapChange[]>();
+    for (const r of results) {
+      const found = this.resolveIn(r.concept, mission);
+      if (!found) {
+        lines.push(`${r.concept}: no such concept (use "topic/concept").`);
+        continue;
+      }
+      const res = await this.topics.recordPractice(found.topic.slug, found.concept.id, r.outcome, { at, session, practice: 'mission' });
+      if (!res) continue;
+      if (res.change) changes.set(found.topic.slug, [...(changes.get(found.topic.slug) ?? []), res.change]);
+      lines.push(`${found.topic.slug}/${found.concept.id}: ${r.outcome}${res.change ? ', now shaky' : ''}`);
+    }
+    if (this.feed.session && !this.feed.session.endedAt) {
+      for (const [slug, list] of changes) await this.feed.add({ type: 'map', topic: slug, changes: list });
+    }
+    const reviewed: Mission = await this.missions.review(mission.id, verdict, markdown);
+    return { mission: reviewed, lines };
+  }
+
+  /** A concept named in a mission review: "topic/id", or a bare id in the mission's topic. */
+  private resolveIn(ref: string, mission: Mission) {
+    if (ref.includes('/')) return this.resolve(ref);
+    const topic = this.topics.get(mission.topic ?? '') ?? this.currentTopic();
+    const concept = topic?.concepts.find((c) => c.id === slugify(ref));
+    return topic && concept ? { topic, concept } : null;
   }
 
   /** What's fading, and what has been practised in the current session. */

@@ -12,7 +12,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import WebSocket from 'ws';
 import { allowed } from '../server/images.ts';
-import type { FeedState, Progress, PublicItem, ReviewQueue, Roadmap, SessionSummary, Topic, TopicSummary } from '../shared/types.ts';
+import type { FeedState, Mission, Progress, PublicItem, ReviewQueue, Roadmap, SearchHit, SessionSummary, Topic, TopicSummary } from '../shared/types.ts';
 
 const PORT = 4799;
 const TLS_PORT = 4798;
@@ -46,9 +46,9 @@ async function startServer() {
 }
 
 before(async () => {
-  dataDir = await mkdtemp(path.join(tmpdir(), 'mind-gym-test-'));
+  dataDir = await mkdtemp(path.join(tmpdir(), 'aristotle-test-'));
   // A certificate from the real script, marked as trusted the way setup-hostname.sh does.
-  tlsDir = await mkdtemp(path.join(tmpdir(), 'mind-gym-tls-'));
+  tlsDir = await mkdtemp(path.join(tmpdir(), 'aristotle-tls-'));
   assert.equal(spawnSync('bash', ['scripts/tls.sh'], { env: { ...process.env, GYM_TLS_DIR: tlsDir }, stdio: 'ignore' }).status, 0);
   await writeFile(path.join(tlsDir, 'installed'), '');
   await startServer();
@@ -95,11 +95,14 @@ test('lists the tools', async () => {
     'find_images',
     'get_roadmap',
     'get_topic',
+    'list_missions',
     'list_roadmaps',
     'list_topics',
     'preview_svg',
     'quiz',
     'record_practice',
+    'review_mission',
+    'save_mission',
     'save_roadmap',
     'show',
     'start_session',
@@ -352,7 +355,7 @@ async function until(check: () => boolean, ms = 5000) {
   }
 }
 
-test('the terminal runs the command, takes messages, and only opens to the gym itself', async () => {
+test('the terminal runs the command, takes messages, and only opens to Aristotle itself', async () => {
   await assert.rejects(openTerminal(), /403/, 'no Origin');
   await assert.rejects(openTerminal('https://example.com'), /403/, 'another site');
 
@@ -411,11 +414,11 @@ test('run starts the command with the request as its first message, or types it 
   ws.close();
 });
 
-/** A request to gym.test, the way the browser makes it once nftables has forwarded it to the server. */
-function requestGym(secure: boolean, route: string, ca?: Buffer): Promise<{ status: number; location?: string; body: string }> {
+/** A request to aristotle.test, the way the browser makes it once nftables has forwarded it to the server. */
+function requestName(secure: boolean, route: string, ca?: Buffer): Promise<{ status: number; location?: string; body: string }> {
   return new Promise((resolve, reject) => {
-    const options = { host: '127.0.0.1', port: secure ? TLS_PORT : PORT, path: route, headers: { host: 'gym.test' } };
-    const req = secure ? https.get({ ...options, servername: 'gym.test', ca }) : http.get(options);
+    const options = { host: '127.0.0.1', port: secure ? TLS_PORT : PORT, path: route, headers: { host: 'aristotle.test' } };
+    const req = secure ? https.get({ ...options, servername: 'aristotle.test', ca }) : http.get(options);
     req.on('response', (res) => {
       let body = '';
       res.on('data', (chunk) => (body += chunk));
@@ -425,19 +428,19 @@ function requestGym(secure: boolean, route: string, ca?: Buffer): Promise<{ stat
   });
 }
 
-test('gym.test is served over https with its own certificate, and its pages move there from http', async () => {
+test('aristotle.test is served over https with its own certificate, and its pages move there from http', async () => {
   const ca = await readFile(path.join(tlsDir, 'ca.crt'));
-  const page = await requestGym(true, '/topics', ca);
+  const page = await requestName(true, '/topics', ca);
   assert.equal(page.status, 200);
-  assert.deepEqual(JSON.parse((await requestGym(true, '/api/health', ca)).body), { ok: true });
-  await assert.rejects(requestGym(true, '/', undefined), /self-signed|unable to (get|verify)/, 'only its own authority vouches for it');
+  assert.deepEqual(JSON.parse((await requestName(true, '/api/health', ca)).body), { ok: true });
+  await assert.rejects(requestName(true, '/', undefined), /self-signed|unable to (get|verify)/, 'only its own authority vouches for it');
 
-  assert.deepEqual(await requestGym(false, '/topics?x=1', ca), { status: 307, location: 'https://gym.test/topics?x=1', body: '' });
-  assert.equal((await requestGym(false, '/api/health')).status, 200, 'a page still open over http keeps its feed');
+  assert.deepEqual(await requestName(false, '/topics?x=1', ca), { status: 307, location: 'https://aristotle.test/topics?x=1', body: '' });
+  assert.equal((await requestName(false, '/api/health')).status, 200, 'a page still open over http keeps its feed');
   assert.equal((await fetch(`${BASE}/`)).status, 200, 'localhost stays on http');
 
   // ws hands servername on to tls.connect, though its types leave it out.
-  const tlsOptions: WebSocket.ClientOptions = { ca, servername: 'gym.test', headers: { host: 'gym.test' }, origin: 'https://gym.test' } as WebSocket.ClientOptions;
+  const tlsOptions: WebSocket.ClientOptions = { ca, servername: 'aristotle.test', headers: { host: 'aristotle.test' }, origin: 'https://aristotle.test' } as WebSocket.ClientOptions;
   const ws = new WebSocket(`wss://127.0.0.1:${TLS_PORT}/api/terminal`, tlsOptions);
   await new Promise((resolve, reject) => ws.on('open', resolve).on('error', reject));
   ws.close();
@@ -497,4 +500,86 @@ test('a question can carry the step that leads into it, in one call', async () =
   assert.equal(step.type, 'block');
   assert.equal(step.type === 'block' && step.markdown, 'Here is the step.');
   assert.equal(ask.type, 'ask');
+});
+
+test('a Praxis mission is set, debriefed in the interface, and reviewed into practice', async () => {
+  const post = (id: string, body: unknown) =>
+    fetch(`${BASE}/api/missions/${id}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const mission = {
+    title: 'Rewrite the field equations in forms',
+    scope: 'step',
+    roadmap: 'geometry-path',
+    topic: 'differential-forms',
+    arena: 'anywhere',
+    why: 'Maxwell in two lines.',
+    brief: 'Take [[covector]] and write $dF = 0$.',
+    criteria: ['Both equations written as forms'],
+    concepts: ['covector', 'differential-forms/vector', 'differential-forms/nope'],
+  };
+  assert.equal((await call('save_mission', { ...mission, topic: undefined })).isError, true, 'a step mission needs its topic');
+  const saved = textOf(await call('save_mission', mission));
+  assert.match(saved, /Mission created .*#\/praxis\/rewrite-the-field-equations-in-forms/);
+  assert.match(saved, /Not on any map: differential-forms\/nope/);
+  assert.match(textOf(await call('get_roadmap', { roadmap: 'geometry-path' })), /Praxis missions:\n- rewrite-the-field-equations-in-forms: .*\[open\]/);
+
+  // Nothing to review until he debriefs.
+  assert.equal((await call('review_mission', { mission: 'rewrite-the-field-equations-in-forms', verdict: 'achieved', critique: 'x' })).isError, true);
+  assert.equal((await post('rewrite-the-field-equations-in-forms', { action: 'debrief', text: '  ' })).status, 400);
+  const debriefed = (await (await post('rewrite-the-field-equations-in-forms', { action: 'debrief', text: 'Did both; dF = 0 and d*F = J.' })).json()) as Mission;
+  assert.equal(debriefed.status, 'debriefed');
+  assert.match(textOf(await call('list_missions', { status: 'debriefed' })), /rewrite-the-field-equations-in-forms/);
+  assert.match(textOf(await call('list_missions', { mission: 'rewrite-the-field-equations-in-forms' })), /His debrief .*\n.*dF = 0 and d\*F = J/);
+
+  const reviewed = textOf(
+    await call('review_mission', {
+      mission: 'rewrite-the-field-equations-in-forms',
+      verdict: 'partly',
+      critique: 'Sound on the first.',
+      results: [{ concept: 'vector', outcome: 'wrong' }, { concept: 'covector', outcome: 'right' }],
+    }),
+  );
+  assert.match(reviewed, /Reviewed \(partly\)/);
+  assert.match(reviewed, /differential-forms\/vector: wrong, now shaky/);
+  const topic = await get<Topic>('/api/topics/differential-forms');
+  const vector = topic.concepts.find((c) => c.id === 'vector')!;
+  assert.equal(vector.status, 'shaky');
+  assert.equal(vector.evidence.at(-1)?.practice, 'mission');
+  assert.match(textOf(await call('get_topic', { topic: 'differential-forms' })), /used in Praxis: wrong/);
+
+  const [stored] = await get<Mission[]>('/api/missions');
+  assert.equal(stored.status, 'reviewed');
+  assert.equal(stored.review?.verdict, 'partly');
+
+  // Rewriting the brief keeps what happened; dropping and restoring keep it too.
+  await call('save_mission', { ...mission, mission: stored.id, why: 'Maxwell, short.' });
+  const rewritten = await get<Mission[]>('/api/missions');
+  assert.equal(rewritten.length, 1);
+  assert.equal(rewritten[0].why, 'Maxwell, short.');
+  assert.equal(rewritten[0].status, 'reviewed');
+  assert.equal(((await (await post(stored.id, { action: 'drop' })).json()) as Mission).status, 'dropped');
+  assert.equal((await post(stored.id, { action: 'debrief', text: 'more' })).status, 400);
+  assert.equal(((await (await post(stored.id, { action: 'restore' })).json()) as Mission).status, 'reviewed');
+  assert.equal((await post('nope', { action: 'drop' })).status, 400);
+  assert.ok(await readFile(path.join(dataDir, 'missions', `${stored.id}.json`), 'utf8'));
+});
+
+test('search finds roadmaps, concepts, missions and what was said in sessions', async () => {
+  const search = (q: string) => get<SearchHit[]>(`/api/search?q=${encodeURIComponent(q)}`);
+  assert.deepEqual(await search('  '), []);
+
+  const [first] = await search('geometry');
+  assert.equal(first.kind, 'roadmap');
+  assert.equal(first.slug, 'geometry-path');
+
+  const covector = (await search('COVECTOR')).find((h) => h.kind === 'concept');
+  assert.equal(covector?.slug, 'differential-forms');
+  assert.equal(covector?.concept, 'covector');
+
+  assert.ok((await search('field equations')).some((h) => h.kind === 'mission' && h.id === 'rewrite-the-field-equations-in-forms'));
+
+  // A step's text, and his own answer, in any order of words.
+  const said = await search('eats vector');
+  assert.ok(said.some((h) => h.kind === 'session' && h.title === 'Covectors' && /eats a vector/.test(h.snippet ?? '')));
+  assert.ok((await search('every point covector')).some((h) => h.kind === 'session'));
+  assert.deepEqual(await search('zzzz-nothing'), []);
 });

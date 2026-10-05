@@ -1,5 +1,5 @@
-// The Mind Gym server: the interface, its live feed, and the MCP endpoint Claude Code connects to.
-// Listens on 127.0.0.1 only: HTTP, and HTTPS for gym.test when scripts/tls.sh has made its certificate.
+// The Aristotle server: the interface, its live feed, and the MCP endpoint Claude Code connects to.
+// Listens on 127.0.0.1 only: HTTP, and HTTPS for aristotle.test when scripts/tls.sh has made its certificate.
 
 import http from 'node:http';
 import https from 'node:https';
@@ -14,11 +14,14 @@ import { PID_FILE } from './control.ts';
 import { AnswerError, publicItem } from './feed.ts';
 import { Gym } from './gym.ts';
 import { createMcpServer } from './mcp.ts';
+import { MissionError } from './missions.ts';
+import { Search } from './search.ts';
 import { Terminal } from './terminal.ts';
 import type { AskAnswerBody, FeedEvent, QuizAnswerBody } from '../shared/types.ts';
 
 const gym = await Gym.load();
 const feed = gym.feed;
+const search = new Search(gym);
 const terminal = new Terminal();
 const sockets = new WebSocketServer({ noServer: true });
 
@@ -30,14 +33,14 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
       return send(res, 403, 'Forbidden');
     }
     const url = new URL(req.url ?? '/', 'http://localhost');
-    // Once the browsers trust the certificate, pages on http://gym.test move to https. Not /api/: a page
+    // Once the browsers trust the certificate, pages on http://aristotle.test move to https. Not /api/: a page
     // still open over http keeps its live feed and terminal, which a redirect to another origin would break.
     if (TLS_TRUSTED && !('encrypted' in req.socket) && req.headers.host === HOSTNAME && !url.pathname.startsWith('/api/') && url.pathname !== '/mcp') {
       res.writeHead(307, { Location: `https://${HOSTNAME}${req.url ?? '/'}` }).end();
       return;
     }
     if (url.pathname === '/mcp') return await handleMcp(req, res);
-    if (url.pathname.startsWith('/api/')) return await handleApi(req, res, url.pathname);
+    if (url.pathname.startsWith('/api/')) return await handleApi(req, res, url.pathname, url.searchParams);
     return await serveStatic(res, url.pathname);
   } catch (err) {
     console.error(err);
@@ -46,7 +49,7 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
   }
 }
 
-// The terminal runs Claude Code, so it is only ever reachable from the gym's own pages: a browser always
+// The terminal runs Claude Code, so it is only ever reachable from Aristotle's own pages: a browser always
 // sends an Origin on a WebSocket, and other sites (or a rebound DNS name) fail the Host and Origin checks.
 function upgrade(req: http.IncomingMessage, socket: Duplex, head: Buffer) {
   const url = new URL(req.url ?? '/', 'http://localhost');
@@ -81,7 +84,7 @@ async function handleMcp(req: http.IncomingMessage, res: http.ServerResponse) {
   await transport.handleRequest(req, res);
 }
 
-async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, route: string) {
+async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, route: string, params: URLSearchParams) {
   if (req.method === 'GET' && route === '/api/health') return json(res, 200, { ok: true });
   if (req.method === 'GET' && route === '/api/state') return json(res, 200, feed.state());
   if (req.method === 'GET' && route === '/api/events') return streamEvents(req, res);
@@ -96,6 +99,24 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ro
     const topic = gym.topics.get(decodeURIComponent(route.slice('/api/topics/'.length)));
     return topic ? json(res, 200, topic) : json(res, 404, { error: 'No such topic' });
   }
+  if (req.method === 'GET' && route === '/api/missions') return json(res, 200, gym.missions.all());
+  if (req.method === 'POST' && route.startsWith('/api/missions/')) {
+    const id = decodeURIComponent(route.slice('/api/missions/'.length));
+    const body = (await readJson(req)) as { action?: string; text?: unknown } | null;
+    try {
+      if (body?.action === 'debrief') {
+        const text = String(body.text ?? '').trim();
+        if (!text) return json(res, 400, { error: 'Write what happened first' });
+        return json(res, 200, await gym.missions.debrief(id, text));
+      }
+      if (body?.action === 'drop' || body?.action === 'restore') return json(res, 200, await gym.missions.setDropped(id, body.action === 'drop'));
+      return json(res, 400, { error: 'Unknown action' });
+    } catch (err) {
+      if (err instanceof MissionError) return json(res, 400, { error: (err as Error).message });
+      throw err;
+    }
+  }
+  if (req.method === 'GET' && route === '/api/search') return json(res, 200, await search.query(params.get('q') ?? ''));
   if (req.method === 'GET' && route === '/api/sessions') return json(res, 200, await gym.listSessions());
   if (req.method === 'GET' && route === '/api/progress') return json(res, 200, await gym.progress());
   if (req.method === 'GET' && route === '/api/reviews') return json(res, 200, gym.reviewQueue());
@@ -212,7 +233,7 @@ function send(res: http.ServerResponse, status: number, message: string) {
 
 const portInUse = (port: number) => (err: NodeJS.ErrnoException) => {
   if (err.code === 'EADDRINUSE') {
-    console.error(`Port ${port} is already in use: the Mind Gym is probably already running.`);
+    console.error(`Port ${port} is already in use: Aristotle is probably already running.`);
     process.exit(1);
   }
   throw err;
@@ -223,7 +244,7 @@ tls?.on('error', portInUse(TLS_PORT));
 server.listen(PORT, HOST, () => {
   mkdirSync(path.dirname(PID_FILE), { recursive: true });
   writeFileSync(PID_FILE, String(process.pid));
-  console.log(`${new Date().toISOString()} Mind Gym running at ${URL_CLEAN} (http://localhost:${PORT})`);
+  console.log(`${new Date().toISOString()} Aristotle running at ${URL_CLEAN} (http://localhost:${PORT})`);
 });
 tls?.listen(TLS_PORT, HOST);
 

@@ -31,7 +31,7 @@
     }
   }
 
-  /** ANSI colours readable on the gym's own surfaces. */
+  /** ANSI colours readable on Aristotle's own surfaces. */
   function theme() {
     const css = getComputedStyle(document.documentElement);
     const v = (name: string) => css.getPropertyValue(name).trim();
@@ -95,7 +95,7 @@
     };
   });
 
-  // Follow the gym's theme switch.
+  // Follow Aristotle's theme switch.
   $effect(() => {
     void look.value;
     requestAnimationFrame(() => term && (term.options.theme = theme()));

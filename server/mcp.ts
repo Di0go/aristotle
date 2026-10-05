@@ -12,6 +12,7 @@ import type {
 import * as z from 'zod';
 import { KEEPALIVE_MS, URL_CLEAN, WAIT_MS } from './config.ts';
 import type { Gym } from './gym.ts';
+import { describeMission, summarizeMission } from './missions.ts';
 import { describeRoadmap } from './roadmaps.ts';
 import { findImages, viewImage } from './images.ts';
 import { describeTopic } from './topics.ts';
@@ -25,12 +26,12 @@ const error = (t: string): CallToolResult => ({ ...text(t), isError: true });
 /** Everything a lesson's Markdown can hold. Written out once, in `show`; quiz and ask point here. */
 const MATH_AND_DIAGRAMS =
   'Markdown is rendered with LaTeX maths ($...$ inline, $$...$$ on its own lines; write a literal dollar as \\$), ' +
-  '```mermaid code blocks as diagrams, and inline <svg> elements (which may animate with SMIL <animate>; the gym adds play and replay buttons). ' +
+  '```mermaid code blocks as diagrams, and inline <svg> elements (which may animate with SMIL <animate>; Aristotle adds play and replay buttons). ' +
   'Hover cards: {{term|short definition}} marks a term with a definition he can hover; [[concept-id]], [[other-topic/concept-id]] or [[concept-id|text]] links a concept on the map and shows its preview. ' +
   'Also: ==highlighted text==; callouts as Obsidian writes them (> [!idea] Title, then > lines; kinds: idea, key, why, context, example, you, careful, term, note); ' +
   '<figure> with <figcaption> around a drawing; ![alt](https://… "caption") for an image with a caption (only images you have checked exist, e.g. Wikimedia Commons); ' +
   'and ```sequence code blocks: Markdown frames split by lines of ---, which he steps through with Next and Back. ' +
-  'The visual kit (prefer it to hand-drawn SVG; each is a fenced block of JSON, drawn and animated by the gym): ' +
+  'The visual kit (prefer it to hand-drawn SVG; each is a fenced block of JSON, drawn and animated by Aristotle): ' +
   '```balance (two forces on one value: {title, left:{label,detail}, right:{label,detail}, unit, min, max, neutral, neutralLabel, states:[{label, left:0-1, right:0-1, value, note}]}), ' +
   '```timeline (things over time, log scale by default: {title, scale:"log"|"linear", from:"0.5s", to:"2h", marks:["1s","1min"], lanes:[{label, start, end, peak?, note?}]}), ' +
   '```flow (a pathway: {title, direction:"LR"|"TB", nodes:[{id,label,sub?}], edges:[{from,to,label?,kind:"a"|"b"|"slow"}], steps:[{caption, on:[node ids]}]}), ' +
@@ -59,12 +60,12 @@ const conceptParam = z
 
 export function createMcpServer(gym: Gym): McpServer {
   const mcp = new McpServer(
-    { name: 'mind-gym', version: '0.2.0' },
+    { name: 'aristotle', version: '0.3.0' },
     {
       instructions:
-        `The Mind Gym is the learner's interface at ${URL_CLEAN}. He reads and answers there, not in the terminal: ` +
+        `Aristotle is the learner's interface at ${URL_CLEAN}. He reads and answers there, not in the terminal: ` +
         'teaching content goes in `show`, graded questions in `quiz`, open questions in `ask`, and what he knows goes on the map with `update_map` ' +
-        '(the gym draws the map). Keep terminal replies to a line or two.',
+        '(Aristotle draws the map). Keep terminal replies to a line or two.',
     },
   );
 
@@ -98,7 +99,9 @@ export function createMcpServer(gym: Gym): McpServer {
         (s) =>
           `- ${s.startedAt.slice(0, 16).replace('T', ' ')}: ${s.goal} (${s.steps} steps, quizzes ${s.quizRight}/${s.quizTotal}, ${s.asks} written)`,
       );
-      return text(`${describeTopic(t)}\n\nRecent sessions:\n${recent.join('\n') || '(none)'}${roadmapContext(gym, t.slug)}`);
+      const missions = gym.missions.of({ topic: t.slug });
+      const praxis = missions.length ? `\n\nPraxis missions:\n${missions.map(summarizeMission).join('\n')}` : '';
+      return text(`${describeTopic(t)}\n\nRecent sessions:\n${recent.join('\n') || '(none)'}${praxis}${roadmapContext(gym, t.slug)}`);
     },
   );
 
@@ -133,7 +136,8 @@ export function createMcpServer(gym: Gym): McpServer {
     async ({ roadmap }) => {
       const r = gym.roadmaps.get(roadmap);
       if (!r) return error(`No roadmap "${roadmap}". Roadmaps: ${gym.roadmaps.all().map((x) => x.slug).join(', ') || 'none'}.`);
-      return text(describeRoadmap(r, (slug) => gym.topics.get(slug)));
+      const missions = gym.missions.of({ roadmap: r.slug });
+      return text(describeRoadmap(r, (slug) => gym.topics.get(slug)) + (missions.length ? `\n\nPraxis missions:\n${missions.map(summarizeMission).join('\n')}` : ''));
     },
   );
 
@@ -143,7 +147,7 @@ export function createMcpServer(gym: Gym): McpServer {
       title: 'Save a roadmap',
       description:
         'Create a roadmap, or replace the steps of an existing one (pass its slug as `roadmap`): reordering, adding and dropping steps all go through here. ' +
-        'The gym shows it on the Roadmaps page straight away, so he can read it there while you plan it together. ' +
+        'Aristotle shows it on the Roadmaps page straight away, so he can read it there while you plan it together. ' +
         'Save it as "draft" while planning and as "active" only once he has approved it. ' +
         'Each step becomes a topic named after its title, so keep a step\'s title stable once it has been started, ' +
         'and pass `topic` to point a step at a topic that already exists under another name.',
@@ -173,11 +177,112 @@ export function createMcpServer(gym: Gym): McpServer {
   );
 
   mcp.registerTool(
+    'save_mission',
+    {
+      title: 'Save a Praxis mission',
+      description:
+        'Create a Praxis mission, or rewrite one (pass its id as `mission`): a real task he does outside the app that puts a step\'s ' +
+        '(or a whole roadmap\'s) concepts to work for his own advantage, in one of his projects, his training, on his computer, or anywhere when nothing of his fits. ' +
+        'He sees it on the Praxis page and on the roadmap, does it, and writes a debrief there; you then judge it with `review_mission`. ' +
+        'scope "step" follows a roadmap step (pass `topic`, the step\'s topic slug, and `roadmap`); "capstone" closes a roadmap (pass `roadmap`); "topic" follows a topic outside any roadmap. ' +
+        'Rewriting keeps his debrief and your review. ' +
+        SAME_MARKDOWN,
+      inputSchema: {
+        mission: z.string().optional().describe('Id of the mission to rewrite; omit to create one'),
+        title: z.string().min(1).describe('An imperative, e.g. "Map your own stress response in a sparring round"'),
+        scope: z.enum(['step', 'capstone', 'topic']),
+        roadmap: z.string().optional().describe('Roadmap slug (step and capstone missions)'),
+        topic: z.string().optional().describe('Topic slug (step and topic missions)'),
+        arena: z.string().min(1).describe('Where it happens, short: a project ("~/Projects/Machine"), "training", "this computer", "anywhere"'),
+        why: z.string().min(1).describe('What it gets him, in a sentence or two: the advantage, not the lesson'),
+        brief: z.string().min(1).describe('What to do, in Markdown: the situation, the task, any constraints, and what to bring back'),
+        criteria: z.array(z.string().min(1)).min(1).max(8).describe('Done when: observable results he can report on'),
+        concepts: z.array(z.string().min(1)).default([]).describe('The concepts it puts to use, as "topic/id"'),
+      },
+    },
+    async ({ mission, title, scope, roadmap, topic, arena, why, brief, criteria, concepts }) => {
+      if (mission && !gym.missions.get(mission)) return error(`No mission "${mission}" to rewrite; omit \`mission\` to create one.`);
+      if (roadmap && !gym.roadmaps.get(roadmap)) return error(`No roadmap "${roadmap}".`);
+      if (scope === 'capstone' && !roadmap) return error('A capstone needs its `roadmap`.');
+      if (scope !== 'capstone' && !topic) return error(`A ${scope} mission needs its \`topic\`.`);
+      const missing = concepts.filter((c) => !gym.resolve(c.includes('/') ? c : `${topic ?? ''}/${c}`));
+      const r = roadmap ? gym.roadmaps.get(roadmap)!.slug : undefined;
+      const t = topic ? (gym.topics.get(topic)?.slug ?? topic) : undefined;
+      const { mission: m, created } = await gym.missions.save(
+        { title, scope, arena, why, brief, criteria, concepts, ...(r ? { roadmap: r } : {}), ...(t ? { topic: t } : {}) },
+        mission,
+      );
+      return text(
+        `Mission ${created ? 'created' : 'rewritten'} (${URL_CLEAN}/#/praxis/${m.id}): ${summarizeMission(m).slice(2)}` +
+          (missing.length ? `\nNot on any map: ${missing.join(', ')}. Use "topic/id" for concepts; they are needed to record the review.` : ''),
+      );
+    },
+  );
+
+  mcp.registerTool(
+    'list_missions',
+    {
+      title: 'List Praxis missions',
+      description:
+        'List his Praxis missions with their status: open (to do), debriefed (he reported back: review it), reviewed, dropped. ' +
+        'Pass `mission` to read one in full, with his debrief.',
+      inputSchema: {
+        mission: z.string().optional().describe('Id of one mission to read in full'),
+        status: z.enum(['open', 'debriefed', 'reviewed', 'dropped']).optional(),
+        topic: z.string().optional().describe('Only missions on this topic (slug)'),
+        roadmap: z.string().optional().describe('Only missions on this roadmap (slug)'),
+      },
+    },
+    async ({ mission, status, topic, roadmap }) => {
+      if (mission) {
+        const m = gym.missions.get(mission);
+        return m ? text(describeMission(m)) : error(`No mission "${mission}".`);
+      }
+      const list = gym.missions.of({ topic, roadmap }).filter((m) => !status || m.status === status);
+      return text(list.length ? list.map(summarizeMission).join('\n') : 'No missions.');
+    },
+  );
+
+  mcp.registerTool(
+    'review_mission',
+    {
+      title: 'Review a Praxis mission',
+      description:
+        'Close a mission he has debriefed: a verdict, your critique (shown to him on the mission), and a result per concept it used. ' +
+        'Results count as practice: right pushes a concept\'s next review out, wrong makes a solid concept shaky. ' +
+        'Before judging, check what you can (read the repo, the files, the numbers he reports) and ask for anything missing. ' +
+        SAME_MARKDOWN,
+      inputSchema: {
+        mission: z.string().min(1).describe('Mission id'),
+        verdict: z.enum(['achieved', 'partly', 'missed']),
+        critique: z
+          .string()
+          .min(1)
+          .describe('In Markdown: what he did against each criterion, what was sound, the first thing that went wrong if anything did, and the next step'),
+        results: z
+          .array(z.object({ concept: z.string().min(1).describe('"topic/id", or an id in the mission\'s topic'), outcome: z.enum(['right', 'partial', 'wrong']) }))
+          .default([]),
+      },
+    },
+    async ({ mission, verdict, critique, results }) => {
+      const m = gym.missions.get(mission);
+      if (!m) return error(`No mission "${mission}".`);
+      if (!m.debrief) return error('He has not debriefed this mission yet: there is nothing to review.');
+      try {
+        const { lines } = await gym.reviewMission(m.id, verdict, critique, results);
+        return text(`Reviewed (${verdict}); he sees it on the mission.${lines.length ? `\n${lines.join('\n')}` : ''}`);
+      } catch (err) {
+        return error((err as Error).message);
+      }
+    },
+  );
+
+  mcp.registerTool(
     'start_session',
     {
       title: 'Start a session',
       description:
-        'Start a session in the Mind Gym. Clears the "Now" view and opens a new session log. ' +
+        'Start a session in Aristotle. Clears the "Now" view and opens a new session log. ' +
         'kind "learn" (a lesson) and "train" (problems) are on one topic: pass an existing topic slug to continue it (check `list_topics` first), ' +
         'or a new title to create one. kind "review" practises fading concepts across all topics and takes no topic. ' +
         'Call it when a sitting starts and whenever the topic or kind changes.',
@@ -263,7 +368,7 @@ export function createMcpServer(gym: Gym): McpServer {
     {
       title: 'Update the knowledge map',
       description:
-        "Add, change or remove concepts on the current topic's knowledge map, which the gym draws as a graph. " +
+        "Add, change or remove concepts on the current topic's knowledge map, which Aristotle draws as a graph. " +
         'Concepts are nodes; `deps` are their prerequisites (edges). Use it to sketch the strands while probing, to lay out the plan, ' +
         'and to mark progress as each step locks in. Only the fields you pass change. ' +
         STATUSES,
@@ -307,7 +412,7 @@ export function createMcpServer(gym: Gym): McpServer {
     {
       title: 'Show the learner something',
       description:
-        'Show content in the Mind Gym: one teaching step, the plan, a summary, or feedback on an answer. ' +
+        'Show content in Aristotle: one teaching step, the plan, a summary, or feedback on an answer. ' +
         'Use one call per reasoning step rather than one long message. ' +
         MATH_AND_DIAGRAMS +
         ' Returns immediately.',
@@ -337,7 +442,7 @@ export function createMcpServer(gym: Gym): McpServer {
     {
       title: 'Quiz the learner',
       description:
-        'Ask one or more graded multiple-choice questions in the Mind Gym and wait for the answers. ' +
+        'Ask one or more graded multiple-choice questions in Aristotle and wait for the answers. ' +
         'The interface shuffles the options, always adds "I don\'t know" and a note field, and shows right/wrong with your explanation as soon as he answers. ' +
         'Write every option as a bare claim of similar length and form, with no reasoning in it, so the right one cannot be spotted by its wording; ' +
         'put the reasoning in `explanation`. Each wrong option should be a mistake he might really make. ' +
@@ -381,7 +486,7 @@ export function createMcpServer(gym: Gym): McpServer {
     {
       title: 'Ask an open question',
       description:
-        'Ask the learner to write an answer in the Mind Gym and wait for it: a problem to solve without help, ' +
+        'Ask the learner to write an answer in Aristotle and wait for it: a problem to solve without help, ' +
         'a concept to explain in his own words, or something to recall from memory. Producing an answer is a heavier, more telling check than recognising one. ' +
         'The interface gives him a text box with a live maths preview. Critique what he writes with `show` (kind "feedback"). ' +
         SAME_MARKDOWN,
@@ -418,7 +523,7 @@ export function createMcpServer(gym: Gym): McpServer {
     {
       title: 'Collect late answers',
       description:
-        'Get answers the learner gave in the Mind Gym after a `quiz` or `ask` call stopped waiting, ' +
+        'Get answers the learner gave in Aristotle after a `quiz` or `ask` call stopped waiting, ' +
         'for example because he stepped away and came back. Call it when he says he is back or has answered.',
     },
     async () => {
@@ -439,7 +544,7 @@ export function createMcpServer(gym: Gym): McpServer {
       title: 'Preview an SVG',
       description:
         'Render an SVG to an image and look at it before showing it to the learner: check that labels are legible and not overlapping, ' +
-        'that nothing is cut off, and that the drawing says what it should. The gym shows inline SVG in light and dark themes; ' +
+        'that nothing is cut off, and that the drawing says what it should. Aristotle shows inline SVG in light and dark themes; ' +
         'use currentColor for lines and text so they follow the theme, and preview with dark: true to check.',
       inputSchema: {
         svg: z.string().min(1).describe('The SVG markup, starting with <svg'),
@@ -540,7 +645,7 @@ const THEME = {
   dark: { background: '#121513', ink: '#d5dbd3' },
 };
 
-/** SVG to PNG with rsvg-convert, on the gym's card colours, so currentColor renders as it would in the gym. */
+/** SVG to PNG with rsvg-convert, on Aristotle's card colours, so currentColor renders as it would in Aristotle. */
 function renderSvg(svg: string, dark: boolean): Promise<Buffer> {
   const theme = dark ? THEME.dark : THEME.light;
   const themed = svg.replace(/<svg\b/, `<svg color="${theme.ink}"`);
@@ -590,7 +695,7 @@ async function waitForLearner(gym: Gym, id: string, extra: Extra) {
 function notAnswered(): CallToolResult {
   const minutes = Math.round(WAIT_MS / 60_000);
   return text(
-    `No answer yet: he hasn't answered in the Mind Gym within ${minutes} minutes, so he has probably stepped away. ` +
+    `No answer yet: he hasn't answered in Aristotle within ${minutes} minutes, so he has probably stepped away. ` +
       'The question stays open there and his answer will be saved. End your turn now without asking anything else. ' +
       'When he is back, call `collect_answers`.',
   );

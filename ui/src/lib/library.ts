@@ -1,7 +1,7 @@
 // The hierarchy everything hangs on: roadmaps hold steps, a step is a topic, a topic holds concepts.
 // Topics that belong to no roadmap are "loose".
 
-import { isFading, stepState, type Concept, type ConceptStatus, type Roadmap, type StepState, type Topic } from '../../../shared/types.ts';
+import { isFading, stepState, type Concept, type ConceptStatus, type Mission, type Roadmap, type StepState, type Topic } from '../../../shared/types.ts';
 
 export interface Place {
   roadmap: Roadmap;
@@ -80,4 +80,43 @@ export function stepsOf(roadmap: Roadmap, topics: Record<string, Topic>): StepVi
     const topic = topics[s.topic];
     return { index, title: s.title, goal: s.goal, why: s.why, slug: s.topic, topic, state: stepState(topic), counts: countsOf(topic) };
   });
+}
+
+// Praxis: missions hang off a step (by topic), a whole roadmap (its capstone), or a loose topic.
+
+export const SCOPE_LABEL = { step: 'Step mission', capstone: 'Capstone', topic: 'Topic mission' } as const;
+export const STATUS_LABEL = { open: 'To do', debriefed: 'Waiting for review', reviewed: 'Reviewed', dropped: 'Dropped' } as const;
+export const VERDICT_LABEL = { achieved: 'Achieved', partly: 'Partly', missed: 'Missed' } as const;
+
+/** Where a mission comes from, in words: "The fighting mind · step 2: Performance under pressure". */
+export function missionSource(m: Mission, roadmaps: Record<string, Roadmap>, topics: Record<string, Topic>): string {
+  const roadmap = m.roadmap ? roadmaps[m.roadmap] : undefined;
+  if (m.scope === 'capstone') return roadmap ? `${roadmap.title} · the whole roadmap` : (m.roadmap ?? '');
+  const index = roadmap?.steps.findIndex((s) => s.topic === m.topic) ?? -1;
+  const title = (index >= 0 ? roadmap!.steps[index].title : undefined) ?? topics[m.topic ?? '']?.title ?? m.topic ?? '';
+  return roadmap && index >= 0 ? `${roadmap.title} · step ${index + 1}: ${title}` : title;
+}
+
+export interface MissionSlot {
+  roadmap: Roadmap;
+  /** The step's index, or null for the roadmap's capstone. */
+  index: number | null;
+  title: string;
+}
+
+/** Finished steps with no mission yet, and finished roadmaps with no capstone: where a mission is due. */
+export function missionsDue(roadmaps: Roadmap[], topics: Record<string, Topic>, missions: Mission[]): MissionSlot[] {
+  const out: MissionSlot[] = [];
+  const live = missions.filter((m) => m.status !== 'dropped');
+  for (const r of roadmaps) {
+    if (r.status !== 'active') continue;
+    const steps = stepsOf(r, topics);
+    for (const s of steps) {
+      if (s.state === 'done' && !live.some((m) => m.scope === 'step' && m.topic === s.slug)) out.push({ roadmap: r, index: s.index, title: s.title });
+    }
+    if (steps.length && steps.every((s) => s.state === 'done') && !live.some((m) => m.scope === 'capstone' && m.roadmap === r.slug)) {
+      out.push({ roadmap: r, index: null, title: r.title });
+    }
+  }
+  return out;
 }

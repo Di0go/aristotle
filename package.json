@@ -1,11 +1,11 @@
 {
-  "name": "mind-gym",
+  "name": "aristotle",
   "private": true,
   "type": "module",
-  "description": "A personal mind gym: Claude Code is the tutor, this app is the gym.",
+  "description": "A personal tutor: Claude Code teaches, this app is where you learn.",
   "scripts": {
     "start": "vite build && node server/control.ts restart",
-    "gym": "node server/control.ts",
+    "app": "node server/control.ts",
     "serve": "node server/index.ts",
     "dev": "node --watch server/index.ts & vite; kill %1",
     "build": "vite build",

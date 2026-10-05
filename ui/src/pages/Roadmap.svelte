@@ -4,7 +4,8 @@
   import { link } from '../lib/router.svelte.ts';
   import { actions } from '../lib/actions.ts';
   import { ago } from '../lib/format.ts';
-  import { markOf, outline, stepsOf } from '../lib/library.ts';
+  import { markOf, outline, stepsOf, STATUS_LABEL } from '../lib/library.ts';
+  import type { Mission } from '../../../shared/types.ts';
   import StatusBar from '../lib/StatusBar.svelte';
 
   let { slug }: { slug: string } = $props();
@@ -13,9 +14,20 @@
   const steps = $derived(roadmap ? stepsOf(roadmap, feed.topics) : []);
   const next = $derived(steps.find((s) => s.state !== 'done') ?? null);
   const done = $derived(steps.filter((s) => s.state === 'done').length);
+  const missions = $derived(feed.missionList.filter((m) => m.roadmap === slug && m.status !== 'dropped'));
+  const stepMissions = (topic: string) => missions.filter((m) => m.scope === 'step' && m.topic === topic);
+  const capstone = $derived(missions.find((m) => m.scope === 'capstone') ?? null);
   const STATE = { 'not-started': 'Not started', started: 'In progress', done: 'Done' } as const;
 
 </script>
+
+{#snippet missionLine(m: Mission)}
+  <a class="mission-line" href={link.mission(m.id)}>
+    <span class="praxis">Praxis</span>
+    <span class="m-title">{m.title}</span>
+    <span class="tag {m.status === 'reviewed' ? 'solid' : m.status === 'debriefed' ? 'shaky' : 'cyan'}">{STATUS_LABEL[m.status]}</span>
+  </a>
+{/snippet}
 
 <div class="page">
   {#if roadmap}
@@ -70,13 +82,35 @@
                 {/each}
               </ul>
             {/if}
+            {#each stepMissions(s.slug) as m (m.id)}{@render missionLine(m)}{/each}
             <div class="step-actions">
               <a class={isNext ? 'primary small' : 'ghost small'} href={link.lesson(s.slug)}>Go</a>
               {#if s.topic}<a class="ghost small" href={link.topic(s.slug)}>Map</a>{/if}
+              {#if s.state === 'done' && stepMissions(s.slug).length === 0}
+                <button class="ghost small" onclick={() => actions.stepMission(roadmap, s.index)}>Get a Praxis mission</button>
+              {/if}
             </div>
           </div>
         </li>
       {/each}
+      {#if roadmap.status === 'active' && steps.length}
+        <li class="route-item capstone" class:done={capstone?.status === 'reviewed'}>
+          <div class="rail-col" aria-hidden="true"><span class="node">★</span></div>
+          <div class="step-card">
+            <div class="step-head"><h2>Capstone</h2></div>
+            {#if capstone}
+              {@render missionLine(capstone)}
+            {:else}
+              <p class="step-goal">
+                A bigger mission that uses the whole roadmap at once, in your own life. It opens once every step is done{done === steps.length ? '.' : `: ${steps.length - done} to go.`}
+              </p>
+              {#if done === steps.length}
+                <div class="step-actions"><button class="primary small" onclick={() => actions.capstone(roadmap)}>Design the capstone with Claude</button></div>
+              {/if}
+            {/if}
+          </div>
+        </li>
+      {/if}
     </ol>
   {:else if feed.roadmaps}
     <div class="empty-state">
@@ -259,6 +293,40 @@
 
   .step-concepts a:hover {
     color: var(--cyan-ink);
+  }
+
+  .mission-line {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 4px 10px;
+    margin-top: 14px;
+    padding: 9px 12px;
+    font-size: 0.88rem;
+    color: var(--fg);
+    text-decoration: none;
+    background: var(--b1);
+    border-left: 2px solid var(--acc);
+    border-radius: 0 var(--radius) var(--radius) 0;
+  }
+
+  .mission-line:hover .m-title {
+    color: var(--acc);
+  }
+
+  .praxis {
+    font-size: 0.76rem;
+    font-weight: 600;
+    color: var(--acc);
+  }
+
+  .m-title {
+    flex: 1;
+    min-width: 12rem;
+  }
+
+  .capstone .node {
+    font-size: 0.95rem;
   }
 
   .step-actions {

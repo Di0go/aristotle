@@ -1,6 +1,6 @@
 {
   "mcpServers": {
-    "gym": {
+    "aristotle": {
       "command": "node",
       "args": ["server/bridge.ts"]
     }

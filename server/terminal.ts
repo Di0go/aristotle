@@ -1,4 +1,4 @@
-// Claude Code inside the gym: one interactive `claude` running in a pseudo-terminal, streamed to the
+// Claude Code inside Aristotle: one interactive `claude` running in a pseudo-terminal, streamed to the
 // interface over a WebSocket. It is the same interactive Claude Code as in any terminal, on his own login.
 
 import os from 'node:os';

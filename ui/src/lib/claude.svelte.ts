@@ -1,4 +1,4 @@
-// The connection to Claude Code running inside the gym (server/terminal.ts).
+// The connection to Claude Code running inside Aristotle (server/terminal.ts).
 
 type Listener = (data: string, replay: boolean) => void;
 
@@ -99,7 +99,7 @@ class Claude {
       .split(/[╭│─>]{2,}|\n\s*\n|\? for shortcuts/)[0]
       .replace(/\s+/g, ' ')
       .trim();
-    // Tool calls look like "gym - show (MCP)(…)"; only plain sentences are worth showing.
+    // Tool calls look like "aristotle - show (MCP)(…)"; only plain sentences are worth showing.
     return /^[\w-]+ - \w+ \(MCP\)|^\w+\(/.test(said) || said.length < 3 ? '' : said.slice(0, 280);
   }
 

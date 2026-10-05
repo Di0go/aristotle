@@ -78,7 +78,7 @@
             title="Claude updates your map and writes where to pick up next time"
           >{feed.wrapping ? 'Wrapping up…' : 'Stop for today'}</button>
         </div>
-        {#if stopHint && !claude.running}<p class="stop-hint muted">Claude isn't running in the gym. If you're talking to it in your own terminal, tell it there to stop for today.</p>{/if}
+        {#if stopHint && !claude.running}<p class="stop-hint muted">Claude isn't running in Aristotle. If you're talking to it in your own terminal, tell it there to stop for today.</p>{/if}
         <dl class="props">
           <dt>session</dt><dd>{KIND[feed.session.kind ?? 'learn']}: {feed.session.goal}</dd>
           {#if place}<dt>roadmap</dt><dd><a href={link.roadmap(place.roadmap.slug)}>{place.roadmap.title}</a>, step {place.index + 1} of {place.roadmap.steps.length}</dd>{/if}

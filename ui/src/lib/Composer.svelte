@@ -1,5 +1,5 @@
 <script lang="ts">
-  // Talk to Claude from the gym: types the message into the Claude Code running in the drawer.
+  // Talk to Claude from Aristotle: types the message into the Claude Code running in the drawer.
   import { claude } from './claude.svelte.ts';
 
   let text = $state('');

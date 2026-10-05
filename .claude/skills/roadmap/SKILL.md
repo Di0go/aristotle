@@ -1,13 +1,13 @@
 ---
 name: roadmap
-description: Plan a roadmap with Diogo in the Mind Gym: an ordered path of topics towards something bigger, each with its own goal, agreed with him before any of it is taught. Use when he types /roadmap, asks for a roadmap, a learning path, a curriculum or "what order should I learn X in", or wants to change an existing roadmap.
+description: Plan a roadmap with Diogo in Aristotle: an ordered path of topics towards something bigger, each with its own goal, agreed with him before any of it is taught. Use when he types /roadmap, asks for a roadmap, a learning path, a curriculum or "what order should I learn X in", or wants to change an existing roadmap.
 ---
 
 # Roadmap
 
 A roadmap is the order of topics; each topic is still taught by the `teach` skill, one map and one reasoning step at a time. Your job here is the shape of the path: which topics, in which order, and why that order. Nothing gets taught in this skill.
 
-The roadmap lives in the gym (the Roadmaps page), and `save_roadmap` puts it there the moment you call it, so he reads the draft there while you talk it through in the terminal. Keep terminal replies short and point him at the page.
+The roadmap lives in Aristotle (the Roadmaps page), and `save_roadmap` puts it there the moment you call it, so he reads the draft there while you talk it through in the terminal. Keep terminal replies short and point him at the page.
 
 ## Steps
 
@@ -29,6 +29,7 @@ Same tool, same slug. Read it first with `get_roadmap`. Keep the titles of steps
 
 ## Principles
 
+- Every step ends in practice: once a step is done it gets a Praxis mission, and the finished roadmap a capstone (the `praxis` skill). When choosing steps, favour ones that can be put to work in his life; the `why` can say where.
 - A roadmap is a plan, not a contract. He hops in and out; there are no dates, deadlines or schedules on it.
 - Fewer, sharper steps beat a long syllabus. If it needs more than 8, it's two roadmaps.
 - Be honest about the field: if part of it is shaky science (much of pop psychology is), say so in that step's `why`, and plan to teach it as contested.
