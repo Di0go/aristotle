@@ -9,6 +9,8 @@
   import StatusLine from './lib/StatusLine.svelte';
   import HoverCard from './lib/HoverCard.svelte';
   import Search from './lib/Search.svelte';
+  import Lightbox from './lib/Lightbox.svelte';
+  import Logo from './lib/Logo.svelte';
   import { searchBox } from './lib/search.svelte.ts';
   import './lib/tabs.svelte.ts';
   import { link, router } from './lib/router.svelte.ts';
@@ -70,7 +72,7 @@
       <button onclick={() => (railOpen = true)} aria-label="Open the library">
         <svg viewBox="0 0 18 18" aria-hidden="true"><path d="M3 5h12M3 9h12M3 13h12" /></svg>
       </button>
-      <a class="mobile-brand" href={link.now()}><svg class="mobile-mark" viewBox="0 0 32 32" aria-hidden="true"><path d="M22.6 9.2 A9 9 0 1 0 25 16.2" fill="none" stroke="var(--acc)" stroke-width="3.2" stroke-linecap="round" /><circle cx="16" cy="16" r="2.6" fill="currentColor" /></svg>aristotle</a>
+      <a class="mobile-brand" href={link.now()}><Logo size={20} class="mobile-mark" />aristotle</a>
       {#if feed.pending}<a class="turn" href={link.now()}>Your turn</a>{/if}
       <button class="mobile-search" onclick={() => searchBox.toggle(true)} aria-label="Search">
         <svg viewBox="0 0 18 18" aria-hidden="true"><path d="M7.5 3a4.5 4.5 0 1 0 0 9a4.5 4.5 0 1 0 0-9M10.8 10.8l4 4" /></svg>
@@ -97,6 +99,7 @@
 
 <HoverCard />
 <Search />
+<Lightbox />
 
 {#if claude.mounted}
   <TerminalDrawer />

@@ -179,13 +179,13 @@
   text-align: center;
 }
 
+/* Under the drawing, never over it. Quiet until the figure is pointed at. */
 .figure-tools {
-  position: absolute;
-  top: 0;
-  right: 0;
   display: flex;
+  justify-content: center;
   gap: 4px;
-  opacity: 0;
+  margin-top: 10px;
+  opacity: 0.55;
   transition: opacity 0.15s;
 }
 
@@ -492,4 +492,12 @@
   50% {
     opacity: 0.55;
   }
+}
+
+/* What a click enlarges (Lightbox.svelte). */
+.md img,
+.md figure > svg,
+.md .mermaid-diagram svg,
+.kit-plate .plate img {
+  cursor: zoom-in;
 }

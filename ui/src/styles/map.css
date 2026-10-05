@@ -265,18 +265,13 @@
 }
 
 .atlas-legend {
-  position: absolute;
-  left: 14px;
-  bottom: 12px;
+  flex: none;
   display: flex;
   flex-wrap: wrap;
   gap: 6px 16px;
-  padding: 8px 12px;
+  margin-top: 12px;
   font-size: 0.8rem;
   color: var(--graphite);
-  background: var(--sheet);
-  border: 1px solid var(--rule);
-  border-radius: var(--radius);
 }
 
 .atlas-legend span {

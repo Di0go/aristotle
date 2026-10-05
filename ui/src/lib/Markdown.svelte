@@ -126,7 +126,7 @@
       if (still) svg.pauseAnimations();
       label();
       tools.append(play, replay);
-      frame.append(tools);
+      svg.after(tools);
     }
   });
 

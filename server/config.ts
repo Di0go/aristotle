@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 
 export const ROOT = path.resolve(import.meta.dirname, '..');
@@ -20,6 +20,18 @@ export const TLS_PORT = Number(process.env.GYM_TLS_PORT ?? 4748);
 /** Written by scripts/setup-hostname.sh once the browsers trust the certificate: only then does http:// move to https://. */
 export const TLS_TRUSTED = existsSync(path.join(TLS_DIR, 'installed'));
 export const URL_CLEAN = `${TLS_TRUSTED ? 'https' : 'http'}://${HOSTNAME}`;
+
+/** This install's own choices, kept out of git: .gym/settings.json, e.g. {"accent": "red"}. */
+const SETTINGS_FILE = process.env.GYM_SETTINGS ?? path.join(ROOT, '.gym', 'settings.json');
+function readSettings(): { accent?: string } {
+  try {
+    return JSON.parse(readFileSync(SETTINGS_FILE, 'utf8')) as { accent?: string };
+  } catch {
+    return {};
+  }
+}
+/** The accent the interface starts with until a browser picks its own (blue when unset). */
+export const ACCENT = ['blue', 'red', 'violet', 'graphite'].includes(readSettings().accent ?? '') ? readSettings().accent : undefined;
 
 /** Names and ports allowed in Host/Origin headers: this server, the Vite dev server, and the forwarded name. */
 export const ALLOWED_NAMES = ['localhost', '127.0.0.1', HOSTNAME];

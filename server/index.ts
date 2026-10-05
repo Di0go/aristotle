@@ -9,7 +9,7 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { WebSocketServer } from 'ws';
-import { ALLOWED_NAMES, ALLOWED_PORTS, HOST, HOSTNAME, PORT, TLS_DIR, TLS_PORT, TLS_TRUSTED, UI_DIR, URL_CLEAN } from './config.ts';
+import { ACCENT, ALLOWED_NAMES, ALLOWED_PORTS, HOST, HOSTNAME, PORT, TLS_DIR, TLS_PORT, TLS_TRUSTED, UI_DIR, URL_CLEAN } from './config.ts';
 import { PID_FILE } from './control.ts';
 import { AnswerError, publicItem } from './feed.ts';
 import { Gym } from './gym.ts';
@@ -189,6 +189,7 @@ async function serveStatic(res: http.ServerResponse, pathname: string) {
       return send(res, 503, 'The interface is not built yet. Run: pnpm build');
     }
   }
+  if (ACCENT && file.endsWith(`${path.sep}index.html`)) body = Buffer.from(body.toString('utf8').replace('<html lang="en">', `<html lang="en" data-accent="${ACCENT}">`));
   const type = TYPES[path.extname(file)] ?? 'application/octet-stream';
   const cache = file.includes(`${path.sep}assets${path.sep}`) ? 'public, max-age=31536000, immutable' : 'no-cache';
   res.writeHead(200, { 'Content-Type': type, 'Cache-Control': cache }).end(body);

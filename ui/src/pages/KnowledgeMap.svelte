@@ -231,14 +231,6 @@
           />
         {/each}
       </svg>
-      <div class="atlas-legend">
-        <span><i class="dot solid"></i>Solid</span>
-        <span><i class="dot fading"></i>Fading</span>
-        <span><i class="dot shaky"></i>Shaky</span>
-        <span><i class="dot"></i>Not yet</span>
-        <span><i class="goal-key"></i>Goal</span>
-        <span><i class="cross-key"></i>Builds on another topic</span>
-      </div>
     {:else if topics}
       <div class="empty-state atlas-empty">
         <h2>Nothing on the map yet</h2>
@@ -248,4 +240,15 @@
       <p class="muted">Loading…</p>
     {/if}
   </div>
+  {#if all && all.boxes.length}
+    <!-- Below the map, not over it: the map is drawn to fill the stage, so anything on top hides concepts. -->
+    <div class="atlas-legend">
+      <span><i class="dot solid"></i>Solid</span>
+      <span><i class="dot fading"></i>Fading</span>
+      <span><i class="dot shaky"></i>Shaky</span>
+      <span><i class="dot"></i>Not yet</span>
+      <span><i class="goal-key"></i>Goal</span>
+      <span><i class="cross-key"></i>Builds on another topic</span>
+    </div>
+  {/if}
 </div>

@@ -5,6 +5,7 @@
   import { countsOf, looseTopics, markOf, outline, placeOf, stepsOf } from './library.ts';
   import type { Topic } from '../../../shared/types.ts';
   import Grip from './Grip.svelte';
+  import Logo from './Logo.svelte';
 
   let { onnavigate }: { onnavigate?: () => void } = $props();
 
@@ -93,7 +94,7 @@
 
 <div class="files">
   <div class="vault">
-    <a class="vault-name" href={link.roadmaps()} onclick={onnavigate}><svg class="mark" viewBox="0 0 32 32" aria-hidden="true"><path d="M22.6 9.2 A9 9 0 1 0 25 16.2" fill="none" stroke="var(--acc)" stroke-width="3.2" stroke-linecap="round" /><circle cx="16" cy="16" r="2.6" fill="currentColor" /></svg>aristotle</a>
+    <a class="vault-name" href={link.roadmaps()} onclick={onnavigate}><Logo size={20} class="mark" />aristotle</a>
     <a class="add" href={link.roadmaps()} onclick={onnavigate} title="Plan a roadmap or start a topic" aria-label="Plan a roadmap or start a topic">
       <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3.5v9M3.5 8h9" /></svg>
     </a>
@@ -164,11 +165,6 @@
     color: var(--fg);
     font-weight: 600;
     text-decoration: none;
-  }
-
-  .mark {
-    width: 18px;
-    height: 18px;
   }
 
   .add {
