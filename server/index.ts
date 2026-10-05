@@ -28,6 +28,7 @@ import {
 import { PID_FILE } from './control.ts';
 import { AnswerError, publicItem } from './feed.ts';
 import { AsideError } from './asides.ts';
+import { ChatError } from './chat.ts';
 import { GlossError } from './glosses.ts';
 import { Gym } from './gym.ts';
 import { createMcpServer } from './mcp.ts';
@@ -239,6 +240,22 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ro
     return json(res, 200, { text: gym.notes.about() });
   }
 
+  // The chat beside a lesson: his message, with where he is; the answer streams over the live feed as it is written.
+  if (req.method === 'GET' && route.startsWith('/api/chats/')) return json(res, 200, gym.chats.get(tail('/api/chats/')));
+  if (req.method === 'POST' && route.startsWith('/api/chats/')) {
+    const body = (await readJson(req)) as { text?: unknown; where?: unknown; page?: unknown; step?: unknown } | null;
+    if (typeof body?.text !== 'string') return json(res, 400, { error: 'Missing text' });
+    const str = (v: unknown) => (typeof v === 'string' ? v : undefined);
+    const thread = tail('/api/chats/');
+    try {
+      const answer = await gym.chats.send(thread, body.text, chatContext(thread, str(body.where), str(body.page), str(body.step)));
+      return json(res, 200, answer);
+    } catch (err) {
+      if (err instanceof ChatError) return json(res, 400, { error: err.message });
+      throw err;
+    }
+  }
+
   // History, progress and search
   if (req.method === 'GET' && route === '/api/sessions') return json(res, 200, await gym.listSessions());
   if (req.method === 'GET' && route.startsWith('/api/sessions/')) {
@@ -252,6 +269,28 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ro
   if (req.method === 'GET' && route === '/api/backup') return json(res, 200, gym.backup.state());
 
   return json(res, 404, { error: 'Not found' });
+}
+
+/**
+ * What the chat is told with each of his messages: where he is, what is on his screen, what he holds in the class,
+ * his notes on the step and what he says about himself. Fresh every time, so it is never out of date.
+ */
+function chatContext(thread: string, where?: string, page?: string, step?: string): string {
+  const topic = gym.topics.get(thread);
+  const parts = [`Where he is now: ${where ?? (topic ? `the class ${topic.title}` : 'outside any class (Home, the map…)')}`];
+  if (topic) {
+    const by = (s: string) => topic.concepts.filter((c) => c.status === s).map((c) => c.label);
+    parts.push(
+      `The class: ${topic.title}. Its goal: ${topic.goal}`,
+      `On its map: solid: ${by('solid').join(', ') || 'none yet'}; shaky: ${by('shaky').join(', ') || 'none'}; not yet: ${by('unknown').join(', ') || 'none'}.`,
+    );
+  }
+  if (page) parts.push(`What is on his screen:\n${page}`);
+  const note = step && topic ? gym.notes.of(topic.slug).find((n) => n.step === step) : undefined;
+  if (note) parts.push(`His own notes on this step:\n${note.text}`);
+  const about = gym.notes.about().trim();
+  if (about) parts.push(`About him, in his words:\n${about}`);
+  return parts.join('\n\n');
 }
 
 /** The live feed as server-sent events, with a ping every 20 seconds while nothing happens. */

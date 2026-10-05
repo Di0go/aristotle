@@ -4,6 +4,7 @@ import {
   isInteractive,
   type FeedEvent,
   type Aside,
+  type ChatMessage,
   type StepNote,
   type FeedState,
   type Gloss,
@@ -45,6 +46,10 @@ class LiveFeed {
   notes = $state<StepNote[]>([]);
   /** What he wrote on his About you page. */
   about = $state('');
+  /** The chats beside lessons, by thread (a class's slug, or "home"), loaded when first shown. */
+  chats = $state<Record<string, ChatMessage[]>>({});
+  /** Aristotle's answer being written, by thread: its id and the text so far. */
+  chatDrafts = $state<Record<string, { id: string; text: string }>>({});
 
   /** The first question still waiting for the learner, if any. Once a session has ended, nothing is. */
   pending = $derived(this.session?.endedAt ? null : (this.items.find((i) => isInteractive(i) && !i.answeredAt) ?? null));
@@ -108,6 +113,12 @@ class LiveFeed {
     return null;
   }
 
+  /** A chat's messages, loaded once; later ones arrive over the live feed. */
+  async loadChat(thread: string) {
+    if (this.chats[thread]) return;
+    this.chats[thread] = await getJson<ChatMessage[]>(`/api/chats/${encodeURIComponent(thread)}`);
+  }
+
   /** Adds an item to the session, or replaces it in place when it is already there (an answered question). */
   upsert(item: PublicItem) {
     const i = this.items.findIndex((x) => x.id === item.id);
@@ -127,6 +138,8 @@ class LiveFeed {
     this.asides = await getJson<Aside[]>('/api/asides');
     this.notes = await getJson<StepNote[]>('/api/notes');
     this.about = (await getJson<{ text: string }>('/api/about')).text;
+    // Chats already open are read again, so nothing said while disconnected is missed.
+    for (const t of Object.keys(this.chats)) this.chats[t] = await getJson<ChatMessage[]>(`/api/chats/${encodeURIComponent(t)}`);
     this.topics = Object.fromEntries(topics.map((t) => [t.slug, t]));
     this.roadmaps = Object.fromEntries(roadmaps.map((r) => [r.slug, r]));
     this.missions = Object.fromEntries(missions.map((m) => [m.id, m]));
@@ -158,6 +171,12 @@ class LiveFeed {
       this.notes = event.notes;
     } else if (event.type === 'about') {
       this.about = event.about;
+    } else if (event.type === 'chat') {
+      const list = this.chats[event.thread];
+      if (list && !list.some((m) => m.id === event.message.id)) list.push(event.message);
+      if (event.message.role === 'assistant') delete this.chatDrafts[event.thread];
+    } else if (event.type === 'chat-delta') {
+      this.chatDrafts[event.thread] = { id: event.id, text: event.text };
     } else {
       this.upsert(event.item);
     }

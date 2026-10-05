@@ -9,6 +9,7 @@ import { Glosses } from './glosses.ts';
 import { Feed, readSession, SessionCache, summarizeSession, type SessionRecord } from './feed.ts';
 import { Missions } from './missions.ts';
 import { Notes } from './notes.ts';
+import { Chats } from './chat.ts';
 import type { Outcome } from './reviews.ts';
 import { Roadmaps } from './roadmaps.ts';
 import { slugify } from './slug.ts';
@@ -51,11 +52,21 @@ export class Gym {
   readonly glosses: Glosses;
   readonly asides: Asides;
   readonly notes: Notes;
+  readonly chats: Chats;
   readonly backup = new Backup();
   private summaries = new SessionCache((record) => summarizeSession(record));
   private statusChanges = new SessionCache((record) => statusChanges(record));
 
-  constructor(feed: Feed, topics: Topics, roadmaps: Roadmaps, missions: Missions, glosses: Glosses, asides: Asides, notes: Notes) {
+  constructor(
+    feed: Feed,
+    topics: Topics,
+    roadmaps: Roadmaps,
+    missions: Missions,
+    glosses: Glosses,
+    asides: Asides,
+    notes: Notes,
+    chats: Chats,
+  ) {
     this.feed = feed;
     this.topics = topics;
     this.roadmaps = roadmaps;
@@ -63,6 +74,7 @@ export class Gym {
     this.glosses = glosses;
     this.asides = asides;
     this.notes = notes;
+    this.chats = chats;
     topics.events.on('topic', (topic) => feed.events.emit('event', { type: 'topic', topic }));
     roadmaps.events.on('roadmap', (roadmap) => feed.events.emit('event', { type: 'roadmap', roadmap }));
     missions.events.on('mission', (mission) => feed.events.emit('event', { type: 'mission', mission }));
@@ -70,6 +82,8 @@ export class Gym {
     asides.events.on('asides', (list) => feed.events.emit('event', { type: 'asides', asides: list }));
     notes.events.on('notes', (list) => feed.events.emit('event', { type: 'notes', notes: list }));
     notes.events.on('about', (about) => feed.events.emit('event', { type: 'about', about }));
+    chats.events.on('message', (thread, message) => feed.events.emit('event', { type: 'chat', thread, message }));
+    chats.events.on('delta', (d) => feed.events.emit('event', { type: 'chat-delta', ...d }));
     feed.events.on('event', () => this.backup.schedule());
     this.backup.schedule(30_000);
   }
@@ -83,6 +97,7 @@ export class Gym {
       await Glosses.load(),
       await Asides.load(),
       await Notes.load(),
+      await Chats.load(),
     );
   }
 

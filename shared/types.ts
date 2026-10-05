@@ -121,7 +121,11 @@ export type FeedEvent =
   /** His notes on every step, after one changes. */
   | { type: 'notes'; notes: StepNote[] }
   /** His own words about himself (the About you page), after he edits them. */
-  | { type: 'about'; about: string };
+  | { type: 'about'; about: string }
+  /** A message in a chat, his or Aristotle's, once it is complete. */
+  | { type: 'chat'; thread: string; message: ChatMessage }
+  /** Aristotle's answer as it is being written: the text so far. */
+  | { type: 'chat-delta'; thread: string; id: string; text: string };
 
 // Knowledge maps
 
@@ -447,4 +451,21 @@ export interface StepNote {
   title?: string;
   text: string;
   updated: string;
+}
+
+// The chat beside a lesson
+
+export interface ChatMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  text: string;
+  at: string;
+}
+
+/** One conversation: a class's (by its slug), or "home" for talk away from any class. */
+export interface ChatThread {
+  thread: string;
+  /** The Claude Code session it continues. */
+  session?: string;
+  messages: ChatMessage[];
 }

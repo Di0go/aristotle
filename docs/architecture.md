@@ -30,6 +30,7 @@ A plain Node HTTP server, run directly as TypeScript (Node's type stripping: onl
 - **MCP** is stateless: a fresh `McpServer` per request on the Streamable HTTP transport, so restarting the server never strands Claude Code.
 - **The interface** is the built `dist/ui`, served with long caching for hashed assets.
 - **The terminal**: [`terminal.ts`](../server/terminal.ts) runs `claude` in a pseudo-terminal (node-pty) in the app's folder and streams it over a WebSocket to the drawer. The interface starts it when Aristotle opens; messages sent before it has drawn its screen and gone quiet are held and typed in then.
+- **The chat beside a lesson**: [`chat.ts`](../server/chat.ts) keeps one conversation per class in `data/chats/<thread>.json` and continues it as one Claude Code session (`claude -p --resume`, locked down like the one-shot runner, from a folder of its own under the state directory). Each message is sent with fresh context (where he is, his screen, the class's map, his notes, About you); the answer streams as `chat-delta` events over the live feed, then a `chat` event. The tutor reads the class's chat in `get_topic`.
 - **Glosses and questions on a passage**: [`oneshot.ts`](../server/oneshot.ts) runs `claude -p` on his own login, headless and locked down: no tools, no MCP servers, no settings or hooks, no saved session, in a neutral folder. The request goes on stdin; what it prints is the answer. Sonnet by default (`ARISTOTLE_ONESHOT_MODEL`); five to fifteen seconds. [`glosses.ts`](../server/glosses.ts) explains a phrase (phrase, topic, passage); it is also handed up to five licence-checked pictures from Wikimedia Commons ([`images.ts`](../server/images.ts)), by title and description, and names one on a last `IMAGE: n` line only when the phrase is visual and a candidate clearly shows it (`ARISTOTLE_GLOSS_IMAGES=off` turns this off). [`asides.ts`](../server/asides.ts) answers his question on a passage, with the paragraph, the step's title and the topic.
 - **Backup**: [`backup.ts`](../server/backup.ts) commits `data/` (its own Git repository) after quiet periods and pushes if it has a remote.
 
@@ -124,6 +125,8 @@ Only for the interface (and the tests); Claude Code uses MCP.
 | `PUT` | `/api/notes` |
 | `GET` | `/api/about` |
 | `PUT` | `/api/about` |
+| `GET` | `/api/chats/…` |
+| `POST` | `/api/chats/…` |
 | `GET` | `/api/sessions` |
 | `GET` | `/api/sessions/…` |
 | `GET` | `/api/progress` |
@@ -144,6 +147,7 @@ Only for the interface (and the tests); Claude Code uses MCP.
 | [`asides.ts`](../server/asides.ts) | His questions on a passage ("Ask about this"): asked beside a step, answered by Claude Code on his own login (oneshot.ts) without interrupting the class, and kept with the step. |
 | [`backup.ts`](../server/backup.ts) | Versions data/ in its own Git repository, kept apart from the code so his learning history never lands in the app's repo. |
 | [`bridge.ts`](../server/bridge.ts) | Claude Code starts this over stdio (see .mcp.json). |
+| [`chat.ts`](../server/chat.ts) | The chat beside a lesson: he talks with Aristotle (a second Claude Code on his own login, beside the tutor) while he reads, about anything. |
 | [`config.ts`](../server/config.ts) | Every setting the server reads, in one place. |
 | [`control.ts`](../server/control.ts) | Start, stop and check the Aristotle server. |
 | [`feed.ts`](../server/feed.ts) | The live session: what the interface shows under "Now", and the session log on disk. |
@@ -201,6 +205,7 @@ Only for the interface (and the tests); Claude Code uses MCP.
 | [`Ask.svelte`](../ui/src/lib/Ask.svelte) | An open question in a lesson: the prompt, a text box with a live maths preview, and the answer once sent. |
 | [`AskPanel.svelte`](../ui/src/lib/AskPanel.svelte) | The "Ask about this" panel: it opens by the passage he selected, takes his question, and shows Claude's answer there, while the class carries on. |
 | [`Block.svelte`](../ui/src/lib/Block.svelte) | One piece of teaching from `show` (orientation, step, plan, summary, feedback or note), labelled and rendered. |
+| [`ChatPanel.svelte`](../ui/src/lib/ChatPanel.svelte) | The chat beside a lesson: talk with Aristotle about anything while reading. |
 | [`ClassPage.svelte`](../ui/src/lib/ClassPage.svelte) | One page of a class: the intro, or one step with its checks and the feedback on his answers, with Previous and Next. |
 | [`Composer.svelte`](../ui/src/lib/Composer.svelte) | Talk to Claude from Aristotle: types the message into the Claude Code running in the drawer. |
 | [`ConceptNode.svelte`](../ui/src/lib/ConceptNode.svelte) | One concept on a map: status by fill and outline, goal by an inner ring, focus by a halo. |
@@ -211,7 +216,7 @@ Only for the interface (and the tests); Claude Code uses MCP.
 | [`Home.svelte`](../ui/src/lib/Home.svelte) | Home: a dashboard that answers what to do now (one card, one button), how he is doing (this week, his courses) and what needs him (reviews coming due, recent answers, words he looked up, missions). |
 | [`HoverCard.svelte`](../ui/src/lib/HoverCard.svelte) | One hover card for the whole app. |
 | [`LessonActivity.svelte`](../ui/src/lib/LessonActivity.svelte) | The foot of a running lesson: what is happening right now, so he never has to guess whether to wait. |
-| [`LessonBench.svelte`](../ui/src/lib/LessonBench.svelte) | The panel beside a step, in plain words: what this step teaches, what it builds on (and whether he holds those), what it leads to; then his own notebook for the step, kept with it. |
+| [`LessonBench.svelte`](../ui/src/lib/LessonBench.svelte) | The panel beside a step, two tabs. |
 | [`Lightbox.svelte`](../ui/src/lib/Lightbox.svelte) | Click an image or a drawing in a lesson to see it large: images in Markdown, the plate of a ```plate (with its numbered markers), inline SVG drawings and Mermaid diagrams. |
 | [`LocalGraph.svelte`](../ui/src/lib/LocalGraph.svelte) | The neighbourhood of one concept: it in the middle, what it builds on above, what builds on it below. |
 | [`Logo.svelte`](../ui/src/lib/Logo.svelte) | The mark: the peripatos, the covered walk of the Lyceum where Aristotle's school taught (and, the story goes, walked as it talked). |
@@ -232,7 +237,7 @@ Only for the interface (and the tests); Claude Code uses MCP.
 | [`actions.ts`](../ui/src/lib/actions.ts) | Starting things from the interface: each action asks the Claude Code running in Aristotle to run a skill. |
 | [`aside.svelte.ts`](../ui/src/lib/aside.svelte.ts) | "Ask about this": a question on a passage he selected, asked in a small panel by the passage and answered by Claude Code beside the step, without interrupting the class. |
 | [`automatic.svelte.ts`](../ui/src/lib/automatic.svelte.ts) | What Aristotle does on its own, from what he does, so he never presses a button for the app's housekeeping. |
-| [`bench.svelte.ts`](../ui/src/lib/bench.svelte.ts) | Whether the panel beside a step is folded away, so the step gets the whole width. |
+| [`bench.svelte.ts`](../ui/src/lib/bench.svelte.ts) | The panel beside a step: whether it is folded away (so the step gets the whole width), and which of its tabs is open, This step or Chat. |
 | [`classes.svelte.ts`](../ui/src/lib/classes.svelte.ts) | Each topic's class as pages (steps.ts), for the library tree, the class page and its step pages: past sessions loaded on first use and kept, the session running now read from the live feed as it grows. |
 | [`claude.svelte.ts`](../ui/src/lib/claude.svelte.ts) | The connection to Claude Code running inside Aristotle (server/terminal.ts). |
 | [`feed.svelte.ts`](../ui/src/lib/feed.svelte.ts) | Live copy of the server's state, kept current over Server-Sent Events. |

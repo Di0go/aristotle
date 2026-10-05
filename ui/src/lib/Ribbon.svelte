@@ -62,18 +62,6 @@
 
   <span class="space"></span>
 
-  <button
-    class="rib"
-    class:on={claude.open}
-    class:asking={claude.asking && !claude.open}
-    onclick={() => claude.toggle()}
-    title="Claude (Ctrl+`)"
-    aria-expanded={claude.open}
-  >
-    <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4.5 6l4 4-4 4M10.5 14.5h5" /></svg>
-    <span class="lbl">Claude</span>
-    {#if claude.asking && !claude.open}<i class="pip turn"></i>{:else if claude.running}<i class="pip quiet"></i>{/if}
-  </button>
   <button class="rib" onclick={() => focus.toggle(true)} title="Focus: hide everything but the page (F)">
     <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 7.5V4h3.5M12.5 4H16v3.5M16 12.5V16h-3.5M7.5 16H4v-3.5" /></svg>
     <span class="lbl">Focus</span>
@@ -195,10 +183,6 @@
     background: var(--acc);
   }
 
-  .pip.quiet {
-    background: var(--solid);
-  }
-
   .pip.turn {
     box-shadow: 0 0 0 2px var(--b1);
     animation: beat 1.8s var(--ease) infinite;
@@ -208,10 +192,6 @@
     50% {
       transform: scale(1.35);
     }
-  }
-
-  .asking {
-    color: var(--acc);
   }
 
   .settings-wrap {

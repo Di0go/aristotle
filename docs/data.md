@@ -12,6 +12,7 @@ data/
 ├── asides.json               his questions on passages of a lesson, with Claude's answers
 ├── notes.json                his notebook on each step, in his words
 ├── about.md                  About you: what he does and wants, in his words
+├── chats/<thread>.json       the chat beside each class ("home" for the rest), and its Claude Code session
 └── profile.md                what the tutor has learned about how he learns (written by the skills)
 ```
 
@@ -61,6 +62,10 @@ Quiz items keep the right answers and explanations; the interface only receives 
 ## His words: step notes and About you
 
 `notes.json` is an array of `StepNote`: the topic, the id of the step's block, the step's title when he wrote it, his text and when; an emptied notebook is removed. `about.md` is his About you page as plain text. Both are written only from the interface ([`notes.ts`](../server/notes.ts)); `get_topic` lists a topic's notes, `read_about` returns About you.
+
+## Chats
+
+`chats/<thread>.json` is a `ChatThread`: the thread (a class's slug, or `home`), the Claude Code session it continues, and its messages (his and Aristotle's, with when). Rewritten whole and atomically after each message ([`chat.ts`](../server/chat.ts)).
 
 ## Backup
 

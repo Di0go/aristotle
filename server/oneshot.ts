@@ -31,15 +31,8 @@ export function oneshot(system: string, request: string): Promise<string> {
         system,
       ];
   const [file, ...rest] = args;
-  const home = os.homedir();
   return new Promise((resolve, reject) => {
-    const child = spawn(file, rest, {
-      cwd: os.tmpdir(),
-      stdio: ['pipe', 'pipe', 'pipe'],
-      timeout: TIMEOUT_MS,
-      // A service started at login may not have the user's PATH; Claude Code lives in ~/.local/bin.
-      env: { ...process.env, PATH: [path.join(home, '.local/bin'), process.env.PATH ?? '/usr/local/bin:/usr/bin:/bin'].join(':') },
-    });
+    const child = spawn(file, rest, { cwd: os.tmpdir(), stdio: ['pipe', 'pipe', 'pipe'], timeout: TIMEOUT_MS, env: claudeEnv() });
     let out = '';
     let err = '';
     child.stdout.on('data', (d) => (out += d));
@@ -53,4 +46,9 @@ export function oneshot(system: string, request: string): Promise<string> {
     });
     child.stdin.end(request);
   });
+}
+
+/** The environment Claude Code runs in: a service started at login may not have his PATH, and it lives in ~/.local/bin. */
+export function claudeEnv(): NodeJS.ProcessEnv {
+  return { ...process.env, PATH: [path.join(os.homedir(), '.local/bin'), process.env.PATH ?? '/usr/local/bin:/usr/bin:/bin'].join(':') };
 }

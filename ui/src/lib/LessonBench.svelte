@@ -1,7 +1,9 @@
 <script lang="ts">
-  // The panel beside a step, in plain words: what this step teaches, what it builds on (and whether he holds those),
-  // what it leads to; then his own notebook for the step, kept with it. It folds away to give the step the width.
+  // The panel beside a step, two tabs. This step, in plain words: what it teaches, what it builds on (and whether he
+  // holds those), what it leads to, then his own notebook for the step. Chat: talk with Aristotle while reading
+  // (ChatPanel.svelte). It folds away to give the step the width.
   import { bench } from './bench.svelte.ts';
+  import ChatPanel from './ChatPanel.svelte';
   import { feed } from './feed.svelte.ts';
   import { ago } from './format.ts';
   import { markOf, splitRef } from './library.ts';
@@ -84,74 +86,124 @@
   }
 </script>
 
-<div class="bench-inner">
+<div class="bench-inner" class:chatting={bench.tab === 'chat'}>
   <div class="panel-head">
+    <div class="tabs" role="tablist" aria-label="Beside the step">
+      <button role="tab" aria-selected={bench.tab === 'step'} class:on={bench.tab === 'step'} onclick={() => bench.show('step')}
+        >This step</button
+      >
+      <button role="tab" aria-selected={bench.tab === 'chat'} class:on={bench.tab === 'chat'} onclick={() => bench.show('chat')}
+        >Chat</button
+      >
+    </div>
     {#if onclose}<button class="close bench-close" onclick={onclose} aria-label="Close">×</button>{/if}
     <button class="link fold" onclick={() => bench.toggle(true)} title="Hide this panel">Hide »</button>
   </div>
 
-  {#if taught}
-    <section class="bench-section">
-      <h3 class="bench-title">This step teaches</h3>
-      <p class="taught"><a href={link.topic(topic.slug, taught.id)} data-concept="{topic.slug}/{taught.id}">{taught.label}</a></p>
-      {#if taught.summary}<p class="taught-sum">{taught.summary}</p>{/if}
-    </section>
-
-    {#if buildsOn.length}
+  {#if bench.tab === 'chat'}
+    <div class="chat-wrap"><ChatPanel thread={topic.slug} title={topic.title} {page} /></div>
+  {:else}
+    {#if taught}
       <section class="bench-section">
-        <h3 class="bench-title">It builds on</h3>
-        <ul class="chips">
-          {#each buildsOn as d (`${d.slug}/${d.id}`)}
-            {@const mark = d.concept ? markOf(d.concept) : 'unknown'}
-            <li>
-              <a
-                class="chip {mark}"
-                href={link.topic(d.slug, d.id)}
-                data-concept="{d.slug}/{d.id}"
-                title={mark === 'solid' ? 'You hold this' : 'Not solid yet'}>{d.concept?.label ?? d.id.replace(/-/g, ' ')}</a
-              >
-            </li>
-          {/each}
-        </ul>
-        <p class="legend">Green: you hold it.</p>
+        <h3 class="bench-title">This step teaches</h3>
+        <p class="taught"><a href={link.topic(topic.slug, taught.id)} data-concept="{topic.slug}/{taught.id}">{taught.label}</a></p>
+        {#if taught.summary}<p class="taught-sum">{taught.summary}</p>{/if}
       </section>
+
+      {#if buildsOn.length}
+        <section class="bench-section">
+          <h3 class="bench-title">It builds on</h3>
+          <ul class="chips">
+            {#each buildsOn as d (`${d.slug}/${d.id}`)}
+              {@const mark = d.concept ? markOf(d.concept) : 'unknown'}
+              <li>
+                <a
+                  class="chip {mark}"
+                  href={link.topic(d.slug, d.id)}
+                  data-concept="{d.slug}/{d.id}"
+                  title={mark === 'solid' ? 'You hold this' : 'Not solid yet'}>{d.concept?.label ?? d.id.replace(/-/g, ' ')}</a
+                >
+              </li>
+            {/each}
+          </ul>
+          <p class="legend">Green: you hold it.</p>
+        </section>
+      {/if}
+
+      {#if leadsTo.length}
+        <section class="bench-section">
+          <h3 class="bench-title">It leads to</h3>
+          <ul class="chips">
+            {#each leadsTo as c (c.id)}
+              <li><a class="chip {markOf(c)}" href={link.topic(topic.slug, c.id)} data-concept="{topic.slug}/{c.id}">{c.label}</a></li>
+            {/each}
+          </ul>
+        </section>
+      {/if}
     {/if}
 
-    {#if leadsTo.length}
-      <section class="bench-section">
-        <h3 class="bench-title">It leads to</h3>
-        <ul class="chips">
-          {#each leadsTo as c (c.id)}
-            <li><a class="chip {markOf(c)}" href={link.topic(topic.slug, c.id)} data-concept="{topic.slug}/{c.id}">{c.label}</a></li>
-          {/each}
-        </ul>
+    {#if stepId}
+      <section class="bench-section nb">
+        <header class="nb-head">
+          <h3>Your notes on this step</h3>
+          <span class="nb-state" class:on={saved !== ''}>{saved === 'saving' ? 'Saving…' : 'Saved ✓'}</span>
+        </header>
+        <textarea
+          class="nb-page"
+          bind:this={box}
+          bind:value={text}
+          oninput={onInput}
+          placeholder="Write what you want to keep from this step, in your own words…"
+          aria-label="Your notes on this step"></textarea>
+        {#if note}<p class="nb-foot">Kept with this step · {ago(note.updated)}</p>{/if}
       </section>
     {/if}
-  {/if}
-
-  {#if stepId}
-    <section class="bench-section nb">
-      <header class="nb-head">
-        <h3>Your notes on this step</h3>
-        <span class="nb-state" class:on={saved !== ''}>{saved === 'saving' ? 'Saving…' : 'Saved ✓'}</span>
-      </header>
-      <textarea
-        class="nb-page"
-        bind:this={box}
-        bind:value={text}
-        oninput={onInput}
-        placeholder="Write what you want to keep from this step, in your own words…"
-        aria-label="Your notes on this step"></textarea>
-      {#if note}<p class="nb-foot">Kept with this step · {ago(note.updated)}</p>{/if}
-    </section>
   {/if}
 </div>
 
 <style>
   .panel-head {
     display: flex;
-    justify-content: flex-end;
-    margin: -6px -4px 4px 0;
+    align-items: center;
+    gap: 10px;
+    margin: -6px -4px 18px 0;
+  }
+
+  .tabs {
+    display: flex;
+    gap: 2px;
+    margin-right: auto;
+    padding: 2px;
+    border-radius: 9px;
+    background: var(--b2);
+  }
+
+  .tabs button {
+    padding: 4px 12px;
+    border: 0;
+    border-radius: 7px;
+    background: none;
+    color: var(--muted);
+    font: 500 0.8rem var(--sans);
+    cursor: pointer;
+  }
+
+  .tabs button.on {
+    background: var(--b0);
+    color: var(--fg);
+    box-shadow: 0 1px 2px rgb(0 0 0 / 0.08);
+  }
+
+  /* The chat scrolls its own messages and keeps its box at the foot, so the panel itself stays put. */
+  .bench-inner.chatting {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .chat-wrap {
+    flex: 1;
+    min-height: 0;
   }
 
   .fold {

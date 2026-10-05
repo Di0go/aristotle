@@ -126,12 +126,19 @@ export function createMcpServer(gym: Gym): McpServer {
       const notebook = written.length
         ? `\n\nHis own notes on steps (his words, kept beside the step):\n${written.map((n) => `- ${n.title ?? gym.feed.stepTitleOf(n.step) ?? 'a step'}: ${n.text.replace(/\s+/g, ' ').slice(0, 300)}`).join('\n')}`
         : '';
+      const talk = gym.chats
+        .get(t.slug)
+        .filter((m) => m.role === 'user')
+        .slice(-8);
+      const chat = talk.length
+        ? `\n\nWhat he said in the chat beside this class (with Aristotle, not with you), most recent last:\n${talk.map((m) => `- ${m.text.replace(/\s+/g, ' ').slice(0, 240)}`).join('\n')}`
+        : '';
       const asked = gym.glosses.of(t.slug);
       const glosses = asked.length
         ? `\n\nPhrases he selected and asked to have explained (gaps he noticed himself):\n${asked.map((g) => `- "${g.text}" (${g.at.slice(0, 10)})`).join('\n')}`
         : '';
       return text(
-        `${describeTopic(t)}\n\nRecent sessions:\n${recent.join('\n') || '(none)'}${praxis}${glosses}${asides}${notebook}${roadmapContext(gym, t.slug)}`,
+        `${describeTopic(t)}\n\nRecent sessions:\n${recent.join('\n') || '(none)'}${praxis}${glosses}${asides}${notebook}${chat}${roadmapContext(gym, t.slug)}`,
       );
     },
   );

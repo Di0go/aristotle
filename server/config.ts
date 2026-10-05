@@ -25,6 +25,7 @@ export const GLOSSES_FILE = path.join(DATA_DIR, 'glosses.json');
 export const ASIDES_FILE = path.join(DATA_DIR, 'asides.json');
 export const NOTES_FILE = path.join(DATA_DIR, 'notes.json');
 export const ABOUT_FILE = path.join(DATA_DIR, 'about.md');
+export const CHATS_DIR = path.join(DATA_DIR, 'chats');
 
 /** Where this install keeps what isn't learning: certificate, settings, pid files, log. Never in git. */
 export const STATE_DIR = process.env.ARISTOTLE_STATE_DIR ?? path.join(ROOT, DEV ? '.dev/state' : '.aristotle');

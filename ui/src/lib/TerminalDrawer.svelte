@@ -186,7 +186,7 @@
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div class="drawer-grip" onpointerdown={startResize} title="Drag to resize"></div>
   <header class="drawer-head">
-    <span class="drawer-title"><i class="run-dot" class:on={claude.running}></i>Claude Code</span>
+    <span class="drawer-title"><i class="run-dot" class:on={claude.running}></i>Terminal · Claude Code</span>
     <span class="muted drawer-state">
       {#if !claude.connected}Connecting…{:else if claude.running}Running in ~/Projects/Learn{:else}Not running{/if}
     </span>

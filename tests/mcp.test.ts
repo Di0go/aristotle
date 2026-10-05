@@ -26,6 +26,7 @@ import type {
   SearchHit,
   SessionSummary,
   Aside,
+  ChatMessage,
   Gloss,
   StepNote,
   Topic,
@@ -806,4 +807,36 @@ test('a course keeps where he will use it, and says so to the tutor', async () =
   );
   assert.match(again, /Where he will use it: In my sparring rounds/);
   assert.equal((await get<Roadmap>('/api/roadmaps/used-course')).use, 'In my sparring rounds');
+});
+
+test('the chat beside a class sees where he is, keeps the conversation, and the tutor reads it', async () => {
+  const say = (body: unknown) =>
+    fetch(`${BASE}/api/chats/chatted-topic`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  await call('start_session', { topic: 'Chatted topic', goal: 'Talk' });
+  const res = await say({
+    text: 'Why does it beat on its own?',
+    where: 'Chatted topic · Step 1: The pacemaker',
+    page: 'It fires on its own.',
+  });
+  assert.equal(res.status, 200);
+  const answer = (await res.json()) as ChatMessage;
+  // The request Claude Code got: where he is, the class and its map, his screen, and his message.
+  assert.match(answer.text, /Where he is now: Chatted topic · Step 1: The pacemaker/);
+  assert.match(answer.text, /The class: Chatted topic/);
+  assert.match(answer.text, /What is on his screen:\nIt fires on its own\./);
+  assert.match(answer.text, /His message: Why does it beat on its own\?/);
+  const thread = await get<ChatMessage[]>('/api/chats/chatted-topic');
+  assert.deepEqual(
+    thread.map((m) => m.role),
+    ['user', 'assistant'],
+  );
+  assert.match(
+    textOf(await call('get_topic', { topic: 'chatted-topic' })),
+    /said in the chat beside this class[\s\S]*Why does it beat on its own\?/,
+  );
+  assert.equal((await say({ text: '   ' })).status, 400);
 });

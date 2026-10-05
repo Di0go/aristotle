@@ -77,7 +77,11 @@ class Claude {
     // Claude Code moves the cursor between words instead of printing spaces, so each escape becomes a space.
     const chunk = msg.data.replace(ANSI, ' ').replace(/\s+/g, ' ');
     this.recent = (this.recent + chunk).slice(-1500);
-    if (ASKING.test(this.recent)) this.asking = true;
+    // Something only the terminal can answer (a permission, a trust prompt): open it, so he sees it without looking.
+    if (ASKING.test(this.recent) && !this.asking) {
+      this.asking = true;
+      this.toggle(true);
+    }
     if (WORKING.test(chunk)) {
       if (!this.busy) this.busySince = Date.now();
       this.busy = true;

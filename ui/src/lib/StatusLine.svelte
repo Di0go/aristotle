@@ -26,9 +26,9 @@
   {#if feed.pending}<span class="turn">Your turn</span>{:else if live && claude.busy}<span class="work">Claude is working…</span>{/if}
   {#if topic && counts.total}<span>{counts.solid} of {counts.total} solid</span>{/if}
   {#if place}<span>class {place.index + 1} of {place.roadmap.steps.length}</span>{/if}
-  <button class="claude" onclick={() => claude.toggle()} title="Claude (Ctrl+`)">
+  <button class="claude" onclick={() => claude.toggle()} title="The terminal Claude Code runs in (Ctrl+`)">
     <i class:on={claude.running} class:ask={claude.asking}></i>
-    {claude.asking ? 'Claude is asking something' : claude.running ? 'Claude running' : 'Claude off'}
+    {claude.asking ? 'Terminal: Claude is asking something' : 'Terminal'}
   </button>
 </footer>
 
