@@ -28,7 +28,7 @@
 It runs on your Claude subscription. No API keys, no accounts, no cloud: everything you learn is a plain file you own.
 
 <p align="center">
-  <a href="docs/images/hero-dark.webp"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/hero-dark.webp"><img src="docs/images/hero-light.webp" alt="A lesson in Aristotle: an engraving of the heart from Gray's Anatomy with numbered markers, inside a step on how the heart keeps time, with the courses in the library beside it, the panel with what the step teaches and the learner's notes, a chat with Aristotle and an answered check laid over it." width="100%"></picture></a>
+  <a href="docs/images/hero-dark.webp"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/hero-dark.webp"><img src="docs/images/hero-light.webp" alt="A lesson in Aristotle: the step &quot;Where the beat starts&quot;, with an engraving of the heart from Gray's Anatomy, the courses in the library beside it, and a chat with Aristotle answering a question about the step." width="100%"></picture></a>
 </p>
 
 ## The method
