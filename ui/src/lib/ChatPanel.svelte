@@ -311,7 +311,10 @@
       </ul>
     {/if}
     {#if error}<p class="err">{error}</p>{/if}
-    <div class="box" class:busy={sending}>
+    <div class="box">
+      <button class="tool" onclick={startTag} title="Tag a step, a concept or a class" aria-label="Tag a step, a concept or a class"
+        >@</button
+      >
       <textarea
         bind:this={box}
         bind:value={text}
@@ -320,19 +323,15 @@
         rows="1"
         placeholder={page ? `Ask about ${pageLabel(page).toLowerCase()}…` : `Ask about ${title}…`}
         aria-label="Message Aristotle"></textarea>
-      <div class="bar">
-        <button class="tool" onclick={startTag} title="Tag a step, a concept or a class">@</button>
-        <span class="spacer"></span>
-        {#if sending}
-          <button class="send stop" onclick={stop} title="Stop the answer" aria-label="Stop the answer">
-            <svg viewBox="0 0 12 12" aria-hidden="true"><rect x="1" y="1" width="10" height="10" rx="2" /></svg>
-          </button>
-        {:else}
-          <button class="send" onclick={() => void send()} disabled={!text.trim()} title="Send (Enter)" aria-label="Send">
-            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 12.5V3.8M4 7.6L8 3.6l4 4" /></svg>
-          </button>
-        {/if}
-      </div>
+      {#if sending}
+        <button class="send stop" onclick={stop} title="Stop the answer" aria-label="Stop the answer">
+          <svg viewBox="0 0 12 12" aria-hidden="true"><rect x="2.5" y="2.5" width="7" height="7" rx="1.5" /></svg>
+        </button>
+      {:else}
+        <button class="send" onclick={() => void send()} disabled={!text.trim()} title="Send (Enter)" aria-label="Send">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 12.5V3.5M4.25 7.25L8 3.5l3.75 3.75" /></svg>
+        </button>
+      {/if}
     </div>
   </div>
 </div>
@@ -603,55 +602,65 @@
     padding-top: 8px;
   }
 
+  /* One calm row: @ on the left, the text in the middle, send on the right, all on the first line's centre as the
+     box grows. Send is a round button in the text colour that keeps its place and shape: faint until there is
+     something to send, solid when there is; Stop takes its place while Aristotle writes. */
   .box {
+    display: flex;
+    align-items: flex-end;
+    gap: 2px;
+    padding: 5px;
     border: 1px solid var(--rule);
-    border-radius: 16px;
+    border-radius: 14px;
     background: var(--b0);
-    box-shadow: 0 1px 2px rgb(0 0 0 / 0.04);
-    transition:
-      border-color 0.2s,
-      box-shadow 0.2s;
+    transition: border-color 0.15s;
   }
 
   .box:focus-within {
     border-color: var(--acc-line);
-    box-shadow: 0 4px 18px -8px rgb(0 0 0 / 0.25);
   }
 
   textarea {
+    flex: 1;
+    min-width: 0;
     display: block;
-    width: 100%;
     resize: none;
-    padding: 12px 14px 4px;
+    padding: 6px 4px;
     border: 0;
     background: none;
     color: var(--fg);
     font: 0.92rem / 1.5 var(--sans);
   }
 
+  textarea::placeholder {
+    color: var(--faint);
+  }
+
   textarea:focus {
     outline: none;
   }
 
-  .bar {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 6px 8px 8px 10px;
+  .tool,
+  .send {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    margin-bottom: 2px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    cursor: pointer;
   }
 
   .tool {
-    display: grid;
-    place-items: center;
-    width: 26px;
-    height: 26px;
-    padding: 0;
-    border: 0;
-    border-radius: 8px;
     background: none;
-    color: var(--muted);
-    font: 600 0.9rem var(--sans);
-    cursor: pointer;
+    color: var(--faint);
+    font: 500 0.95rem var(--sans);
+    transition:
+      background-color 0.15s,
+      color 0.15s;
   }
 
   .tool:hover {
@@ -659,59 +668,35 @@
     color: var(--fg);
   }
 
-  .spacer {
-    flex: 1;
-  }
-
-  /* Send: a quiet square until there is something to send, then solid; Stop takes its place while Aristotle writes. */
   .send {
-    display: grid;
-    place-items: center;
-    width: 32px;
-    height: 32px;
-    padding: 0;
-    border: 0;
-    border-radius: 10px;
-    background: var(--acc);
-    color: var(--on-acc);
-    cursor: pointer;
+    background: var(--fg);
+    color: var(--b0);
     transition:
-      background-color 0.15s,
-      color 0.15s,
+      opacity 0.15s,
       transform 0.1s;
   }
 
   .send:disabled {
-    background: transparent;
-    color: var(--faint);
+    opacity: 0.18;
     cursor: default;
   }
 
   .send:not(:disabled):hover {
-    filter: brightness(1.08);
+    opacity: 0.85;
   }
 
   .send:not(:disabled):active {
-    transform: scale(0.94);
+    transform: scale(0.92);
   }
 
   .send svg {
-    width: 16px;
-    height: 16px;
+    width: 15px;
+    height: 15px;
     fill: none;
     stroke: currentColor;
-    stroke-width: 2;
+    stroke-width: 2.2;
     stroke-linecap: round;
     stroke-linejoin: round;
-  }
-
-  .send.stop {
-    background: var(--b2);
-    color: var(--fg);
-  }
-
-  .send.stop:hover {
-    background: var(--hover);
   }
 
   .send.stop svg {
