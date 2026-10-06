@@ -12,8 +12,15 @@ interface ServerMessage {
 
 /** ANSI escape sequences, stripped out to read what is on screen. */
 const ANSI = /\x1b\[[0-9;?]*[ -/]*[@-~]|\x1b\][^\x07]*(?:\x07|\x1b\\)|\x1b[@-Z\\-_]/g;
-/** Claude Code's status line while it works ("✻ Pondering… (12s · esc to interrupt)"). */
-const WORKING = /esc to interrupt/i;
+/**
+ * Claude Code's status line while it works ("✻ Noodling… (12s · ↓ 130 tokens · thinking)"). It redraws only the cells
+ * that change, so a chunk may hold just the word or just the counter; older versions also said "esc to interrupt".
+ */
+const WORKING = /\p{Lu}\p{Ll}{2,}…|↓ \d+ tokens|esc to interrupt/u;
+/** Sending Claude something counts as work until its status line shows up (it takes a second or two to start). */
+const STARTING_MS = 10_000;
+/** The status line redraws several times a second (with pauses of 2 s while its word changes); quiet this long, the work is over. */
+const SETTLED_MS = 4000;
 /** The status word in that line, e.g. "Pondering…". */
 const STATUS_WORD = /(\p{Lu}\p{Ll}{2,}…)/gu;
 /** Claude Code asking something only the terminal can answer: a permission or a trust prompt. */
@@ -83,24 +90,28 @@ class Claude {
       this.toggle(true);
     }
     if (WORKING.test(chunk)) {
-      if (!this.busy) this.busySince = Date.now();
-      this.busy = true;
       const words = [...chunk.matchAll(STATUS_WORD)];
       if (words.length) this.doing = words[words.length - 1][1];
-      clearTimeout(this.idleTimer);
-      // The status line keeps redrawing while Claude works; once it has been quiet for a moment, the work is over.
-      this.idleTimer = setTimeout(() => {
-        this.busy = false;
-        this.doing = '';
-        this.lastSaid = this.readLastSaid();
-      }, 2500);
+      this.working(SETTLED_MS);
     }
   }
 
-  /** Claude Code prints its replies after a "⏺" marker; the text runs until its input box. */
+  /** Claude is working, and is taken to have stopped once nothing says so for `ms`. */
+  private working(ms: number) {
+    if (!this.busy) this.busySince = Date.now();
+    this.busy = true;
+    clearTimeout(this.idleTimer);
+    this.idleTimer = setTimeout(() => {
+      this.busy = false;
+      this.doing = '';
+      this.lastSaid = this.readLastSaid();
+    }, ms);
+  }
+
+  /** Claude Code prints its replies after a "●" marker ("⏺" in older versions); the text runs until its input box. */
   private readLastSaid(): string {
     const text = this.screen.replace(ANSI, ' ').replace(/[ \t]+/g, ' ');
-    const at = text.lastIndexOf('⏺');
+    const at = Math.max(text.lastIndexOf('●'), text.lastIndexOf('⏺'));
     if (at === -1) return '';
     const said = text
       .slice(at + 1, at + 600)
@@ -137,6 +148,7 @@ class Claude {
     this.asking = false;
     this.recent = '';
     this.post({ type: 'send', text });
+    if (this.running) this.working(STARTING_MS);
   }
 
   /** Asks Claude to do something: `command` is typed in if it is running here, otherwise it starts with `initial`. */
@@ -144,6 +156,7 @@ class Claude {
     this.asking = false;
     this.recent = '';
     this.post({ type: 'run', text: command, initial });
+    this.working(STARTING_MS);
   }
 
   resize(cols: number, rows: number) {
