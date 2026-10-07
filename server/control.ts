@@ -9,6 +9,7 @@ import { spawn, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, openSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { INSTANCE, PORT, ROOT, STATE_DIR, UI_DIR, URL_CLEAN } from './config.ts';
+import { listenerOwner } from './peer.ts';
 
 // One pid file per port, so test servers on other ports never touch the real one's.
 export const PID_FILE = path.join(STATE_DIR, `server-${PORT}.pid`);
@@ -27,11 +28,18 @@ function serviceRoot(): string | undefined {
   return out.status === 0 && out.stdout.trim() ? out.stdout.trim() : undefined;
 }
 
-/** What the running server says about itself, or null when nothing answers on the port. */
-export async function health(): Promise<{ ok: boolean; instance?: string; root?: string } | null> {
+/** What the running server says about itself, or null when nothing answers on the port (or someone else does). */
+export async function health(): Promise<{ ok: boolean; instance?: string; root?: string; pid?: number } | null> {
+  // 127.0.0.1, not localhost: localhost resolves to ::1 first, where another user could be listening.
+  // And only a server this user runs: another account listening on the port first is not Aristotle (peer.ts).
+  const owner = listenerOwner(PORT);
+  if (owner !== undefined && owner !== process.getuid?.()) {
+    console.error(`Aristotle: port ${PORT} is held by another user (uid ${owner}); not talking to it.`);
+    return null;
+  }
   try {
-    const res = await fetch(`http://localhost:${PORT}/api/health`, { signal: AbortSignal.timeout(1000) });
-    return res.ok ? ((await res.json()) as { ok: boolean; instance?: string; root?: string }) : null;
+    const res = await fetch(`http://127.0.0.1:${PORT}/api/health`, { signal: AbortSignal.timeout(1000) });
+    return res.ok ? ((await res.json()) as { ok: boolean; instance?: string; root?: string; pid?: number }) : null;
   } catch {
     return null;
   }
@@ -82,6 +90,8 @@ export async function stop(): Promise<void> {
   } catch {
     return;
   }
+  // A pid file left by a crash may name some other process by now: only ever signal an Aristotle server.
+  if (!isServer(pid)) return;
   try {
     process.kill(pid, 'SIGTERM');
   } catch {
@@ -90,10 +100,20 @@ export async function stop(): Promise<void> {
   for (let i = 0; i < 50 && (await isRunning()); i++) await sleep(100);
 }
 
+/** Whether `pid` is an Aristotle server (its command line runs server/index.ts); true where that can't be read. */
+function isServer(pid: number): boolean {
+  if (!Number.isInteger(pid) || pid <= 0) return false;
+  try {
+    return readFileSync(`/proc/${pid}/cmdline`, 'utf8').includes('server/index.ts');
+  } catch (err) {
+    return (err as NodeJS.ErrnoException).code !== 'ENOENT';
+  }
+}
+
 if (import.meta.main) {
   const [command = 'status', flag] = process.argv.slice(2);
   const say = (m: string) => console.error(m);
-  const where = `${URL_CLEAN} (http://localhost:${PORT})`;
+  const where = `${URL_CLEAN} (http://127.0.0.1:${PORT})`;
   const runs = serviceEnabled() ? serviceRoot() : undefined;
 
   if (command === 'start' || command === 'restart') {

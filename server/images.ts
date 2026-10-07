@@ -10,6 +10,14 @@ const API = 'https://commons.wikimedia.org/w/api.php';
 const UA = 'Aristotle/0.3 (personal learning app; https://github.com/Di0go/aristotle) node-fetch';
 // Wikimedia serves originals from upload. and rendered thumbnails (PNG versions of SVGs, for one) from thumb.
 const IMAGE_HOSTS = ['upload.wikimedia.org', 'thumb.wikimedia.org'];
+/** Commons searches and downloads that take longer than this have failed. */
+const TIMEOUT_MS = 20_000;
+/** The largest image view_image will download: a 1200px rendition is a fraction of this. */
+const MAX_IMAGE_BYTES = 15 * 1024 * 1024;
+/** Anyone can edit a file's page on Commons, so its words reach Claude cut short (and are framed as data, mcp.ts). */
+const MAX_FIELD = 200;
+/** Wide enough to place markers to a percent, small enough to keep the picture cheap in Claude's context. */
+const VIEW_WIDTH = 800;
 
 export interface FoundImage {
   title: string;
@@ -68,7 +76,7 @@ export async function findImages(query: string, limit = 8): Promise<{ images: Fo
     iiprop: 'url|size|mime|extmetadata',
     iiurlwidth: '1200',
   });
-  const res = await fetch(`${API}?${params}`, { headers: { 'User-Agent': UA } });
+  const res = await fetch(`${API}?${params}`, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(TIMEOUT_MS) });
   if (!res.ok) throw new Error(`Wikimedia Commons answered ${res.status}`);
   const data = (await res.json()) as { query?: { pages?: Record<string, Page> } };
   const pages = Object.values(data.query?.pages ?? {}).sort((a, b) => (a.index ?? 0) - (b.index ?? 0));
@@ -78,24 +86,24 @@ export async function findImages(query: string, limit = 8): Promise<{ images: Fo
     const info = p.imageinfo?.[0];
     if (!info || !/^image\/(jpeg|png|svg\+xml|gif|webp)$/.test(info.mime ?? '')) continue;
     const m = info.extmetadata ?? {};
-    const license = strip(m.LicenseShortName?.value);
+    const license = strip(m.LicenseShortName?.value).slice(0, MAX_FIELD);
     if (!allowed(license, strip(m.Restrictions?.value))) {
       rejected++;
       continue;
     }
-    const artist = strip(m.Artist?.value) || 'Unknown author';
+    const artist = strip(m.Artist?.value).slice(0, MAX_FIELD) || 'Unknown author';
     images.push({
-      title: p.title.replace(/^File:/, ''),
+      title: p.title.replace(/^File:/, '').slice(0, MAX_FIELD),
       page: info.descriptionurl ?? `https://commons.wikimedia.org/wiki/${encodeURIComponent(p.title)}`,
       // Without Commons' tracking parameters.
       src: (info.thumburl ?? info.url ?? '').split('?')[0],
       width: info.thumbwidth ?? 0,
       height: info.thumbheight ?? 0,
       license,
-      licenseUrl: strip(m.LicenseUrl?.value) || undefined,
+      licenseUrl: strip(m.LicenseUrl?.value).slice(0, MAX_FIELD) || undefined,
       artist,
       credit: `${artist}, ${license}, via Wikimedia Commons`,
-      ...(strip(m.ImageDescription?.value) ? { description: strip(m.ImageDescription?.value).slice(0, 240) } : {}),
+      ...(strip(m.ImageDescription?.value) ? { description: strip(m.ImageDescription?.value).slice(0, MAX_FIELD) } : {}),
     });
     if (images.length >= limit) break;
   }
@@ -108,12 +116,14 @@ export async function viewImage(src: string, width = 0, height = 0): Promise<Buf
   if (url.protocol !== 'https:' || !IMAGE_HOSTS.includes(url.hostname)) {
     throw new Error(`Only images from ${IMAGE_HOSTS.join(', ')} can be viewed (use a src from find_images).`);
   }
-  const res = await fetch(url, { headers: { 'User-Agent': UA } });
+  // No redirects (they could lead anywhere), a time limit, and never more than MAX_IMAGE_BYTES read into memory.
+  const res = await fetch(url, { headers: { 'User-Agent': UA }, redirect: 'error', signal: AbortSignal.timeout(TIMEOUT_MS) });
   if (!res.ok) throw new Error(`The image host answered ${res.status}`);
-  const type = res.headers.get('content-type') ?? 'image/jpeg';
-  const bytes = Buffer.from(await res.arrayBuffer());
-  if (bytes.length > 15 * 1024 * 1024) throw new Error('The image is too large to view.');
-  const W = 1000;
+  const type = (res.headers.get('content-type') ?? '').split(';')[0].trim();
+  if (!/^image\/(jpeg|png|gif|webp|svg\+xml)$/.test(type)) throw new Error(`Not an image (${type || 'no type'}).`);
+  if (Number(res.headers.get('content-length') ?? 0) > MAX_IMAGE_BYTES) throw new Error('The image is too large to view.');
+  const bytes = await readCapped(res, MAX_IMAGE_BYTES);
+  const W = VIEW_WIDTH;
   const H = width > 0 && height > 0 ? Math.round((W * height) / width) : W;
   // The grid is drawn in percent of the image's own box, the same units the plate's markers use.
   const lines: string[] = [];
@@ -131,6 +141,19 @@ export async function viewImage(src: string, width = 0, height = 0): Promise<Buf
     <g stroke="#ff2d55" stroke-opacity="0.55" stroke-width="1" fill="#ff2d55" font-family="sans-serif" font-size="12" font-weight="700">${lines.join('')}</g>
   </svg>`;
   return rsvgConvert(svg, ['--format', 'png'], { maxBuffer: 40 * 1024 * 1024, timeout: 20_000 });
+}
+
+/** The body of `res`, refusing it as soon as it passes `max` bytes. */
+async function readCapped(res: Response, max: number): Promise<Buffer> {
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  if (!res.body) return Buffer.alloc(0);
+  for await (const chunk of res.body) {
+    size += chunk.length;
+    if (size > max) throw new Error('The image is too large to view.');
+    chunks.push(chunk);
+  }
+  return Buffer.concat(chunks);
 }
 
 /** Pipes an SVG through rsvg-convert and resolves with what it prints; its stderr becomes the error. */

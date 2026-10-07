@@ -1,12 +1,11 @@
 // Claude Code inside Aristotle: one interactive `claude` running in a pseudo-terminal, streamed to the
 // interface over a WebSocket. It is the same interactive Claude Code as in any terminal, on his own login.
 
-import os from 'node:os';
-import path from 'node:path';
 import pty from 'node-pty';
 import type { IPty } from 'node-pty';
 import type { WebSocket } from 'ws';
 import { CLAUDE_CMD as COMMAND, INSTANCE, ROOT } from './config.ts';
+import { claudeEnv } from './oneshot.ts';
 
 /** Output kept for clients that connect later, so the drawer shows the whole recent screen. */
 const BUFFER_LIMIT = 256 * 1024;
@@ -54,7 +53,6 @@ export class Terminal {
     const [file, ...args] = COMMAND.split(' ');
     if (resume) args.push('--continue');
     if (prompt) args.push(prompt);
-    const home = os.homedir();
     this.buffer = '';
     this.bracketedPaste = false;
     this.ready = false;
@@ -66,11 +64,14 @@ export class Terminal {
       rows: this.rows,
       cwd: ROOT,
       env: {
-        ...process.env,
+        ...claudeEnv(),
         TERM: 'xterm-256color',
         COLORTERM: 'truecolor',
-        // A service started at login may not have the user's PATH; Claude Code lives in ~/.local/bin.
-        PATH: [path.join(home, '.local/bin'), process.env.PATH ?? '/usr/local/bin:/usr/bin:/bin'].join(':'),
+        // quiz and ask wait for the learner, often longer than the two minutes after which Claude Code would move a
+        // tool call to the background (an extra turn, and an answer lost if the session ends): they stay in front.
+        CLAUDE_CODE_MCP_AUTO_BACKGROUND_MS: '0',
+        // Tells the bridge it serves the tutor in the drawer, and the Stop hook that this is a lesson, not development.
+        ARISTOTLE_DRAWER: '1',
       } as Record<string, string>,
     });
     this.proc.onData((data) => {
@@ -158,6 +159,8 @@ export class Terminal {
       } else if (msg.type === 'resize') this.resize(msg.cols, msg.rows);
     });
     ws.on('close', () => this.clients.delete(ws));
+    // A malformed frame (invalid UTF-8, too large) closes this socket; unhandled, it would take the server down.
+    ws.on('error', () => ws.terminate());
   }
 
   /** Ignores sizes no real drawer has. */

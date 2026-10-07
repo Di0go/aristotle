@@ -67,7 +67,7 @@ Claude Code in the drawer runs in the release copy, so lessons use the released 
 
 - on **commit**, quick ones only (`pnpm gates --quick`, [`.githooks/pre-commit`](../.githooks/pre-commit));
 - on **push** ([`.githooks/pre-push`](../.githooks/pre-push));
-- in **CI** ([`.github/workflows/ci.yml`](../.github/workflows/ci.yml));
+- in **CI** ([`.github/workflows/ci.yml`](../.github/workflows/ci.yml)), with a read-only token, no credentials left on disk, and actions pinned to commits that [Dependabot](../.github/dependabot.yml) proposes updates to;
 - before every **release**.
 
 The single commands: `pnpm lint` (read only: Biome lints and checks the formatting of TypeScript, CSS and JSON, Prettier the formatting of `.svelte` files), `pnpm format` (apply both), `pnpm check` (types, through `svelte-check`, which also type-checks and lints the `.svelte` files), `pnpm test`, `pnpm build`.
@@ -124,6 +124,7 @@ Every setting is an environment variable with a default. `.env` is not read: set
 | `ARISTOTLE_GLOSS_IMAGES` | Whether a gloss may carry a picture from Wikimedia Commons, when one would help (off in the tests: no network). | [`config.ts`](../server/config.ts) |
 | `ARISTOTLE_ONESHOT_CMD` | A command that reads a question on stdin and prints the answer, in place of Claude Code (oneshot.ts); tests swap one in. | [`config.ts`](../server/config.ts) |
 | `ARISTOTLE_WAIT_MS` | How long quiz and ask wait for an answer before handing control back to Claude. | [`config.ts`](../server/config.ts) |
+| `ARISTOTLE_CLAUDE_CWD` |  | [`config.ts`](../server/config.ts) |
 | `ARISTOTLE_RELEASE_DIR` | Where the release copy lives: a Git worktree of this repository that the live service runs. | [`release.ts`](../scripts/release.ts) |
 <!-- /generated -->
 

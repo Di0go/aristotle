@@ -27,6 +27,13 @@ if [[ $EUID -ne 0 ]]; then
   exit 1
 fi
 
+# $TLS belongs to the user, so anything there could change between a check and its use. Root reads each file once,
+# into a private copy, and checks and uses only that copy; the one file it writes there, it writes as the user.
+WORK=$(mktemp -d)
+trap 'rm -rf "$WORK"' EXIT
+OWNER=$(stat -c %U "$TLS" 2>/dev/null || echo root)
+snapshot() { install -m 600 -o root -g root "$1" "$WORK/$(basename "$1")" && echo "$WORK/$(basename "$1")"; }
+
 # 0. The old name, gym.test: its unit, rule, hosts lines and authority.
 if [[ -f /etc/systemd/system/mindgym-nome.service ]]; then
   systemctl disable --now mindgym-nome.service || true
@@ -41,7 +48,8 @@ if grep -qE '(^#.*Mind Gym|\sgym\.test(\s|$))' /etc/hosts; then
   echo "Removed gym.test from /etc/hosts (backup: /etc/hosts.bak-aristotle)"
 fi
 if [[ -f "$TLS/retired-ca.crt" ]]; then
-  trust anchor --remove "$TLS/retired-ca.crt" 2>/dev/null || true
+  RETIRED=$(snapshot "$TLS/retired-ca.crt")
+  trust anchor --remove "$RETIRED" 2>/dev/null || true
   rm -f "$TLS/retired-ca.crt"
   echo "Stopped trusting the old gym.test authority"
 fi
@@ -96,15 +104,16 @@ if [[ ! -f "$TLS/ca.crt" ]]; then
   echo "No certificate yet: run 'bash $ROOT/scripts/tls.sh' as yourself, then this again." >&2
   exit 1
 fi
+CA=$(snapshot "$TLS/ca.crt")
 # Exactly one permitted name, and it is $NAME: an authority that may also sign anything else is refused.
-PERMITTED=$(openssl x509 -in "$TLS/ca.crt" -noout -ext nameConstraints 2>/dev/null \
+PERMITTED=$(openssl x509 -in "$CA" -noout -ext nameConstraints 2>/dev/null \
   | sed -n '/Permitted:/,/Excluded:/{/DNS:\|IP:\|email:\|URI:\|DirName:/p}' | tr -d ' ')
-CRITICAL=$(openssl x509 -in "$TLS/ca.crt" -noout -ext nameConstraints 2>/dev/null | grep -c 'Name Constraints: critical' || true)
+CRITICAL=$(openssl x509 -in "$CA" -noout -ext nameConstraints 2>/dev/null | grep -c 'Name Constraints: critical' || true)
 if [[ "$PERMITTED" != "DNS:$NAME" || "$CRITICAL" != 1 ]]; then
   echo "$TLS/ca.crt is not limited to $NAME: not trusting it. Run 'bash $ROOT/scripts/tls.sh' first." >&2
   exit 1
 fi
-trust anchor --remove "$TLS/ca.crt" 2>/dev/null || true
-trust anchor --store "$TLS/ca.crt"
-install -o "$(stat -c %U "$TLS")" -g "$(stat -c %G "$TLS")" -m 644 /dev/null "$TLS/installed"
+trust anchor --remove "$CA" 2>/dev/null || true
+trust anchor --store "$CA"
+runuser -u "$OWNER" -- touch "$TLS/installed"
 echo "Trusted. Restart Aristotle (pnpm app restart) and open https://$NAME"

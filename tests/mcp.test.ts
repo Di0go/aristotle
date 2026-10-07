@@ -325,12 +325,46 @@ test('an answer given after the wait ends is collected later', async () => {
 });
 
 test('rejects requests from other sites', async () => {
-  const res = await fetch(`${BASE}/api/answer`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Origin: 'https://example.com' },
-    body: '{}',
-  });
-  assert.equal(res.status, 403);
+  const post = (headers: Record<string, string>) =>
+    fetch(`${BASE}/api/answer`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...headers }, body: '{}' });
+  assert.equal((await post({ Origin: 'https://example.com' })).status, 403);
+  // Not even other servers on this machine: another project's Vite, anything on port 80 or 443.
+  for (const origin of ['http://localhost:5173', 'http://localhost', 'https://localhost', 'http://127.0.0.1:443']) {
+    assert.equal((await post({ Origin: origin })).status, 403, origin);
+  }
+  // What a browser marks as coming from another site, even without an Origin (an <img>, a link).
+  assert.equal((await fetch(`${BASE}/api/state`, { headers: { 'Sec-Fetch-Site': 'cross-site' } })).status, 403);
+  assert.equal((await fetch(`${BASE}/api/state`, { headers: { 'Sec-Fetch-Site': 'same-site' } })).status, 403);
+  // A form or a no-cors fetch can only send text/plain: refused, Origin or not.
+  const plain = await fetch(`${BASE}/api/answer`, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: '{}' });
+  assert.equal(plain.status, 415);
+  // Another name for this machine (DNS rebinding), or our port on another name.
+  for (const host of ['evil.example:4799', `localhost:5173`, `LOCALHOST.:${PORT}`]) {
+    const status = await new Promise<number>((resolve, reject) => {
+      http
+        .get({ host: '127.0.0.1', port: PORT, path: '/api/state', headers: { host } }, (res) => resolve(res.statusCode!))
+        .on('error', reject);
+    });
+    assert.equal(status, 403, host);
+  }
+});
+
+test('every answer carries the security headers: own scripts only, no framing', async () => {
+  for (const route of ['/', '/api/state']) {
+    const res = await fetch(`${BASE}${route}`);
+    const csp = res.headers.get('Content-Security-Policy') ?? '';
+    assert.match(csp, /script-src 'self'/, route);
+    assert.match(csp, /frame-ancestors 'none'/, route);
+    assert.match(csp, /form-action 'none'/, route);
+    assert.equal(res.headers.get('X-Frame-Options'), 'DENY', route);
+    assert.equal(res.headers.get('X-Content-Type-Options'), 'nosniff', route);
+  }
+});
+
+test('malformed requests get a 400, not a server error', async () => {
+  assert.equal((await answer({ id: 'x', picks: [null] })).status, 400);
+  assert.equal((await answer({ id: 'x', picks: [{ choice: 0, note: 5 }] })).status, 400);
+  assert.equal((await fetch(`${BASE}/api/topics/%E0%A4%A`)).status, 400);
 });
 
 test('a restarted server keeps the session and the map', async () => {
@@ -439,6 +473,14 @@ test('a concept past its review date is fading, and a review session practises i
 test('the terminal runs the command, takes messages, and only opens to Aristotle itself', async () => {
   await assert.rejects(openTerminal(), /403/, 'no Origin');
   await assert.rejects(openTerminal('https://example.com'), /403/, 'another site');
+  await assert.rejects(openTerminal('http://localhost:5173'), /403/, 'another dev server on this machine');
+
+  // A malformed frame (invalid UTF-8) closes that socket only: the server stays up.
+  const bad = await openTerminal(BASE);
+  const closed = new Promise((r) => bad.ws.on('close', r));
+  (bad.ws as unknown as { _socket: import('node:net').Socket })._socket.write(Buffer.from([0x81, 0x83, 1, 2, 3, 4, 0xfe, 0xfc, 0xfe]));
+  await closed;
+  assert.equal((await fetch(`${BASE}/api/health`)).status, 200);
 
   const { ws, messages } = await openTerminal(BASE);
   await until(() => messages.some((m) => m.type === 'state'));

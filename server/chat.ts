@@ -8,8 +8,8 @@ import { randomUUID } from 'node:crypto';
 import { EventEmitter } from 'node:events';
 import { mkdir, readdir, readFile, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { CHATS_DIR, ONESHOT_CMD, ONESHOT_MODEL, STATE_DIR } from './config.ts';
-import { claudeEnv } from './oneshot.ts';
+import { CHATS_DIR, ONESHOT_CMD } from './config.ts';
+import { claudeCwd, claudeEnv, headlessArgs, limited } from './oneshot.ts';
 import { slugify } from './slug.ts';
 import type { ChatMessage, ChatThread } from '../shared/types.ts';
 
@@ -18,8 +18,6 @@ const TIMEOUT_MS = 180_000;
 const STOPPED = '\u0000stopped';
 const MAX_MESSAGE = 8000;
 const MAX_CONTEXT = 12_000;
-/** A neutral folder for its sessions: no project's CLAUDE.md, the same one every time so sessions can resume. */
-const CWD = path.join(STATE_DIR, 'chat');
 
 const SYSTEM =
   'You are Aristotle, talking with a learner beside their lesson in the Aristotle app. A separate tutor runs the lesson; ' +
@@ -140,80 +138,74 @@ export class Chats {
   private ask(t: ChatThread, request: string, onText: (soFar: string) => void): Promise<string> {
     const resume = Boolean(t.session);
     const session = t.session ?? randomUUID();
-    const args = ONESHOT_CMD
+    // Always the same private folder (oneshot.ts claudeCwd), so a session can be resumed.
+    const [file, ...rest] = ONESHOT_CMD
       ? ONESHOT_CMD.split(' ')
       : [
           'claude',
-          '-p',
-          '--model',
-          ONESHOT_MODEL,
-          '--tools',
-          '',
-          '--strict-mcp-config',
-          '--setting-sources',
-          '',
-          resume ? '--resume' : '--session-id',
-          session,
-          '--output-format',
-          'stream-json',
-          '--verbose',
-          '--include-partial-messages',
-          '--system-prompt',
-          SYSTEM,
+          ...headlessArgs(SYSTEM, [
+            resume ? '--resume' : '--session-id',
+            session,
+            '--output-format',
+            'stream-json',
+            '--verbose',
+            '--include-partial-messages',
+          ]),
         ];
-    const [file, ...rest] = args;
-    return mkdir(CWD, { recursive: true }).then(
-      () =>
-        new Promise<string>((resolve, reject) => {
-          const child = spawn(file, rest, { cwd: CWD, stdio: ['pipe', 'pipe', 'pipe'], timeout: TIMEOUT_MS, env: claudeEnv() });
-          const run = { kill: () => child.kill('SIGTERM'), stopped: false };
-          this.running.set(t.thread, run);
-          let buffer = '';
-          let text = '';
-          let plain = '';
-          let err = '';
-          child.stdout.on('data', (d) => {
-            buffer += d;
-            let nl = buffer.indexOf('\n');
-            while (nl !== -1) {
-              const line = buffer.slice(0, nl);
-              buffer = buffer.slice(nl + 1);
-              nl = buffer.indexOf('\n');
-              let ev: { type?: string; event?: { type?: string; delta?: { type?: string; text?: string } } };
-              try {
-                ev = JSON.parse(line);
-              } catch {
-                // Not Claude Code's stream (a stand-in command in the tests): its plain output is the answer.
-                plain += `${line}\n`;
-                continue;
-              }
-              const delta = ev.type === 'stream_event' && ev.event?.type === 'content_block_delta' ? ev.event.delta : undefined;
-              if (delta?.type === 'text_delta' && delta.text) {
-                text += delta.text;
-                onText(text);
-              }
+    return limited(async () => {
+      const cwd = await claudeCwd();
+      return new Promise<string>((resolve, reject) => {
+        const child = spawn(file, rest, { cwd, stdio: ['pipe', 'pipe', 'pipe'], timeout: TIMEOUT_MS, env: claudeEnv() });
+        const run = { kill: () => child.kill('SIGTERM'), stopped: false };
+        this.running.set(t.thread, run);
+        let buffer = '';
+        let text = '';
+        let plain = '';
+        let err = '';
+        child.stdout.on('data', (d) => {
+          buffer += d;
+          let nl = buffer.indexOf('\n');
+          while (nl !== -1) {
+            const line = buffer.slice(0, nl);
+            buffer = buffer.slice(nl + 1);
+            nl = buffer.indexOf('\n');
+            let ev: { type?: string; event?: { type?: string; delta?: { type?: string; text?: string } } };
+            try {
+              ev = JSON.parse(line);
+            } catch {
+              // Not Claude Code's stream (a stand-in command in the tests): its plain output is the answer.
+              plain += `${line}\n`;
+              continue;
             }
-          });
-          child.stderr.on('data', (d) => (err += d));
-          child.on('error', (e) => reject(new ChatError(`Could not start Claude Code: ${e.message}`)));
-          child.on('close', (code, signal) => {
-            if (this.running.get(t.thread) === run) this.running.delete(t.thread);
-            const answer = (text || plain + buffer).trim();
-            // Stopped by him: keep what was written (the session may not have it, so it is started over next time).
-            if (run.stopped) {
-              t.session = code === 0 ? session : undefined;
-              return resolve(`${answer}${STOPPED}`);
+            const delta = ev.type === 'stream_event' && ev.event?.type === 'content_block_delta' ? ev.event.delta : undefined;
+            if (delta?.type === 'text_delta' && delta.text) {
+              text += delta.text;
+              onText(text);
             }
-            if (code === 0 && answer) {
-              t.session = session;
-              return resolve(answer);
-            }
-            if (signal) return reject(new ChatError('Aristotle took too long to answer'));
-            reject(new ChatError(`Aristotle could not answer${err.trim() ? `: ${err.trim().split('\n').at(-1)}` : ''}`));
-          });
-          child.stdin.end(request);
-        }),
-    );
+          }
+        });
+        child.stderr.on('data', (d) => (err += d));
+        child.on('error', (e) => reject(new ChatError(`Could not start Claude Code: ${e.message}`)));
+        child.on('close', (code, signal) => {
+          if (this.running.get(t.thread) === run) this.running.delete(t.thread);
+          const answer = (text || plain + buffer).trim();
+          // Stopped by him: keep what was written (the session may not have it, so it is started over next time).
+          if (run.stopped) {
+            t.session = code === 0 ? session : undefined;
+            return resolve(`${answer}${STOPPED}`);
+          }
+          if (code === 0 && answer) {
+            t.session = session;
+            return resolve(answer);
+          }
+          if (signal) return reject(new ChatError('Aristotle took too long to answer'));
+          reject(new ChatError(`Aristotle could not answer${err.trim() ? `: ${err.trim().split('\n').at(-1)}` : ''}`));
+        });
+        // A child that exits before reading all of a long request must not take the server down with EPIPE.
+        child.stdin.on('error', () => {});
+        child.stdin.end(request);
+      });
+    });
   }
 
   /** Atomic write (temp file + rename), one at a time per thread. */

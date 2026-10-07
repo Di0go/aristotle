@@ -7,4 +7,10 @@ dist/
 *.log
 # The learning history: its own Git repository, never part of the app's.
 data/
-.env
+.env*
+*.key
+*.pem
+# Claude Code's per-machine settings.
+.claude/settings.local.json
+# Worktrees Claude Code makes for parallel agents.
+.claude/worktrees/

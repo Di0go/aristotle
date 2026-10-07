@@ -2,6 +2,7 @@
 // default; docs/development.md lists them all (a test keeps that list honest).
 
 import { existsSync, readFileSync } from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 
 /** The checkout this server runs from. */
@@ -33,6 +34,11 @@ export const UI_DIR = path.join(ROOT, 'dist', 'ui');
 
 /** The only address the server listens on: it is for this machine alone. */
 export const HOST = '127.0.0.1';
+/**
+ * IPv6 loopback, also held by the server, so no other local user can listen there: "localhost" resolves to ::1
+ * first, and whoever answers there would be taken for Aristotle by the browser.
+ */
+export const HOST6 = '::1';
 /** The HTTP port: 4747 live, 4757 dev. */
 export const PORT = Number(process.env.ARISTOTLE_PORT ?? (DEV ? 4757 : 4747));
 /** The clean name (the address it shows and tls.sh's certificate). scripts/setup-hostname.sh sets up aristotle.test only. */
@@ -56,9 +62,33 @@ export const ACCENT = ['blue', 'red', 'violet', 'graphite'].includes(settings.ac
 
 /** The Vite dev server's port (vite.config.ts), which proxies to this server in dev. */
 export const VITE_PORT = Number(process.env.ARISTOTLE_VITE_PORT ?? 5173);
-/** Names and ports allowed in Host/Origin headers: this server, the Vite dev server, and the forwarded name. */
-export const ALLOWED_NAMES = ['localhost', '127.0.0.1', HOSTNAME];
-export const ALLOWED_PORTS = [PORT, VITE_PORT, 80, 443];
+/**
+ * Whether the clean name leads here: scripts/setup-hostname.sh has put it in /etc/hosts, or there is a certificate.
+ * Until then the name would be resolved by whatever DNS server the network offers, so it is not trusted.
+ */
+export const HOSTNAME_READY = TLS_ENABLED || hostsLists(HOSTNAME);
+/**
+ * The exact Host headers this server answers (DNS rebinding: a page on another name gets nothing): this server's port
+ * by IP and by localhost; the Vite dev server's in dev; and the clean name once it is set up.
+ */
+export const ALLOWED_HOSTS: ReadonlySet<string> = new Set([
+  `localhost:${PORT}`,
+  `127.0.0.1:${PORT}`,
+  ...(DEV ? [`localhost:${VITE_PORT}`, `127.0.0.1:${VITE_PORT}`] : []),
+  ...(HOSTNAME_READY ? [HOSTNAME, `${HOSTNAME}:80`] : []),
+  ...(HOSTNAME_READY && TLS_ENABLED ? [`${HOSTNAME}:443`] : []),
+]);
+/**
+ * The exact origins of Aristotle's own pages; every other page is refused (CSRF, and above all the terminal, which runs
+ * Claude Code). Nothing else on this machine is trusted: not other ports (another project's dev server), not port 80.
+ */
+export const ALLOWED_ORIGINS: ReadonlySet<string> = new Set([
+  `http://localhost:${PORT}`,
+  `http://127.0.0.1:${PORT}`,
+  ...(DEV ? [`http://localhost:${VITE_PORT}`, `http://127.0.0.1:${VITE_PORT}`] : []),
+  ...(HOSTNAME_READY ? [`http://${HOSTNAME}`] : []),
+  ...(HOSTNAME_READY && TLS_ENABLED ? [`https://${HOSTNAME}`] : []),
+]);
 
 /** Commit data/ after quiet periods (server/backup.ts). Off in dev: its data is disposable. */
 export const BACKUP = !DEV && process.env.ARISTOTLE_BACKUP !== 'off';
@@ -76,6 +106,24 @@ export const ONESHOT_CMD = process.env.ARISTOTLE_ONESHOT_CMD;
 export const WAIT_MS = Number(process.env.ARISTOTLE_WAIT_MS ?? 15 * 60_000);
 /** Interval of progress notifications while a tool waits, so the call doesn't look idle. */
 export const KEEPALIVE_MS = 15_000;
+
+/**
+ * The folder `claude -p` runs in for glosses, questions on a passage and the chat: private to this user (not /tmp, where
+ * anyone could leave a CLAUDE.md) and outside any project, so no project's CLAUDE.md is read into it.
+ */
+export const CLAUDE_CWD =
+  process.env.ARISTOTLE_CLAUDE_CWD ?? path.join(process.env.XDG_CACHE_HOME || path.join(os.homedir(), '.cache'), 'aristotle', INSTANCE);
+
+/** Whether /etc/hosts maps `name` (setup-hostname.sh). */
+function hostsLists(name: string): boolean {
+  try {
+    return readFileSync('/etc/hosts', 'utf8')
+      .split('\n')
+      .some((line) => line.replace(/#.*/, '').trim().split(/\s+/).slice(1).includes(name));
+  } catch {
+    return false;
+  }
+}
 
 /** settings.json, or nothing when it is missing or unreadable. */
 function readSettings(): { accent?: string } {
