@@ -13,7 +13,23 @@
 
   const byId = $derived(new Map(topic.concepts.map((c) => [c.id, c])));
   const leadsTo = $derived(topic.concepts.filter((c) => c.deps.includes(concept.id)));
-  const history = $derived([...concept.evidence].reverse());
+  /** The whole record, when the live map carries only the newest entries: fetched with the full topic. */
+  let full = $state<{ key: string; evidence: Evidence[] } | null>(null);
+  const shortened = $derived((concept.evidenceTotal ?? 0) > concept.evidence.length);
+  const recordKey = $derived(`${topic.slug}/${concept.id}/${concept.evidenceTotal ?? 0}`);
+  const history = $derived([...(shortened && full?.key === recordKey ? full.evidence : concept.evidence)].reverse());
+
+  $effect(() => {
+    if (!shortened || full?.key === recordKey) return;
+    const [key, slug, id] = [recordKey, topic.slug, concept.id];
+    void fetch(`/api/topics/${encodeURIComponent(slug)}`)
+      .then((r) => (r.ok ? (r.json() as Promise<Topic>) : null))
+      .then((t) => {
+        const found = t?.concepts.find((c) => c.id === id);
+        if (found && key === recordKey) full = { key, evidence: found.evidence };
+      })
+      .catch(() => {});
+  });
   const fading = $derived(isFading(concept));
   const word = $derived(fading ? 'Fading' : WORD[concept.status]);
   /** Fading is still solid underneath (as on the map), so it keeps the solid colour; not yet has none. */

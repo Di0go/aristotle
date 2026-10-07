@@ -22,7 +22,17 @@
 </script>
 
 <footer class="statusline">
-  {#if dev}<span class="dev" title="The dev instance: its own port and data (.dev/), never your real library">dev</span>{/if}
+  <span class="left">
+    {#if dev}<span class="dev" title="The dev instance: its own port and data (.dev/), never your real library">dev</span>{/if}
+    {#if feed.warnings.length}
+      <!-- Something he should know (a backup failing, a file skipped): said quietly, but always in view. -->
+      <span class="warn" role="status" title={feed.warnings.join('\n')}
+        ><i aria-hidden="true"></i><span class="warn-t"
+          >{feed.warnings[0]}{feed.warnings.length > 1 ? ` (and ${feed.warnings.length - 1} more)` : ''}</span
+        ></span
+      >
+    {/if}
+  </span>
   {#if feed.pending}<span class="turn">Your turn</span>{:else if live && claude.busy}<span class="work">Claude is working…</span>{/if}
   {#if topic && counts.total}<span>{counts.solid} of {counts.total} solid</span>{/if}
   {#if place}<span>class {place.index + 1} of {place.roadmap.steps.length}</span>{/if}
@@ -47,8 +57,38 @@
     white-space: nowrap;
   }
 
-  .dev {
+  .left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
     margin-right: auto;
+  }
+
+  .warn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    color: var(--shaky);
+    cursor: default;
+  }
+
+  .warn-t {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .warn i {
+    flex: none;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--shaky);
+  }
+
+  .dev {
     padding: 0 6px;
     border-radius: 3px;
     background: var(--acc);

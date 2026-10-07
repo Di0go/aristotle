@@ -7,6 +7,9 @@ import { feed } from './feed.svelte.ts';
 import { link, router } from './router.svelte.ts';
 import type { Roadmap } from '../../../shared/types.ts';
 
+/** How long /clear is given before the sitting's command is typed in after it. */
+const CLEAR_MS = 1500;
+
 export const actions = {
   /**
    * Sends his answer to a quiz or an ask; an error message, or null. When no tool call was waiting for it (the
@@ -123,7 +126,15 @@ function pickUp() {
  * Planning a roadmap or a mission is a conversation: it stays on the page (where the draft appears) and opens Claude beside it.
  */
 function go(command: string, initial: string, label: string, converse = false, topic?: string, kind: 'learn' | 'other' = 'learn') {
-  claude.run(command, initial);
+  // A new sitting starts from a clean context: the Claude Code in the drawer lives as long as the app, and would
+  // otherwise carry every earlier sitting into each call. Only when no session is open and Claude is idle at its
+  // prompt (not working, not asking something); conversations (a course, a mission) keep theirs.
+  const fresh = !converse && claude.running && !claude.busy && !claude.asking && (!feed.session || Boolean(feed.session.endedAt));
+  if (fresh) {
+    claude.say('/clear');
+    // Typed in after /clear has run, not into the same input box (the terminal types each message, then Enter).
+    setTimeout(() => claude.run(command, initial), CLEAR_MS);
+  } else claude.run(command, initial);
   if (converse) {
     claude.toggle(true);
     return;

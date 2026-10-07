@@ -58,12 +58,22 @@
     margin-bottom: 12px;
   }
 
+  /* A sheen sweeps across: a gradient moved with transform, which the compositor animates without repainting. */
   .line {
+    position: relative;
     display: block;
     height: 10px;
+    overflow: hidden;
     border-radius: 5px;
-    background: linear-gradient(90deg, var(--b2) 0%, var(--hover) 40%, var(--b2) 80%);
-    background-size: 300% 100%;
+    background: var(--b2);
+  }
+
+  .line::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent 0%, var(--hover) 50%, transparent 100%);
+    transform: translateX(-100%);
     animation: shimmer 1.6s ease-in-out infinite;
   }
 
@@ -80,11 +90,8 @@
   }
 
   @keyframes shimmer {
-    from {
-      background-position: 100% 0;
-    }
     to {
-      background-position: -100% 0;
+      transform: translateX(100%);
     }
   }
 

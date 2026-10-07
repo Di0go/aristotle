@@ -1,20 +1,17 @@
 <script lang="ts">
   // The log: every session, grouped by day, each linking to its full record.
-  import { feed } from '../lib/feed.svelte.ts';
+  import { feed, refetching } from '../lib/feed.svelte.ts';
   import { link } from '../lib/router.svelte.ts';
   import { formatDay, formatTime, sessionStats } from '../lib/format.ts';
   import type { SessionSummary } from '../../../shared/types.ts';
 
   let sessions = $state<SessionSummary[] | null>(null);
 
-  // Fetched again whenever the feed moves on (a new item, a topic saved), so today's numbers stay current.
-  $effect(() => {
-    void feed.topicVersion;
-    void feed.items.length;
-    void fetch('/api/sessions')
-      .then((r) => r.json())
-      .then((s: SessionSummary[]) => (sessions = s));
-  });
+  // Fetched again once the feed settles after it moves on (a new item, a topic saved), so today's numbers stay current.
+  refetching(
+    () => feed.sessions(),
+    (s) => (sessions = s),
+  );
 
   const days = $derived.by(() => {
     const out: { day: string; sessions: SessionSummary[] }[] = [];

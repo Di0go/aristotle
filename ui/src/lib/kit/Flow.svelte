@@ -5,6 +5,7 @@
   import dagre from '@dagrejs/dagre';
   import { LINE_H, labelBox, smooth } from '../layout.ts';
   import Glyph, { glyphExtent } from './Glyph.svelte';
+  import { whileVisible } from '../visible.ts';
 
   interface FNode {
     id: string;
@@ -63,6 +64,14 @@
   const CARRY_SCALE = 1.05;
 
   let at = $state(-1);
+  let drawing = $state<SVGSVGElement>();
+
+  // The signals travel only while the figure can be seen: out of sight (scrolled away, the tab hidden) they pause.
+  $effect(() => {
+    const svg = drawing;
+    if (!svg || still) return;
+    return whileVisible(svg, (visible) => (visible ? svg.unpauseAnimations() : svg.pauseAnimations()));
+  });
 
   const steps = $derived(spec.steps ?? []);
   const lit = $derived(at >= 0 && steps[at] ? new Set(steps[at].on) : null);
@@ -147,6 +156,7 @@
   {#if spec.title}<p class="kit-title">{spec.title}</p>{/if}
   <div class="flow-scroll">
     <svg
+      bind:this={drawing}
       viewBox="0 0 {layout.w} {layout.h}"
       style:max-width="{Math.max(layout.w, 320)}px"
       style:min-width="{Math.min(layout.w, 520)}px"

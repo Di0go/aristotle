@@ -514,3 +514,39 @@ html.show-scroll,
 html.show-scroll:hover {
   scrollbar-color: var(--rule-strong) transparent;
 }
+
+/* Skeletons: the shape of what is loading, in quiet bars, so the page doesn't fill in with a jump (Home, the library). */
+.sk {
+  display: block;
+  height: 0.7em;
+  border-radius: 4px;
+  background: var(--b2);
+}
+
+.sk.tall {
+  height: 1.1em;
+}
+
+.sk.w30 {
+  width: 30%;
+}
+
+.sk.w40 {
+  width: 40%;
+}
+
+.sk.w45 {
+  width: 45%;
+}
+
+.sk.w60 {
+  width: 60%;
+}
+
+.sk.w75 {
+  width: 75%;
+}
+
+.sk.w90 {
+  width: 90%;
+}

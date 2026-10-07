@@ -155,6 +155,21 @@ export function layoutTopic(topic: Topic, direction: 'LR' | 'TB', others: Record
 }
 
 /**
+ * Each topic's own layout inside the map of everything, kept per topic object: the live feed replaces a topic only
+ * when it changes, so a change to one topic lays out that one again, not all of them.
+ */
+const atlasLayouts = new WeakMap<Topic, Layout>();
+
+function atlasLayout(topic: Topic): Layout {
+  let l = atlasLayouts.get(topic);
+  if (!l) {
+    l = layoutTopic(topic, 'TB', {}, false);
+    atlasLayouts.set(topic, l);
+  }
+  return l;
+}
+
+/**
  * The map of everything, as the library is organised: a band per roadmap with its steps in order (wrapping
  * onto new rows), a box per topic with its concepts inside, steps not started as empty frames, and a last band
  * for topics on no roadmap. Links between topics are drawn concept to concept.
@@ -204,7 +219,7 @@ export function layoutAtlas(
       let h = GHOST.h;
       let l: Layout | undefined;
       if (item.topic) {
-        l = layoutTopic(item.topic, 'TB', {}, false);
+        l = atlasLayout(item.topic);
         w = Math.max(l.width, 200) + PAD * 2;
         h = l.height + PAD + LABEL_H;
       }

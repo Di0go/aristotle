@@ -1,6 +1,6 @@
 <script lang="ts">
   // During a review session: what has been practised so far, and what is still fading.
-  import { feed } from './feed.svelte.ts';
+  import { refetching } from './feed.svelte.ts';
   import { link } from './router.svelte.ts';
   import type { ReviewQueue } from '../../../shared/types.ts';
 
@@ -14,14 +14,11 @@
 
   let queue = $state<ReviewQueue | null>(null);
 
-  // Refetch whenever a map changes (a review was just recorded) or the session changes.
-  $effect(() => {
-    void feed.topicVersion;
-    void feed.session?.id;
-    void fetch('/api/reviews')
-      .then((r) => r.json())
-      .then((q: ReviewQueue) => (queue = q));
-  });
+  // Refetch once the feed settles after a map changes (a review was just recorded) or the session changes.
+  refetching(
+    async () => (await (await fetch('/api/reviews')).json()) as ReviewQueue,
+    (q) => (queue = q),
+  );
 </script>
 
 <button class="close bench-close" onclick={onclose} aria-label="Close">×</button>

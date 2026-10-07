@@ -22,8 +22,8 @@
   let input = $state<HTMLInputElement>();
   let list = $state<HTMLElement>();
   let timer: ReturnType<typeof setTimeout> | undefined;
-  /** Counts the searches sent, so a slow answer to an older one never replaces a newer one's. */
-  let asked = 0;
+  /** The search in flight: cancelled when he types on, so the server stops on it and its answer never lands. */
+  let inFlight: AbortController | null = null;
 
   // On opening, select what was typed last time, so typing replaces it.
   // Text sent from elsewhere (the context menu) replaces it instead.
@@ -40,6 +40,8 @@
   $effect(() => {
     const query = q.trim();
     clearTimeout(timer);
+    inFlight?.abort();
+    inFlight = null;
     if (!query) {
       hits = [];
       loading = false;
@@ -47,14 +49,21 @@
     }
     loading = true;
     timer = setTimeout(async () => {
-      const mine = ++asked;
+      const mine = new AbortController();
+      inFlight = mine;
       try {
-        const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
-        if (mine !== asked) return;
-        hits = res.ok ? ((await res.json()) as SearchHit[]) : [];
+        const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`, { signal: mine.signal });
+        const found = res.ok ? ((await res.json()) as SearchHit[]) : [];
+        if (mine.signal.aborted) return;
+        hits = found;
         selected = 0;
+      } catch {
+        // Cancelled by a newer search, or the server is away: nothing to show for this one.
       } finally {
-        if (mine === asked) loading = false;
+        if (inFlight === mine) {
+          inFlight = null;
+          loading = false;
+        }
       }
     }, 120);
   });

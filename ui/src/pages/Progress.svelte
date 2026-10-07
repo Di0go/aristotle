@@ -2,7 +2,7 @@
   // Progress: what is solid over time, activity by week, and what is fading.
   import { actions } from '../lib/actions.ts';
   import { longDay, shortDay, weekLabel } from '../lib/charts/scale.ts';
-  import { feed } from '../lib/feed.svelte.ts';
+  import { refetching } from '../lib/feed.svelte.ts';
   import { ago, dayKey, plural } from '../lib/format.ts';
   import { link } from '../lib/router.svelte.ts';
   import StackedColumns from '../lib/charts/StackedColumns.svelte';
@@ -54,12 +54,11 @@
     return a ? ` This week: ${a.right} right, ${a.partial} partly right, ${a.wrong} wrong.` : '';
   });
 
-  $effect(() => {
-    void feed.topicVersion;
-    void fetch('/api/progress')
-      .then((r) => r.json())
-      .then((p: Progress) => (progress = p));
-  });
+  // Worked out on the server: fetched again once the feed settles after a change (a quiz answered, a review recorded).
+  refetching(
+    async () => (await (await fetch('/api/progress')).json()) as Progress,
+    (p) => (progress = p),
+  );
 
   function hours(min: number): string {
     return min < 60 ? `${min} min` : `${Math.floor(min / 60)} h ${min % 60} min`;

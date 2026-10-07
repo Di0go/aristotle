@@ -1,5 +1,6 @@
 // Live copy of the server's state, kept current over Server-Sent Events.
 
+import { untrack } from 'svelte';
 import {
   isInteractive,
   type FeedEvent,
@@ -16,11 +17,14 @@ import {
   type Topic,
 } from '../../../shared/types.ts';
 
+/** How long the feed must be quiet after a change before pages refetch what the server works out from it. */
+const SETTLE_MS = 300;
+
 class LiveFeed {
   session = $state<Session | null>(null);
   items = $state<PublicItem[]>([]);
   connected = $state(false);
-  /** Every topic in full, by slug, updated live. */
+  /** Every topic, by slug, updated live (each concept with only its newest evidence; see Concept.evidenceTotal). */
   topics = $state<Record<string, Topic>>({});
   /** False until the first full load, so pages can tell "loading" from "none". */
   loaded = $state(false);
@@ -31,12 +35,19 @@ class LiveFeed {
   follow = $state<string | null>(null);
   /** Something was started from the interface and its session hasn't appeared yet. */
   starting = $state<{ label: string; at: number; after: string | null } | null>(null);
-  /** Bumped on every topic change, so pages can refetch summaries. */
+  /** Bumped on every topic change. */
   topicVersion = $state(0);
+  /**
+   * Bumped once the feed has been quiet for a moment after a topic, session or item changed (one answer can change
+   * several topics in a row): what pages refetch server-made summaries on (see `refetching`).
+   */
+  settled = $state(0);
   /** Every roadmap, by slug, updated live. Null until loaded. */
   roadmaps = $state<Record<string, Roadmap> | null>(null);
   /** Every Praxis mission, by id, updated live. Null until loaded. */
   missions = $state<Record<string, Mission> | null>(null);
+  /** Problems he should know about (a backup that keeps failing, a data file skipped as unreadable). */
+  warnings = $state<string[]>([]);
 
   /** Every phrase he has had explained, updated live. */
   glosses = $state<Gloss[]>([]);
@@ -62,13 +73,25 @@ class LiveFeed {
   missionList = $derived(Object.values(this.missions ?? {}).sort((a, b) => b.created.localeCompare(a.created)));
 
   private source: EventSource | null = null;
+  /** A full reload is in flight: live events wait for it, then are applied on top of it in order. */
+  private reloading = false;
+  /** The connection came back while reloading: reload once more when this one is done. */
+  private again = false;
+  private held: FeedEvent[] = [];
+  private settleTimer: ReturnType<typeof setTimeout> | undefined;
+  /** /api/sessions, shared by everyone who asks until a topic, the session or an item changes. */
+  private sessionList: Promise<SessionSummary[]> | null = null;
 
   start() {
     this.source = new EventSource('/api/events');
     // Reload the whole state on every (re)connect, so nothing is missed while disconnected.
     this.source.onopen = () => void this.reload();
     this.source.onerror = () => (this.connected = false);
-    this.source.onmessage = (e) => this.apply(JSON.parse(e.data) as FeedEvent);
+    this.source.onmessage = (e) => {
+      const event = JSON.parse(e.data) as FeedEvent;
+      if (this.reloading) this.held.push(event);
+      else this.apply(event);
+    };
   }
 
   /** Marks that something was asked of Claude, so Home and the class can say so until the session starts. */
@@ -82,6 +105,18 @@ class LiveFeed {
     const topic = (await res.json()) as Topic;
     this.topics[slug] = topic;
     return topic;
+  }
+
+  /** Summaries of every session, newest first: one request shared by every page that asks before anything changes. */
+  sessions(): Promise<SessionSummary[]> {
+    if (!this.sessionList) {
+      const list = getJson<SessionSummary[]>('/api/sessions');
+      this.sessionList = list;
+      list.catch(() => {
+        if (this.sessionList === list) this.sessionList = null;
+      });
+    }
+    return this.sessionList;
   }
 
   /**
@@ -124,77 +159,194 @@ class LiveFeed {
     const i = this.items.findIndex((x) => x.id === item.id);
     if (i === -1) this.items.push(item);
     else this.items[i] = item;
+    this.changed();
   }
 
+  /**
+   * Everything at once: fetched side by side and put in place in one go, so pages go from "loading" to the whole
+   * picture without passing through empty states. Events that arrive meanwhile are applied after it, in order, so
+   * an older snapshot never overwrites them.
+   */
   private async reload() {
-    const state = await getJson<FeedState>('/api/state');
-    this.session = state.session;
-    this.items = state.items;
-    this.connected = true;
-    const topics = await getJson<Topic[]>('/api/map');
-    const roadmaps = await getJson<Roadmap[]>('/api/roadmaps');
-    const missions = await getJson<Mission[]>('/api/missions');
-    this.glosses = await getJson<Gloss[]>('/api/glosses');
-    this.asides = await getJson<Aside[]>('/api/asides');
-    this.notes = await getJson<StepNote[]>('/api/notes');
-    this.about = (await getJson<{ text: string }>('/api/about')).text;
-    // Chats already open are read again, so nothing said while disconnected is missed.
-    for (const t of Object.keys(this.chats)) this.chats[t] = await getJson<ChatMessage[]>(`/api/chats/${encodeURIComponent(t)}`);
-    this.topics = Object.fromEntries(topics.map((t) => [t.slug, t]));
-    this.roadmaps = Object.fromEntries(roadmaps.map((r) => [r.slug, r]));
-    this.missions = Object.fromEntries(missions.map((m) => [m.id, m]));
-    this.loaded = true;
-    this.topicVersion++;
+    if (this.reloading) {
+      this.again = true;
+      return;
+    }
+    this.reloading = true;
+    this.again = false;
+    this.held = [];
+    this.sessionList = null;
+    try {
+      const threads = Object.keys(this.chats);
+      const [state, topics, roadmaps, missions, glosses, asides, notes, about, chats] = await Promise.all([
+        getJson<FeedState>('/api/state'),
+        getJson<Topic[]>('/api/map'),
+        getJson<Roadmap[]>('/api/roadmaps'),
+        getJson<Mission[]>('/api/missions'),
+        getJson<Gloss[]>('/api/glosses'),
+        getJson<Aside[]>('/api/asides'),
+        getJson<StepNote[]>('/api/notes'),
+        getJson<{ text: string }>('/api/about'),
+        // Chats already open are read again, so nothing said while disconnected is missed.
+        Promise.all(threads.map((t) => getJson<ChatMessage[]>(`/api/chats/${encodeURIComponent(t)}`))),
+      ]);
+      this.session = state.session;
+      this.items = state.items;
+      this.warnings = state.warnings ?? [];
+      this.topics = Object.fromEntries(topics.map((t) => [t.slug, t]));
+      this.roadmaps = Object.fromEntries(roadmaps.map((r) => [r.slug, r]));
+      this.missions = Object.fromEntries(missions.map((m) => [m.id, m]));
+      this.glosses = glosses;
+      this.asides = asides;
+      this.notes = notes;
+      this.about = about.text;
+      for (const [i, t] of threads.entries()) this.chats[t] = chats[i];
+      this.connected = true;
+      this.loaded = true;
+      this.topicVersion++;
+    } catch {
+      // The server went away mid-load; the next connection loads again.
+    } finally {
+      this.reloading = false;
+      const held = this.held;
+      this.held = [];
+      for (const event of held) this.apply(event);
+      clearTimeout(this.settleTimer);
+      this.settled++;
+      if (this.again) void this.reload();
+    }
+  }
+
+  /** A topic, the session or an item changed: summaries are stale, and pages refetch once the feed settles. */
+  private changed() {
+    this.sessionList = null;
+    clearTimeout(this.settleTimer);
+    this.settleTimer = setTimeout(() => this.settled++, SETTLE_MS);
   }
 
   private apply(event: FeedEvent) {
-    if (event.type === 'session') {
-      const changed = event.session.id !== this.session?.id;
-      this.session = event.session;
-      if (changed) {
-        this.items = [];
-        this.starting = null;
-        if (event.session.topicSlug && !this.topics[event.session.topicSlug]) void this.loadTopic(event.session.topicSlug);
+    switch (event.type) {
+      case 'session': {
+        const changed = event.session.id !== this.session?.id;
+        this.session = event.session;
+        if (changed) {
+          this.items = [];
+          this.starting = null;
+          if (event.session.topicSlug && !this.topics[event.session.topicSlug]) void this.loadTopic(event.session.topicSlug);
+        }
+        this.changed();
+        break;
       }
-    } else if (event.type === 'topic') {
-      this.topics[event.topic.slug] = event.topic;
-      this.topicVersion++;
-    } else if (event.type === 'roadmap') {
-      this.roadmaps = { ...this.roadmaps, [event.roadmap.slug]: event.roadmap };
-    } else if (event.type === 'mission') {
-      this.missions = { ...this.missions, [event.mission.id]: event.mission };
-    } else if (event.type === 'glosses') {
-      this.glosses = event.glosses;
-    } else if (event.type === 'asides') {
-      this.asides = event.asides;
-    } else if (event.type === 'notes') {
-      this.notes = event.notes;
-    } else if (event.type === 'about') {
-      this.about = event.about;
-    } else if (event.type === 'chat') {
-      const list = this.chats[event.thread];
-      if (list && !list.some((m) => m.id === event.message.id)) list.push(event.message);
-      if (event.message.role === 'assistant') delete this.chatDrafts[event.thread];
-    } else if (event.type === 'chat-cleared') {
-      this.chats[event.thread] = [];
-      delete this.chatDrafts[event.thread];
-    } else if (event.type === 'chat-delta') {
-      const draft = this.chatDrafts[event.thread];
-      const before = draft?.id === event.id ? draft.text : '';
-      this.chatDrafts[event.thread] = { id: event.id, text: event.text ?? before + (event.delta ?? '') };
-    } else if (event.type === 'item') {
-      this.upsert(event.item);
+      case 'topic':
+        this.topics[event.topic.slug] = event.topic;
+        this.topicVersion++;
+        this.changed();
+        break;
+      case 'item':
+        this.upsert(event.item);
+        break;
+      case 'roadmap':
+        this.roadmaps = { ...this.roadmaps, [event.roadmap.slug]: event.roadmap };
+        break;
+      case 'mission':
+        this.missions = { ...this.missions, [event.mission.id]: event.mission };
+        break;
+      case 'warnings':
+        this.warnings = event.warnings;
+        break;
+      case 'gloss':
+        put(this.glosses, event.gloss, (g) => g.id === event.gloss.id);
+        break;
+      case 'gloss-removed':
+        this.glosses = this.glosses.filter((g) => g.id !== event.id);
+        break;
+      case 'aside':
+        put(this.asides, event.aside, (a) => a.id === event.aside.id);
+        break;
+      case 'aside-removed':
+        this.asides = this.asides.filter((a) => a.id !== event.id);
+        break;
+      case 'note':
+        put(this.notes, event.note, (n) => n.topic === event.note.topic && n.step === event.note.step);
+        break;
+      case 'note-removed':
+        this.notes = this.notes.filter((n) => !(n.topic === event.topic && n.step === event.step));
+        break;
+      // The whole lists, as older servers send them.
+      case 'glosses':
+        this.glosses = event.glosses;
+        break;
+      case 'asides':
+        this.asides = event.asides;
+        break;
+      case 'notes':
+        this.notes = event.notes;
+        break;
+      case 'about':
+        this.about = event.about;
+        break;
+      case 'chat': {
+        const list = this.chats[event.thread];
+        if (list && !list.some((m) => m.id === event.message.id)) list.push(event.message);
+        if (event.message.role === 'assistant') delete this.chatDrafts[event.thread];
+        break;
+      }
+      case 'chat-cleared':
+        this.chats[event.thread] = [];
+        delete this.chatDrafts[event.thread];
+        break;
+      case 'chat-delta': {
+        // `delta` is appended to the answer it belongs to (a new id starts a new one); `text`, the whole text so
+        // far, is what older servers send.
+        const draft = this.chatDrafts[event.thread];
+        const before = draft?.id === event.id ? draft.text : '';
+        const text = event.delta !== undefined ? before + event.delta : (event.text ?? before);
+        this.chatDrafts[event.thread] = { id: event.id, text };
+        break;
+      }
     }
   }
 }
 
 export const feed = new LiveFeed();
 
+/**
+ * For a page showing something the server works out from the record (sessions, progress, the review queue): loads
+ * it now, and again each time the feed settles after a change. An older answer arriving late never replaces a newer one.
+ * Call it while the component is being set up.
+ */
+export function refetching<T>(load: () => Promise<T>, apply: (value: T) => void) {
+  let asked = 0;
+  $effect(() => {
+    void feed.settled;
+    const mine = ++asked;
+    untrack(load).then(
+      (value) => {
+        if (mine === asked) apply(value);
+      },
+      () => {
+        // Offline for a moment: the next change asks again.
+      },
+    );
+  });
+}
+
 /** Summaries of every session on a topic, newest first. */
 export async function topicSessions(slug: string): Promise<SessionSummary[]> {
-  return (await getJson<SessionSummary[]>('/api/sessions')).filter((s) => s.topicSlug === slug);
+  // The server filters by topic; filtering here too keeps this right against a server that doesn't yet.
+  const all = await getJson<SessionSummary[]>(`/api/sessions?topic=${encodeURIComponent(slug)}`);
+  return all.filter((s) => s.topicSlug === slug);
+}
+
+/** Replaces the record that `same` finds in a live list, or adds it at the end. */
+function put<T>(list: T[], record: T, same: (x: T) => boolean) {
+  const i = list.findIndex(same);
+  if (i === -1) list.push(record);
+  else list[i] = record;
 }
 
 async function getJson<T>(url: string): Promise<T> {
-  return (await (await fetch(url)).json()) as T;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`${url}: ${res.status}`);
+  return (await res.json()) as T;
 }

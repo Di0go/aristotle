@@ -144,7 +144,9 @@
 
   <div class="scroll">
     {#if !feed.loaded}
-      <p class="note">Loading…</p>
+      <div class="sk-tree" aria-busy="true" aria-label="Loading the library">
+        {#each ['w60', 'w75', 'w60', 'w45', 'w75', 'w60'] as w, i (i)}<span class="sk {w}" class:indent={i % 3 !== 0}></span>{/each}
+      </div>
     {:else if roadmaps.length === 0 && loose.length === 0}
       <p class="note">Nothing here yet. Plan a course or start a class and it shows up here.</p>
     {/if}
@@ -264,6 +266,16 @@
     margin: 6px 8px;
     color: var(--faint);
     line-height: 1.5;
+  }
+
+  .sk-tree {
+    display: grid;
+    gap: 14px;
+    padding: 8px 10px;
+  }
+
+  .sk-tree .indent {
+    margin-left: 18px;
   }
 
   .sec {

@@ -1,4 +1,6 @@
 <script lang="ts" module>
+  // Renders lesson Markdown and brings it to life: mermaid diagrams, sequences, explorables and the visual kit's figures.
+
   /** Diagrams drawn so far, by look (theme and accent) and source, so a step revisited shows them at once. */
   const diagrams = new Map<string, string>();
   /** The look Mermaid was last set up for. */
@@ -8,7 +10,6 @@
 </script>
 
 <script lang="ts">
-  // Renders lesson Markdown and brings it to life: mermaid diagrams, sequences, explorables and the visual kit's figures.
   import { getContext, mount, unmount } from 'svelte';
   import { EXPLORABLES, explorable } from './explorables/index.ts';
   import { feed } from './feed.svelte.ts';

@@ -151,6 +151,16 @@
   margin: -64px 0 64px;
 }
 
+/* An entry that could not be shown (FeedList's boundary): said quietly, in its place. */
+.entry-failed {
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px dashed var(--rule-strong);
+  border-radius: var(--radius-lg);
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
 /* A map note that opens a list has nothing above it to tuck under. */
 .notebook > .entry-map:first-child {
   margin-top: 0;
@@ -510,12 +520,6 @@ textarea.note {
   margin-bottom: 26px;
 }
 
-.bench-row {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-}
-
 .bench-title {
   margin: 0 0 8px;
   font-size: 0.75rem;
@@ -530,40 +534,6 @@ textarea.note {
 
 .bench-title a:hover {
   color: var(--fg);
-}
-
-.bench-count {
-  font-size: 0.75rem;
-  color: var(--faint);
-}
-
-.now-label {
-  margin: 0;
-  font-size: 0.98rem;
-  font-weight: 600;
-}
-
-.now-label a {
-  color: var(--fg);
-}
-
-.now-summary {
-  margin: 4px 0 0;
-  color: var(--fg-2);
-  line-height: 1.55;
-}
-
-.now-deps {
-  margin: 8px 0 0;
-  color: var(--faint);
-  font-size: 0.82rem;
-}
-
-.graph-box {
-  padding: 8px 6px 4px;
-  background: var(--b0);
-  border: 1px solid var(--rule);
-  border-radius: 8px;
 }
 
 .plan,
@@ -605,16 +575,6 @@ textarea.note {
 .route li a {
   border: 0;
   padding: 2px 0;
-}
-
-.route-step.here a {
-  color: var(--fg);
-  font-weight: 500;
-}
-
-.route-step.here .dot {
-  border-color: var(--acc);
-  background: var(--acc);
 }
 
 .plan .mark {
