@@ -69,6 +69,8 @@ export async function start(): Promise<boolean> {
       cwd: ROOT,
       detached: true,
       stdio: ['ignore', log, log],
+      // Node keeps the compiled server in the state folder: a restart starts about a third faster.
+      env: { ...process.env, NODE_COMPILE_CACHE: path.join(STATE_DIR, 'compile-cache') },
     }).unref();
   }
   for (let i = 0; i < 50; i++) {

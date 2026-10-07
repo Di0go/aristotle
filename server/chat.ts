@@ -1,16 +1,18 @@
 // The chat beside a lesson: he talks with Aristotle (a second Claude Code on his own login, beside the tutor) while
 // he reads, about anything. Each message carries what he is looking at, so it always knows where he is; it answers
 // at once even while a question waits for him, and never moves the lesson. One conversation per class (and one for
-// everywhere else), kept in data/chats/<thread>.json and continued as one Claude Code session; the tutor reads it.
+// everywhere else), kept in data/chats/<thread>.jsonl (appended to, never rewritten) and continued as one Claude Code
+// session; the tutor reads it.
 
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { EventEmitter } from 'node:events';
+import { readdir } from 'node:fs/promises';
 import path from 'node:path';
 import { CHATS_DIR, ONESHOT_CMD } from './config.ts';
 import { claudeCwd, claudeEnv, headlessArgs, limited } from './oneshot.ts';
 import { slugCandidates, slugify } from './slug.ts';
-import { isObject, loadJsonDir, WriteQueue, writeJson } from './store.ts';
+import { AppendLog, endLastLine, isObject, loadJsonDir, readLog } from './store.ts';
 import type { ChatMessage, ChatThread } from '../shared/types.ts';
 
 const TIMEOUT_MS = 180_000;
@@ -32,6 +34,9 @@ const SYSTEM =
 
 export class ChatError extends Error {}
 
+/** One line of a chat's log: a message, the Claude Code session it continues, or the chat started over. */
+type ChatOp = { op: 'message'; message: ChatMessage } | { op: 'session'; session?: string } | { op: 'clear' };
+
 /** A message as it streams: the thread, the answer's id, and the text added since the last delta. */
 export interface ChatDelta {
   thread: string;
@@ -44,12 +49,28 @@ export class Chats {
   private busy = new Set<string>();
   /** The Claude Code answering in each thread right now, so he can stop it. */
   private running = new Map<string, { kill: () => void; stopped: boolean }>();
-  private queue = new WriteQueue();
+  private log = new AppendLog('A chat');
   readonly events = new EventEmitter<{ message: [string, ChatMessage]; delta: [ChatDelta]; cleared: [string] }>();
 
+  /** Each chat: its log replayed, on top of the whole-file <thread>.json chats were kept in before (never rewritten). */
   static async load(): Promise<Chats> {
     const store = new Chats();
     for (const t of await loadJsonDir(CHATS_DIR, isThread)) store.threads.set(t.thread, t);
+    for (const name of (await readdir(CHATS_DIR)).filter((f) => f.endsWith('.jsonl'))) {
+      const file = path.join(CHATS_DIR, name);
+      await endLastLine(file);
+      const id = name.slice(0, -'.jsonl'.length);
+      const t = store.threads.get(id) ?? { thread: id, messages: [] };
+      for (const op of (await readLog(file)) as ChatOp[]) {
+        if (op.op === 'message') t.messages.push(op.message);
+        else if (op.op === 'session') t.session = op.session;
+        else if (op.op === 'clear') {
+          t.messages = [];
+          t.session = undefined;
+        }
+      }
+      store.threads.set(id, t);
+    }
     return store;
   }
 
@@ -60,7 +81,7 @@ export class Chats {
 
   /** Resolves once every write queued so far has finished. */
   idle(): Promise<void> {
-    return this.queue.idle();
+    return this.log.idle();
   }
 
   /** The id a thread is kept under: its slug now, or before Unicode slugs if it was started then. */
@@ -85,7 +106,7 @@ export class Chats {
     this.cancel(id);
     const t: ChatThread = { thread: id, messages: [] };
     this.threads.set(id, t);
-    await this.write(t);
+    await this.write(id, { op: 'clear' });
     this.events.emit('cleared', id);
   }
 
@@ -109,7 +130,8 @@ export class Chats {
       };
       t.messages.push(mine);
       this.events.emit('message', id, mine);
-      await this.write(t);
+      await this.write(id, { op: 'message', message: mine });
+      const sessionBefore = t.session;
 
       const answerId = randomUUID();
       const request = `${context.slice(0, MAX_CONTEXT)}\n\nTheir message: ${body}`;
@@ -136,7 +158,8 @@ export class Chats {
       if (this.threads.get(id) !== t) return theirs;
       t.messages.push(theirs);
       this.events.emit('message', id, theirs);
-      await this.write(t);
+      if (t.session !== sessionBefore) await this.write(id, { op: 'session', session: t.session });
+      await this.write(id, { op: 'message', message: theirs });
       return theirs;
     } finally {
       this.busy.delete(id);
@@ -217,9 +240,9 @@ export class Chats {
     });
   }
 
-  /** Atomic write, one at a time per thread (store.ts). */
-  private async write(t: ChatThread) {
-    await this.queue.run(t.thread, () => writeJson(path.join(CHATS_DIR, `${t.thread}.json`), t));
+  /** Appends one change to the thread's log (store.ts AppendLog). */
+  private write(thread: string, op: ChatOp): Promise<void> {
+    return this.log.append(path.join(CHATS_DIR, `${thread}.jsonl`), op);
   }
 }
 

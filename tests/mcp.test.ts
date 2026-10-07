@@ -1093,3 +1093,30 @@ test('for the tutor in the drawer, the core tools are always loaded; elsewhere t
   const elsewhere = await list({});
   assert.equal(elsewhere.find((t) => t.name === 'quiz')?._meta?.['anthropic/alwaysLoad'], undefined);
 });
+
+test('a chat is an append-only log, read on top of a chat kept the old way', async () => {
+  const say = (thread: string, text: string) =>
+    fetch(`${BASE}/api/chats/${thread}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text }),
+    });
+  // A chat from before: one whole JSON file.
+  await writeFile(
+    path.join(dataDir, 'chats', 'old-chat.json'),
+    JSON.stringify({ thread: 'old-chat', messages: [{ id: 'a', role: 'user', text: 'Before', at: '2026-01-01T00:00:00.000Z' }] }),
+  );
+  await restart();
+  assert.equal((await say('old-chat', 'After')).status, 200);
+  await restart();
+  assert.deepEqual(
+    (await get<ChatMessage[]>('/api/chats/old-chat')).map((m) => m.role),
+    ['user', 'user', 'assistant'],
+  );
+  const files = await readdir(path.join(dataDir, 'chats'));
+  assert.ok(files.includes('old-chat.json') && files.includes('old-chat.jsonl'), 'the old file is never rewritten');
+  // Starting over is one more line, and holds across a restart.
+  await fetch(`${BASE}/api/chats/old-chat`, { method: 'DELETE' });
+  await restart();
+  assert.deepEqual(await get<ChatMessage[]>('/api/chats/old-chat'), []);
+});

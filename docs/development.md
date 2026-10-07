@@ -76,6 +76,8 @@ The single commands: `pnpm lint` (read only: Biome lints and checks the formatti
 
 `pnpm serve` runs the server in the foreground, for debugging it on its own.
 
+The server keeps its compiled code in Node's compile cache (`NODE_COMPILE_CACHE`): in the state folder when the service, `pnpm app` or the bridge starts it (emptied at every install of the service, so at every release), and in `.dev/state` for `pnpm dev`, which restarts it on every save.
+
 ## Docs
 
 `pnpm docs:gen` rewrites the generated parts of these docs from the code (see [docs/README.md](README.md#how-these-docs-stay-true)). You rarely run it by hand: the pre-commit hook and the Claude Code Stop hook do.

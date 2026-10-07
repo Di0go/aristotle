@@ -4,7 +4,7 @@
 // isn't the right shape is set aside (renamed, never deleted) and reported as a warning (warnings.ts), so one bad file
 // never stops the server and is never overwritten.
 
-import { mkdir, readdir, readFile, rename, writeFile } from 'node:fs/promises';
+import { appendFile, mkdir, open, readdir, readFile, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { DATA_DIR } from './config.ts';
 import { warnings } from './warnings.ts';
@@ -27,6 +27,83 @@ export class WriteQueue {
   /** Resolves once every job queued so far has finished. */
   async idle(): Promise<void> {
     await Promise.all(this.tails.values());
+  }
+}
+
+/**
+ * Append-only logs (JSON Lines): one append at a time per file, and a line that fails to append is kept and written
+ * with the next one, so the file catches up with memory as soon as the disk takes writes again. `warning` is said
+ * while appends fail; `written` hears of each file appended to.
+ */
+export class AppendLog {
+  private queue = new WriteQueue();
+  private unsaved = new Map<string, string[]>();
+  private warning: string;
+  private written: (file: string) => void;
+
+  constructor(warning: string, written: (file: string) => void = () => {}) {
+    this.warning = warning;
+    this.written = written;
+  }
+
+  /** Appends `value` as one line of `file`; rejects if the disk refuses (the line is kept for the next append). */
+  append(file: string, value: unknown): Promise<void> {
+    const pending = this.unsaved.get(file) ?? [];
+    pending.push(JSON.stringify(value));
+    this.unsaved.set(file, pending);
+    return this.queue.run(file, async () => {
+      const lines = this.unsaved.get(file);
+      if (!lines?.length) return;
+      const count = lines.length;
+      try {
+        await mkdir(path.dirname(file), { recursive: true });
+        await appendFile(file, `${lines.join('\n')}\n`);
+      } catch (err) {
+        warnings.set(`log:${this.warning}`, `${this.warning} could not be saved (${(err as Error).message}); kept in memory and retried.`);
+        throw err;
+      }
+      lines.splice(0, count);
+      this.written(file);
+      warnings.set(`log:${this.warning}`, undefined);
+    });
+  }
+
+  /** Resolves once every append queued so far has finished. */
+  idle(): Promise<void> {
+    return this.queue.idle();
+  }
+}
+
+/**
+ * The values in a JSON Lines file, oldest first, skipping a line that doesn't parse (torn by a crash). A last line
+ * without its newline is ended, so the next append starts a line of its own instead of being glued to it.
+ */
+export async function readLog(file: string): Promise<unknown[]> {
+  const out: unknown[] = [];
+  const lines = (await readFile(file, 'utf8')).split('\n');
+  for (const [i, line] of lines.entries()) {
+    if (!line) continue;
+    try {
+      out.push(JSON.parse(line));
+    } catch {
+      console.error(`${new Date().toISOString()} Skipped unreadable line ${i + 1} of ${path.basename(file)}`);
+    }
+  }
+  return out;
+}
+
+/** Ends a log whose last line has no newline (a crash mid-append), so the next line is a line of its own. */
+export async function endLastLine(file: string) {
+  const handle = await open(file, 'r+').catch(() => null);
+  if (!handle) return;
+  try {
+    const { size } = await handle.stat();
+    if (size === 0) return;
+    const last = Buffer.alloc(1);
+    await handle.read(last, 0, 1, size - 1);
+    if (last[0] !== 0x0a) await handle.write('\n', size);
+  } finally {
+    await handle.close();
   }
 }
 

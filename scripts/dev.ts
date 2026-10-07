@@ -28,7 +28,14 @@ if (process.argv[2] === 'snapshot') {
 // pnpm dev: the demo library on first run, then the server and Vite side by side.
 await seed();
 
-const env = { ...process.env, ARISTOTLE_INSTANCE: 'dev', ARISTOTLE_PORT: PORT, ARISTOTLE_VITE_PORT: VITE_PORT };
+const env = {
+  ...process.env,
+  ARISTOTLE_INSTANCE: 'dev',
+  ARISTOTLE_PORT: PORT,
+  ARISTOTLE_VITE_PORT: VITE_PORT,
+  // The server restarts on every save: Node keeps it compiled between restarts.
+  NODE_COMPILE_CACHE: path.join(ROOT, '.dev/state/compile-cache'),
+};
 const children: ChildProcess[] = [
   spawn(process.execPath, ['--watch', '--watch-preserve-output', 'server/index.ts'], { cwd: ROOT, env, stdio: 'inherit' }),
   spawn(process.execPath, ['node_modules/vite/bin/vite.js'], { cwd: ROOT, env, stdio: 'inherit' }),

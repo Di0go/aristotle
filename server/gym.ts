@@ -12,6 +12,7 @@ import { Notes } from './notes.ts';
 import { Chats } from './chat.ts';
 import type { Outcome } from './reviews.ts';
 import { Roadmaps } from './roadmaps.ts';
+import { type Doc, indexSession } from './search.ts';
 import { slugify } from './slug.ts';
 import { leanTopic, Topics, type ConceptInput } from './topics.ts';
 import { warnings } from './warnings.ts';
@@ -55,8 +56,17 @@ export class Gym {
   readonly notes: Notes;
   readonly chats: Chats;
   readonly backup = new Backup();
-  private summaries = new SessionCache((record) => summarizeSession(record));
-  private statusChanges = new SessionCache((record) => statusChanges(record));
+  /**
+   * What each session log yields, worked out once per version of the log (one read for all three): its summary for
+   * the session lists, its map changes for Progress, and its documents for search.
+   */
+  private sessions = new SessionCache((record, id) => ({
+    summary: summarizeSession(record),
+    changes: statusChanges(record),
+    docs: indexSession(id, record),
+  }));
+  /** Bumped by every change to a topic, roadmap or mission, so search knows when its library is out of date. */
+  libraryVersion = 0;
 
   constructor(
     feed: Feed,
@@ -78,6 +88,9 @@ export class Gym {
     this.chats = chats;
     // Each tab keeps a live connection that listens here.
     feed.events.setMaxListeners(0);
+    topics.events.on('topic', () => this.libraryVersion++);
+    roadmaps.events.on('roadmap', () => this.libraryVersion++);
+    missions.events.on('mission', () => this.libraryVersion++);
     topics.events.on('topic', (topic) => feed.events.emit('event', { type: 'topic', topic: leanTopic(topic) }));
     roadmaps.events.on('roadmap', (roadmap) => feed.events.emit('event', { type: 'roadmap', roadmap }));
     missions.events.on('mission', (mission) => feed.events.emit('event', { type: 'mission', mission }));
@@ -330,8 +343,21 @@ export class Gym {
 
   /** Every session (or a topic's), newest first. */
   async listSessions(topicSlug?: string): Promise<SessionSummary[]> {
-    const summaries = await this.summaries.values();
-    return summaries.filter((s): s is SessionSummary => s !== null && (!topicSlug || s.topicSlug === topicSlug)).reverse();
+    const entries = await this.sessions.values();
+    return entries
+      .map((e) => e.summary)
+      .filter((s): s is SessionSummary => s !== null && (!topicSlug || s.topicSlug === topicSlug))
+      .reverse();
+  }
+
+  /** The search documents of every session, oldest first. */
+  async sessionDocs(): Promise<Doc[]> {
+    return (await this.sessions.values()).flatMap((e) => e.docs);
+  }
+
+  /** Reads every session log into the index, a few at a time, so the first Home, Progress or search after a start is quick. */
+  async warm(): Promise<void> {
+    await this.sessions.values();
   }
 
   /** A whole session by id; null for an unknown or malformed id. */
@@ -366,12 +392,16 @@ export class Gym {
   private async solidOverTime(): Promise<Progress['solid']> {
     const status = new Map<string, string>();
     const byDay = new Map<string, number>();
-    const changes = (await this.statusChanges.values()).flat();
+    const changes = (await this.sessions.values()).flatMap((e) => e.changes);
     changes.sort((a, b) => a.at.localeCompare(b.at));
+    // A running count: recounting every status at every change grew with the square of the history.
+    let solid = 0;
     for (const c of changes) {
+      const was = status.get(c.key);
       if (c.removed) status.delete(c.key);
       else if (c.to) status.set(c.key, c.to);
-      byDay.set(localDay(c.at), [...status.values()].filter((s) => s === 'solid').length);
+      solid += (status.get(c.key) === 'solid' ? 1 : 0) - (was === 'solid' ? 1 : 0);
+      byDay.set(localDay(c.at), solid);
     }
     // The maps are the truth for today, including any change made outside a session.
     byDay.set(
@@ -438,14 +468,33 @@ function append<T>(map: Map<string, T[]>, key: string, value: T) {
 
 /** YYYY-MM-DD in local time. */
 function localDay(iso: string): string {
-  const d = new Date(iso);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  return memo(days, iso, () => {
+    const d = new Date(iso);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  });
 }
 
 /** The Monday starting the week of `iso`, as YYYY-MM-DD in local time. */
 function weekOf(iso: string): string {
-  const d = new Date(iso);
-  d.setHours(12, 0, 0, 0);
-  d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
-  return localDay(d.toISOString());
+  return memo(weeks, iso, () => {
+    const d = new Date(iso);
+    d.setHours(12, 0, 0, 0);
+    d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+    return localDay(d.toISOString());
+  });
+}
+
+// Years of evidence fall in a few thousand distinct minutes: work each one out once. (By the minute, not the hour or
+// the day: every time zone's offset is a whole number of minutes.)
+const days = new Map<string, string>();
+const weeks = new Map<string, string>();
+function memo(cache: Map<string, string>, iso: string, work: () => string): string {
+  const key = iso.slice(0, 16);
+  let value = cache.get(key);
+  if (value === undefined) {
+    value = work();
+    if (cache.size > 200_000) cache.clear();
+    cache.set(key, value);
+  }
+  return value;
 }

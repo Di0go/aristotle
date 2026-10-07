@@ -23,6 +23,12 @@ for var in ARISTOTLE_DATA_DIR ARISTOTLE_STATE_DIR; do
   if [[ -n "${!var:-}" ]]; then EXTRA_ENV+="Environment=$var=${!var}"$'\n'; fi
 done
 
+# Node keeps the compiled server here, so a restart starts about a third faster. Emptied on every install (each
+# release), so it never fills with entries for code that no longer runs.
+CACHE="${ARISTOTLE_STATE_DIR:-$ROOT/.aristotle}/compile-cache"
+rm -rf "$CACHE"
+mkdir -p -m 700 "$CACHE"
+
 cat > "$UNIT_DIR/aristotle.service" <<UNIT
 [Unit]
 Description=Aristotle (https://aristotle.test)
@@ -34,6 +40,7 @@ Restart=on-failure
 RestartSec=2
 # Claude Code lives in ~/.local/bin; a service doesn't get the login shell's PATH.
 Environment=PATH=$HOME/.local/bin:$(dirname "$NODE"):/usr/local/bin:/usr/bin:/bin
+Environment=NODE_COMPILE_CACHE=$CACHE
 ${EXTRA_ENV}
 [Install]
 WantedBy=default.target

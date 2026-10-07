@@ -66,7 +66,7 @@ Quiz items keep the right answers and explanations; the interface only receives 
 
 ## Chats
 
-`chats/<thread>.json` is a `ChatThread`: the thread (a class's slug, or `home`), the Claude Code session it continues, and its messages (his and Aristotle's, with when; his keep what he tagged with `@`, an answer he stopped is marked). Clearing a chat empties it and forgets its session. Rewritten whole and atomically after each message ([`chat.ts`](../server/chat.ts)).
+`chats/<thread>.jsonl` is a chat's log, appended to and never rewritten ([`chat.ts`](../server/chat.ts)): one JSON object per line, `{"op":"message","message":…}` (his or Aristotle's, with when; his keep what he tagged with `@`, an answer he stopped is marked), `{"op":"session","session":…}` (the Claude Code session it continues, or none) and `{"op":"clear"}` (started over). The thread is a class's slug, or `home`. A chat from before logs were used is a whole `chats/<thread>.json` (a `ChatThread`); it is still read, never rewritten, and its log, if any, applies on top of it. The interface loads a chat's newest 300 messages.
 
 ## Backup
 

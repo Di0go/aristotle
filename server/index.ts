@@ -47,6 +47,8 @@ const terminal = new Terminal();
 // A drawer's messages are keystrokes and resizes: a megabyte is plenty. A handful of tabs at once, no more.
 const sockets = new WebSocketServer({ noServer: true, maxPayload: 1024 * 1024 });
 const MAX_TERMINAL_CLIENTS = 8;
+/** How many of a chat's messages the interface loads. */
+const CHAT_PAGE = 300;
 /** This user: connections from other accounts on the machine are refused (peer.ts). */
 const UID = process.getuid?.();
 
@@ -290,7 +292,8 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ro
   }
 
   // The chat beside a lesson: his message, with where he is; the answer streams over the live feed as it is written.
-  if (req.method === 'GET' && route.startsWith('/api/chats/')) return json(res, 200, gym.chats.get(tail('/api/chats/')));
+  // A chat's newest messages: years of one chat would be megabytes the panel never scrolls back through.
+  if (req.method === 'GET' && route.startsWith('/api/chats/')) return json(res, 200, gym.chats.get(tail('/api/chats/')).slice(-CHAT_PAGE));
   if (req.method === 'DELETE' && route.startsWith('/api/chats/')) {
     // DELETE /api/chats/<thread>/answer stops the answer being written; DELETE /api/chats/<thread> clears the chat.
     const rest = tail('/api/chats/');
@@ -504,7 +507,11 @@ server6.on('error', (err: NodeJS.ErrnoException) => {
 server.listen(PORT, HOST, () => {
   mkdirSync(path.dirname(PID_FILE), { recursive: true });
   writeFileSync(PID_FILE, String(process.pid));
-  setImmediate(() => void mcpModules());
+  setImmediate(() => {
+    void mcpModules();
+    // Every session log read into the index now, a few at a time, rather than on the first Home, Progress or search.
+    void gym.warm();
+  });
   console.log(`${new Date().toISOString()} Aristotle (${INSTANCE}) running at ${URL_CLEAN} (http://localhost:${PORT})`);
 });
 tls?.listen(TLS_PORT, HOST);

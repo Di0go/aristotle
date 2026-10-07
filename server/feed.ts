@@ -3,11 +3,11 @@
 
 import { randomUUID } from 'node:crypto';
 import { EventEmitter } from 'node:events';
-import { appendFile, mkdir, open, readdir, readFile, stat } from 'node:fs/promises';
+import { mkdir, readdir } from 'node:fs/promises';
 import path from 'node:path';
 import { SESSIONS_DIR } from './config.ts';
 import { slugify } from './slug.ts';
-import { WriteQueue } from './store.ts';
+import { AppendLog, endLastLine, readLog } from './store.ts';
 import { warnings } from './warnings.ts';
 import {
   isInteractive,
@@ -50,18 +50,13 @@ export class AnswerError extends Error {}
 /** A gap between events longer than this means he was away. */
 const IDLE_MS = 15 * 60_000;
 
-/** Rebuilds a session from its log file. */
+/** Rebuilds a session from its log file; a line torn by a crash is skipped (store.ts readLog). */
 export async function readSession(file: string): Promise<SessionRecord> {
   const state: SessionRecord = { session: null, items: [] };
-  const lines = (await readFile(file, 'utf8')).split('\n');
-  for (const [i, line] of lines.entries()) {
-    if (!line) continue;
+  for (const op of await readLog(file)) {
     try {
-      applyOp(state, JSON.parse(line) as Op);
-    } catch {
-      // A torn line from a crash: skip it, keep the rest.
-      console.error(`${new Date().toISOString()} Skipped unreadable line ${i + 1} of ${path.basename(file)}`);
-    }
+      applyOp(state, op as Op);
+    } catch {}
   }
   return state;
 }
@@ -110,9 +105,19 @@ export function publicItem(item: Item): PublicItem {
   };
 }
 
-/** Something worked out from every session log, kept until that log changes (by its modification time). */
+/**
+ * How many times each session log has been appended to since the server started. The server is the only writer of
+ * data/, and Feed bumps this on every append, so a cache can tell what changed without asking the disk (one stat per
+ * log per request was most of the time spent on years of history).
+ */
+const logVersions = new Map<string, number>();
+
+/** How many session logs are read at once when a cache fills, between which other requests get their turn. */
+const READ_BATCH = 32;
+
+/** Something worked out from every session log, kept until that log is appended to. */
 export class SessionCache<T> {
-  private entries = new Map<string, { mtime: number; value: T }>();
+  private entries = new Map<string, { version: number; value: T }>();
   private derive: (record: SessionRecord, id: string) => T;
 
   constructor(derive: (record: SessionRecord, id: string) => T) {
@@ -121,16 +126,27 @@ export class SessionCache<T> {
 
   /** One value per session, oldest first. */
   async values(): Promise<T[]> {
-    const out: T[] = [];
-    for (const name of await sessionFiles()) {
+    const names = await sessionFiles();
+    const out: T[] = new Array(names.length);
+    const stale: number[] = [];
+    for (const [i, name] of names.entries()) {
       const file = path.join(SESSIONS_DIR, name);
-      const mtime = (await stat(file)).mtimeMs;
-      let cached = this.entries.get(file);
-      if (!cached || cached.mtime !== mtime) {
-        cached = { mtime, value: this.derive(await readSession(file), name.replace(/\.jsonl$/, '')) };
-        this.entries.set(file, cached);
-      }
-      out.push(cached.value);
+      const cached = this.entries.get(file);
+      if (cached && cached.version === (logVersions.get(file) ?? 0)) out[i] = cached.value;
+      else stale.push(i);
+    }
+    // The logs not read yet (all of them, the first time), a batch at a time, yielding in between.
+    for (let at = 0; at < stale.length; at += READ_BATCH) {
+      await Promise.all(
+        stale.slice(at, at + READ_BATCH).map(async (i) => {
+          const file = path.join(SESSIONS_DIR, names[i]);
+          const version = logVersions.get(file) ?? 0;
+          const value = this.derive(await readSession(file), names[i].replace(/\.jsonl$/, ''));
+          this.entries.set(file, { version, value });
+          out[i] = value;
+        }),
+      );
+      await new Promise((r) => setImmediate(r));
     }
     return out;
   }
@@ -141,10 +157,8 @@ export class Feed {
   readonly events = new EventEmitter<{ event: [FeedEvent] }>();
   private record: SessionRecord = { session: null, items: [] };
   private file: string | null = null;
-  /** Appends in order, one after another, per log. */
-  private queue = new WriteQueue();
-  /** Lines applied in memory but not yet on disk, per log: a failed append is retried by the next one. */
-  private unsaved = new Map<string, string[]>();
+  /** Appends in order; a failed one is retried by the next (store.ts). Each append bumps the log's version. */
+  private log = new AppendLog('The session log', (file) => logVersions.set(file, (logVersions.get(file) ?? 0) + 1));
   /** Tool calls waiting for an answer, by item id. */
   private waiters = new Map<string, Set<(item: InteractiveItem) => void>>();
 
@@ -164,7 +178,7 @@ export class Feed {
       feed.file = path.join(SESSIONS_DIR, last);
       feed.record = await readSession(feed.file);
       // A crash mid-append leaves a last line without its newline: end it, or the next entry would be glued to it.
-      if (!(await endsWithNewline(feed.file))) await appendFile(feed.file, '\n');
+      await endLastLine(feed.file);
     }
     return feed;
   }
@@ -289,7 +303,7 @@ export class Feed {
 
   /** Resolves once every append queued so far has finished. */
   idle(): Promise<void> {
-    return this.queue.idle();
+    return this.log.idle();
   }
 
   /**
@@ -300,22 +314,7 @@ export class Feed {
     const file = this.file;
     if (!file) throw new Error('No session file');
     applyOp(this.record, op);
-    const pending = this.unsaved.get(file) ?? [];
-    pending.push(JSON.stringify(op));
-    this.unsaved.set(file, pending);
-    await this.queue.run(file, async () => {
-      const lines = this.unsaved.get(file);
-      if (!lines?.length) return;
-      const count = lines.length;
-      try {
-        await appendFile(file, `${lines.join('\n')}\n`);
-      } catch (err) {
-        warnings.set('session-log', `The session log could not be saved (${(err as Error).message}); it is kept in memory and retried.`);
-        throw err;
-      }
-      lines.splice(0, count);
-      warnings.set('session-log', undefined);
-    });
+    await this.log.append(file, op);
   }
 
   private emit(event: FeedEvent) {
@@ -386,20 +385,6 @@ function activeMinutes(record: SessionRecord): number {
     if (gap <= IDLE_MS) total += gap;
   }
   return Math.round(total / 60_000);
-}
-
-/** Whether a file is empty or ends with a newline. */
-async function endsWithNewline(file: string): Promise<boolean> {
-  const handle = await open(file, 'r');
-  try {
-    const { size } = await handle.stat();
-    if (size === 0) return true;
-    const last = Buffer.alloc(1);
-    await handle.read(last, 0, 1, size - 1);
-    return last[0] === 0x0a;
-  } finally {
-    await handle.close();
-  }
 }
 
 /** Local date and time down to the millisecond, so session files sort in the order they were started. */
