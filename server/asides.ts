@@ -15,10 +15,10 @@ const MAX_QUESTION = 1000;
 const MAX_CONTEXT = 2000;
 
 const SYSTEM =
-  'You are a tutor answering a side question a learner asked about a passage of his lesson, without taking over the lesson. ' +
-  'Read his question about the words he selected in the sense the paragraph gives them, and answer exactly that, accurately, in 2 to 6 sentences (under 140 words) of plain Markdown; inline maths as $...$. ' +
+  'You are a tutor answering a side question a learner asked about a passage of their lesson, without taking over the lesson. ' +
+  'Read their question about the words they selected in the sense the paragraph gives them, and answer exactly that, accurately, in 2 to 6 sentences (under 140 words) of plain Markdown; inline maths as $...$. ' +
   'Start with the answer: no preamble, no restating the question, no headings, no follow-up offers. Plain words over jargon. ' +
-  'Answer in the language he asked in. If the answer is uncertain or contested, say so briefly instead of sounding sure. ' +
+  'Answer in the language they asked in. If the answer is uncertain or contested, say so briefly instead of sounding sure. ' +
   'If the honest answer is that the next steps of the lesson cover it, say that in one sentence and give the short version.';
 
 export class AsideError extends Error {}
@@ -58,8 +58,8 @@ export class Asides {
       context.topicTitle ? `Lesson: ${context.topicTitle}` : '',
       context.step ? `Step: ${context.step}` : '',
       around && around !== passage ? `The paragraph it is in: "${around}"` : '',
-      passage ? `The words he selected: "${passage}"` : '',
-      `His question: ${question}`,
+      passage ? `The words they selected: "${passage}"` : '',
+      `Their question: ${question}`,
     ]
       .filter(Boolean)
       .join('\n');

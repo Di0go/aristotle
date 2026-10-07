@@ -161,7 +161,7 @@ export function describeMission(m: Mission): string {
     `Concepts: ${m.concepts.join(', ') || '(none)'}`,
     `\nBrief:\n${m.brief}`,
     `\nDone when:\n${m.criteria.map((c) => `- ${c}`).join('\n')}`,
-    m.debrief ? `\nHis debrief (${m.debrief.at.slice(0, 16).replace('T', ' ')}):\n${m.debrief.text}` : '\nNo debrief yet.',
+    m.debrief ? `\nTheir debrief (${m.debrief.at.slice(0, 16).replace('T', ' ')}):\n${m.debrief.text}` : '\nNo debrief yet.',
     m.review ? `\nYour review (${m.review.at.slice(0, 10)}, ${m.review.verdict}):\n${m.review.markdown}` : '',
   ]
     .filter(Boolean)

@@ -15,7 +15,7 @@ export const MAX_PHRASE = 120;
 const MAX_CONTEXT = 800;
 
 const SYSTEM =
-  'You write glosses for a learner reading a lesson: a short, accurate explanation of a phrase he selected because he ' +
+  'You write glosses for a learner reading a lesson: a short, accurate explanation of a phrase they selected because they ' +
   'did not know it, in the sense the passage uses it. One or two sentences, under 50 words, plain Markdown; inline maths as $...$. ' +
   'Start with the explanation itself: no preamble, no heading, no follow-up offers, and do not mention "the passage". ' +
   'Plain words over jargon; if you must use a technical term, explain it too. If you are not sure, say so briefly rather than guess. ' +

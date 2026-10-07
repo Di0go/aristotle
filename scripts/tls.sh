@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Makes the certificate for https://aristotle.test, as the user (no root), in .aristotle/tls.
 #
-# Same pattern as playground.test on this machine: Aristotle gets its own certificate authority, and that
+# Aristotle gets its own certificate authority, and that
 # authority carries nameConstraints, so it can only ever sign aristotle.test, even if its key leaves this folder.
 # Browsers trust it once scripts/setup-hostname.sh has added it to the system trust store (p11-kit).
 #

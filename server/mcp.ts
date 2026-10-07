@@ -39,10 +39,10 @@ const THEME = {
 const MATH_AND_DIAGRAMS =
   'Markdown is rendered with LaTeX maths ($...$ inline, $$...$$ on its own lines; write a literal dollar as \\$), ' +
   '```mermaid code blocks as diagrams, and inline <svg> elements (which may animate with SMIL <animate>; Aristotle adds play and replay buttons). ' +
-  'Hover cards: {{term|short definition}} marks a term with a definition he can hover (inside a ==highlight== too: =={{term|definition}}==); [[concept-id]], [[other-topic/concept-id]] or [[concept-id|text]] links a concept on the map and shows its preview. ' +
+  'Hover cards: {{term|short definition}} marks a term with a definition they can hover (inside a ==highlight== too: =={{term|definition}}==); [[concept-id]], [[other-topic/concept-id]] or [[concept-id|text]] links a concept on the map and shows its preview. ' +
   'Also: ==highlighted text==; callouts as Obsidian writes them (> [!idea] Title, then > lines; kinds: idea, key, why, context, example, you, careful, term, note); ' +
   '<figure> with <figcaption> around a drawing; ![alt](https://… "caption") for an image with a caption (only images you have checked exist, e.g. Wikimedia Commons); ' +
-  'and ```sequence code blocks: Markdown frames split by lines of ---, which he steps through with Next and Back. ' +
+  'and ```sequence code blocks: Markdown frames split by lines of ---, which they step through with Next and Back. ' +
   'The visual kit (prefer it to hand-drawn SVG; each is a fenced block of JSON, drawn and animated by Aristotle): ' +
   '```balance (two forces on one value: {title, left:{label,detail}, right:{label,detail}, unit, min, max, neutral, neutralLabel, states:[{label, left:0-1, right:0-1, value, note}]}), ' +
   '```timeline (things over time, log scale by default: {title, scale:"log"|"linear", from:"0.5s", to:"2h", marks:["1s","1min"], lanes:[{label, start, end, peak?, note?}]}), ' +
@@ -56,8 +56,8 @@ const SAME_MARKDOWN = 'Markdown is rendered as in `show` (maths, hover terms, ca
 
 /** What each concept status means, for update_map. */
 const STATUSES =
-  'Statuses: "unknown" = he has not shown he holds it; "shaky" = partly (needed help, inconsistent, or holds a misconception: say which in `note`); ' +
-  '"solid" = he got a check on it right without help, ideally by producing or applying it rather than recognising it.';
+  'Statuses: "unknown" = they have not shown they hold it; "shaky" = partly (needed help, inconsistent, or holds a misconception: say which in `note`); ' +
+  '"solid" = they got a check on it right without help, ideally by producing or applying it rather than recognising it.';
 
 // Parameters several tools share.
 const conceptParam = z.string().optional().describe('Id of the map concept this is about; "topic/id" for a concept in another topic');
@@ -76,8 +76,8 @@ export function createMcpServer(gym: Gym): McpServer {
     { name: 'aristotle', version: '0.3.0' },
     {
       instructions:
-        `Aristotle is the learner's interface at ${URL_CLEAN}. He reads and answers there, not in the terminal: ` +
-        'teaching content goes in `show`, graded questions in `quiz`, open questions in `ask`, and what he knows goes on the map with `update_map` ' +
+        `Aristotle is the learner's interface at ${URL_CLEAN}. They read and answer there, not in the terminal: ` +
+        'teaching content goes in `show`, graded questions in `quiz`, open questions in `ask`, and what they know goes on the map with `update_map` ' +
         '(Aristotle draws the map). Keep terminal replies to a line or two.',
     },
   );
@@ -103,7 +103,7 @@ export function createMcpServer(gym: Gym): McpServer {
       title: 'Read a topic',
       description:
         "Read a topic's knowledge map (every concept, its status, prerequisites, notes and check record), the last handoff, recent sessions, " +
-        'and the phrases he asked Aristotle to explain and the questions he asked on passages while reading it. ' +
+        'and the phrases they asked Aristotle to explain and the questions they asked on passages while reading it. ' +
         'Read it before continuing a topic.',
       inputSchema: { topic: z.string().min(1).describe('Topic slug or title') },
     },
@@ -122,22 +122,22 @@ export function createMcpServer(gym: Gym): McpServer {
       const praxis = missions.length ? `\n\nPraxis missions:\n${missions.map(summarizeMission).join('\n')}` : '';
       const questions = gym.asides.of(t.slug);
       const asides = questions.length
-        ? `\n\nQuestions he asked on passages (answered on the spot; what he wondered about):\n${questions.map((q) => `- "${q.question}" (${q.at.slice(0, 10)})`).join('\n')}`
+        ? `\n\nQuestions they asked on passages (answered on the spot; what they wondered about):\n${questions.map((q) => `- "${q.question}" (${q.at.slice(0, 10)})`).join('\n')}`
         : '';
       const written = gym.notes.of(t.slug);
       const notebook = written.length
-        ? `\n\nHis own notes on steps (his words, kept beside the step):\n${written.map((n) => `- ${n.title ?? gym.feed.stepTitleOf(n.step) ?? 'a step'}: ${n.text.replace(/\s+/g, ' ').slice(0, 300)}`).join('\n')}`
+        ? `\n\nTheir own notes on steps (their words, kept beside the step):\n${written.map((n) => `- ${n.title ?? gym.feed.stepTitleOf(n.step) ?? 'a step'}: ${n.text.replace(/\s+/g, ' ').slice(0, 300)}`).join('\n')}`
         : '';
       const talk = gym.chats
         .get(t.slug)
         .filter((m) => m.role === 'user')
         .slice(-8);
       const chat = talk.length
-        ? `\n\nWhat he said in the chat beside this class (with Aristotle, not with you), most recent last:\n${talk.map((m) => `- ${m.text.replace(/\s+/g, ' ').slice(0, 240)}`).join('\n')}`
+        ? `\n\nWhat they said in the chat beside this class (with Aristotle, not with you), most recent last:\n${talk.map((m) => `- ${m.text.replace(/\s+/g, ' ').slice(0, 240)}`).join('\n')}`
         : '';
       const asked = gym.glosses.of(t.slug);
       const glosses = asked.length
-        ? `\n\nPhrases he selected and asked to have explained (gaps he noticed himself):\n${asked.map((g) => `- "${g.text}" (${g.at.slice(0, 10)})`).join('\n')}`
+        ? `\n\nPhrases they selected and asked to have explained (gaps they noticed themselves):\n${asked.map((g) => `- "${g.text}" (${g.at.slice(0, 10)})`).join('\n')}`
         : '';
       return text(
         `${describeTopic(t)}\n\nRecent sessions:\n${recent.join('\n') || '(none)'}${praxis}${glosses}${asides}${notebook}${chat}${roadmapContext(gym, t.slug)}`,
@@ -150,12 +150,14 @@ export function createMcpServer(gym: Gym): McpServer {
     {
       title: 'Read About you',
       description:
-        "Read what he wrote about himself on Aristotle's About you page: what he does, his projects, his sport or work, what he wants. " +
-        'Read it before planning a roadmap or designing a mission, so they fit his life; it is his own word and comes before anything you infer.',
+        "Read what the learner wrote about themselves on Aristotle's About you page: what they do, their projects, their sport or work, what they want. " +
+        'Read it before planning a roadmap or designing a mission, so they fit their life; it is their own word and comes before anything you infer.',
     },
     async () => {
       const about = gym.notes.about().trim();
-      return text(about || 'He has not written anything on his About you page yet. Ask him what you need, in a line, when it matters.');
+      return text(
+        about || 'They have not written anything on their About you page yet. Ask them what you need, in a line, when it matters.',
+      );
     },
   );
 
@@ -163,7 +165,7 @@ export function createMcpServer(gym: Gym): McpServer {
     'list_roadmaps',
     {
       title: 'List roadmaps',
-      description: 'List his roadmaps: ordered paths of topics planned with him, with how far along each one is.',
+      description: "List the learner's roadmaps: ordered paths of topics planned with them, with how far along each one is.",
     },
     async () => {
       const roadmaps = gym.roadmaps.all();
@@ -208,8 +210,8 @@ export function createMcpServer(gym: Gym): McpServer {
       title: 'Save a roadmap',
       description:
         'Create a roadmap, or replace the steps of an existing one (pass its slug as `roadmap`): reordering, adding and dropping steps all go through here. ' +
-        'Aristotle shows it on the Roadmaps page straight away, so he can read it there while you plan it together. ' +
-        'Save it as "draft" while planning and as "active" only once he has approved it. ' +
+        'Aristotle shows it on the Roadmaps page straight away, so they can read it there while you plan it together. ' +
+        'Save it as "draft" while planning and as "active" only once they have approved it. ' +
         "Each step becomes a topic named after its title, so keep a step's title stable once it has been started, " +
         'and pass `topic` to point a step at a topic that already exists under another name.',
       inputSchema: {
@@ -221,13 +223,13 @@ export function createMcpServer(gym: Gym): McpServer {
           .string()
           .optional()
           .describe(
-            'Where he will use what this course teaches, in his words (his sport, his job, a project). Ask him while planning; the final mission is built from it. Kept when omitted.',
+            'Where they will use what this course teaches, in their words (their sport, their job, a project). Ask them while planning; the final mission is built from it. Kept when omitted.',
           ),
         steps: z
           .array(
             z.object({
               title: z.string().min(1).describe('The topic\'s title, e.g. "Performance under pressure"'),
-              goal: z.string().min(1).describe('What he will be able to do or explain once this step is done'),
+              goal: z.string().min(1).describe('What they will be able to do or explain once this step is done'),
               why: z.string().optional().describe('Why it comes here: what it builds on and what it unlocks'),
               topic: z.string().optional().describe('Slug of an existing topic this step is; defaults to the slug of the title'),
             }),
@@ -252,11 +254,11 @@ export function createMcpServer(gym: Gym): McpServer {
     {
       title: 'Save a Praxis mission',
       description:
-        "Create a Praxis mission, or rewrite one (pass its id as `mission`): a real task he does outside the app that puts a step's " +
-        "(or a whole roadmap's) concepts to work for his own advantage, in one of his projects, his training, on his computer, or anywhere when nothing of his fits. " +
-        'He sees it on the Praxis page and on the roadmap, does it, and writes a debrief there; you then judge it with `review_mission`. ' +
+        "Create a Praxis mission, or rewrite one (pass its id as `mission`): a real task the learner does outside the app that puts a step's " +
+        "(or a whole roadmap's) concepts to work for their own advantage, in one of their projects, their training, on their computer, or anywhere when nothing of theirs fits. " +
+        'They see it on the Praxis page and on the roadmap, do it, and write a debrief there; you then judge it with `review_mission`. ' +
         'scope "step" follows a roadmap step (pass `topic`, the step\'s topic slug, and `roadmap`); "capstone" closes a roadmap (pass `roadmap`); "topic" follows a topic outside any roadmap. ' +
-        'Rewriting keeps his debrief and your review. ' +
+        'Rewriting keeps their debrief and your review. ' +
         SAME_MARKDOWN,
       inputSchema: {
         mission: z.string().optional().describe('Id of the mission to rewrite; omit to create one'),
@@ -267,10 +269,10 @@ export function createMcpServer(gym: Gym): McpServer {
         arena: z
           .string()
           .min(1)
-          .describe('Where it happens, short: a project ("~/Projects/Machine"), "training", "this computer", "anywhere"'),
-        why: z.string().min(1).describe('What it gets him, in a sentence or two: the advantage, not the lesson'),
+          .describe('Where it happens, short: a project ("~/Projects/garden"), "training", "this computer", "anywhere"'),
+        why: z.string().min(1).describe('What it gets them, in a sentence or two: the advantage, not the lesson'),
         brief: z.string().min(1).describe('What to do, in Markdown: the situation, the task, any constraints, and what to bring back'),
-        criteria: z.array(z.string().min(1)).min(1).max(8).describe('Done when: observable results he can report on'),
+        criteria: z.array(z.string().min(1)).min(1).max(8).describe('Done when: observable results they can report on'),
         concepts: z.array(z.string().min(1)).default([]).describe('The concepts it puts to use, as "topic/id"'),
       },
     },
@@ -300,8 +302,8 @@ export function createMcpServer(gym: Gym): McpServer {
     {
       title: 'List Praxis missions',
       description:
-        'List his Praxis missions with their status: open (to do), debriefed (he reported back: review it), reviewed, dropped. ' +
-        'Pass `mission` to read one in full, with his debrief.',
+        "List the learner's Praxis missions with their status: open (to do), debriefed (they reported back: review it), reviewed, dropped. " +
+        'Pass `mission` to read one in full, with their debrief.',
       inputSchema: {
         mission: z.string().optional().describe('Id of one mission to read in full'),
         status: z.enum(['open', 'debriefed', 'reviewed', 'dropped']).optional(),
@@ -324,9 +326,9 @@ export function createMcpServer(gym: Gym): McpServer {
     {
       title: 'Review a Praxis mission',
       description:
-        'Close a mission he has debriefed: a verdict, your critique (shown to him on the mission), and a result per concept it used. ' +
+        'Close a mission they have debriefed: a verdict, your critique (shown to them on the mission), and a result per concept it used. ' +
         "Results count as practice: right pushes a concept's next review out, wrong makes a solid concept shaky. " +
-        'Before judging, check what you can (read the repo, the files, the numbers he reports) and ask for anything missing. ' +
+        'Before judging, check what you can (read the repo, the files, the numbers they report) and ask for anything missing. ' +
         SAME_MARKDOWN,
       inputSchema: {
         mission: z.string().min(1).describe('Mission id'),
@@ -335,7 +337,7 @@ export function createMcpServer(gym: Gym): McpServer {
           .string()
           .min(1)
           .describe(
-            'In Markdown: what he did against each criterion, what was sound, the first thing that went wrong if anything did, and the next step',
+            'In Markdown: what they did against each criterion, what was sound, the first thing that went wrong if anything did, and the next step',
           ),
         results: z
           .array(
@@ -350,10 +352,10 @@ export function createMcpServer(gym: Gym): McpServer {
     async ({ mission, verdict, critique, results }) => {
       const m = gym.missions.get(mission);
       if (!m) return error(`No mission "${mission}".`);
-      if (!m.debrief) return error('He has not debriefed this mission yet: there is nothing to review.');
+      if (!m.debrief) return error('They have not debriefed this mission yet: there is nothing to review.');
       try {
         const { lines } = await gym.reviewMission(m.id, verdict, critique, results);
-        return text(`Reviewed (${verdict}); he sees it on the mission.${lines.length ? `\n${lines.join('\n')}` : ''}`);
+        return text(`Reviewed (${verdict}); they see it on the mission.${lines.length ? `\n${lines.join('\n')}` : ''}`);
       } catch (err) {
         return error((err as Error).message);
       }
@@ -377,8 +379,8 @@ export function createMcpServer(gym: Gym): McpServer {
           .string()
           .optional()
           .describe('Existing topic slug, or the title of a new topic, e.g. "Differential forms". Not for review'),
-        goal: z.string().min(1).describe('What he wants from this session, in one sentence'),
-        topic_goal: z.string().optional().describe("For a new topic: what he ultimately wants from it. Defaults to the session's goal"),
+        goal: z.string().min(1).describe('What they want from this session, in one sentence'),
+        topic_goal: z.string().optional().describe("For a new topic: what they ultimately want from it. Defaults to the session's goal"),
       },
     },
     async ({ kind, topic, goal, topic_goal }) => {
@@ -403,7 +405,7 @@ export function createMcpServer(gym: Gym): McpServer {
     {
       title: 'List fading concepts',
       description:
-        'List solid concepts that are due for review ("fading"), least likely to be recalled first, with an estimate of his chance of recalling each now. ' +
+        'List solid concepts that are due for review ("fading"), least likely to be recalled first, with an estimate of their chance of recalling each now. ' +
         'Spaced review: practising a concept just as it starts to fade is what makes it last.',
       inputSchema: {
         topic: z.string().optional().describe('Only this topic (slug)'),
@@ -427,7 +429,7 @@ export function createMcpServer(gym: Gym): McpServer {
     {
       title: 'Record practice results',
       description:
-        'Record how he did on review questions and training problems, after you have judged his answers. ' +
+        'Record how the learner did on review questions and training problems, after you have judged their answers. ' +
         "Each result moves that concept's review schedule (right pushes the next review further out, partial a little, wrong brings it back and makes a solid concept shaky). " +
         "For training problems, pass the `difficulty` you set them at: clean solves at or above the topic's training level raise it, a miss lowers it. " +
         'Quizzes and asks in lessons are recorded automatically; use this for reviews and training.',
@@ -546,9 +548,9 @@ export function createMcpServer(gym: Gym): McpServer {
       title: 'Quiz the learner',
       description:
         'Ask one or more graded multiple-choice questions in Aristotle and wait for the answers. ' +
-        'The interface shuffles the options, always adds "I don\'t know" and a note field, and shows right/wrong with your explanation as soon as he answers. ' +
+        'The interface shuffles the options, always adds "I don\'t know" and a note field, and shows right/wrong with your explanation as soon as they answer. ' +
         'Write every option as a bare claim of similar length and form, with no reasoning in it, so the right one cannot be spotted by its wording; ' +
-        'put the reasoning in `explanation`. Each wrong option should be a mistake he might really make. ' +
+        'put the reasoning in `explanation`. Each wrong option should be a mistake they might really make. ' +
         'Tag each question with its map `concept` so the answer is recorded on the map. ' +
         SAME_MARKDOWN,
       inputSchema: {
@@ -558,7 +560,7 @@ export function createMcpServer(gym: Gym): McpServer {
               question: z.string().min(1),
               options: z.array(z.string().min(1)).min(2).max(6),
               correct: z.number().int().min(0).describe('Index of the right option in `options`'),
-              explanation: z.string().min(1).describe('Why the right answer is right, shown after he answers'),
+              explanation: z.string().min(1).describe('Why the right answer is right, shown after they answer'),
               concept: conceptParam,
               strand: z.string().optional().describe('A label to show above the question, a word or two'),
             }),
@@ -590,8 +592,8 @@ export function createMcpServer(gym: Gym): McpServer {
       title: 'Ask an open question',
       description:
         'Ask the learner to write an answer in Aristotle and wait for it: a problem to solve without help, ' +
-        'a concept to explain in his own words, or something to recall from memory. Producing an answer is a heavier, more telling check than recognising one. ' +
-        'The interface gives him a text box with a live maths preview. Critique what he writes with `show` (kind "feedback"). ' +
+        'a concept to explain in their own words, or something to recall from memory. Producing an answer is a heavier, more telling check than recognising one. ' +
+        'The interface gives them a text box with a live maths preview. Critique what they write with `show` (kind "feedback"). ' +
         SAME_MARKDOWN,
       inputSchema: {
         prompt: z.string().min(1).describe('The question, in Markdown'),
@@ -627,7 +629,7 @@ export function createMcpServer(gym: Gym): McpServer {
       title: 'Collect late answers',
       description:
         'Get answers the learner gave in Aristotle after a `quiz` or `ask` call stopped waiting, ' +
-        'for example because he stepped away and came back. Call it when he says he is back or has answered.',
+        'for example because they stepped away and came back. Call it when they say they are back or have answered.',
     },
     async () => {
       const late = gym.feed.undelivered();
@@ -730,10 +732,10 @@ export function createMcpServer(gym: Gym): McpServer {
       title: 'End the session',
       description:
         'Close the session with a handoff for next time: what locked in, what is still shaky, and the next step. ' +
-        'Shown to him as a summary and read back by `get_topic` when he continues. Call it when he says he is done or stopping, ' +
+        'Shown to them as a summary and read back by `get_topic` when they continue. Call it when they say they are done or stopping, ' +
         'after updating the map.',
       inputSchema: {
-        locked: z.string().min(1).describe('What locked in this session (concept names and what he can now do)'),
+        locked: z.string().min(1).describe('What locked in this session (concept names and what they can now do)'),
         shaky: z.string().min(1).describe('What is still shaky or untested, or "nothing"'),
         next: z.string().min(1).describe('Where to pick up next time: the next concept and why'),
       },
@@ -795,10 +797,10 @@ async function waitForLearner(gym: Gym, id: string, extra: Extra) {
 function notAnswered(): CallToolResult {
   const minutes = Math.round(WAIT_MS / 60_000);
   return text(
-    `No answer yet: he hasn't answered in Aristotle within ${minutes} minutes, so he has stepped away. ` +
-      'Close the sitting now, without asking him anything: a final `update_map` if this sitting changed what he holds, then ' +
-      '`end_session` with the handoff. The question stays open in Aristotle; when he answers it, you are asked to continue ' +
-      'and `collect_answers` gives you his answer. Then end your turn.',
+    `No answer yet: they haven't answered in Aristotle within ${minutes} minutes, so they have stepped away. ` +
+      'Close the sitting now, without asking them anything: a final `update_map` if this sitting changed what they hold, then ' +
+      '`end_session` with the handoff. The question stays open in Aristotle; when they answer it, you are asked to continue ' +
+      'and `collect_answers` gives you their answer. Then end your turn.',
   );
 }
 
@@ -874,16 +876,16 @@ function formatQuiz(item: QuizItem, gym: Gym): string {
     if (!r || r.choice === null) line = `${label}: said "I don't know". Right answer: ${right}.`;
     else if (r.correct) line = `${label}: right (${right}).`;
     else line = `${label}: wrong. Chose "${q.options[r.choice]}". Right answer: ${right}.`;
-    return r?.note ? `${line}\n  His note: "${r.note}"` : line;
+    return r?.note ? `${line}\n  Their note: "${r.note}"` : line;
   });
   const score = item.responses?.filter((r) => r.correct).length ?? 0;
   return (
-    `Quiz answered: ${score}/${item.questions.length} right. He has already seen the right answers and your explanations.\n${lines.join('\n')}` +
+    `Quiz answered: ${score}/${item.questions.length} right. They have already seen the right answers and your explanations.\n${lines.join('\n')}` +
     (missing.size ? `\n(Not recorded on the map, no such concept: ${[...missing].join(', ')}.)` : '')
   );
 }
 
 /** His written answer as Claude reads it. */
 function formatAsk(item: AskItem): string {
-  return `He answered (${item.kind}${item.concept ? `, concept ${item.concept}` : ''}):\n\n${item.response ?? ''}`;
+  return `They answered (${item.kind}${item.concept ? `, concept ${item.concept}` : ''}):\n\n${item.response ?? ''}`;
 }

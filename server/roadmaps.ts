@@ -103,7 +103,7 @@ export function describeRoadmap(roadmap: Roadmap, topics: (slug: string) => Topi
   return [
     `# ${roadmap.title} (${roadmap.slug})${roadmap.status === 'draft' ? ' [DRAFT: not approved yet]' : ''}`,
     `Goal: ${roadmap.goal}`,
-    roadmap.use ? `Where he will use it: ${roadmap.use}` : 'Where he will use it: (not asked yet: ask him, and save it with `use`)',
+    roadmap.use ? `Where they will use it: ${roadmap.use}` : 'Where they will use it: (not asked yet: ask them, and save it with `use`)',
     `\nSteps, in order:`,
     lines.join('\n') || '(none)',
   ].join('\n');

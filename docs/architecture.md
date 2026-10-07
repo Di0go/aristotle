@@ -62,8 +62,8 @@ The method is in `.claude/`: skills Claude follows and subagents it calls. See [
 |---|---|---|
 | skill | [`praxis`](../.claude/skills/praxis/SKILL.md) | Praxis missions in Aristotle. |
 | skill | [`review`](../.claude/skills/review/SKILL.md) | Spaced review in Aristotle. |
-| skill | [`roadmap`](../.claude/skills/roadmap/SKILL.md) | Plan a roadmap with Diogo in Aristotle: an ordered path of topics towards something bigger, each with its own goal, agreed with him before any of it is taught. |
-| skill | [`teach`](../.claude/skills/teach/SKILL.md) | Teach Diogo something in Aristotle so it is understood, not memorised. |
+| skill | [`roadmap`](../.claude/skills/roadmap/SKILL.md) | Plan a roadmap with the learner in Aristotle: an ordered path of topics towards something bigger, each with its own goal, agreed with them before any of it is taught. |
+| skill | [`teach`](../.claude/skills/teach/SKILL.md) | Teach the learner something in Aristotle so it is understood, not memorised. |
 | skill | [`train`](../.claude/skills/train/SKILL.md) | Training sets in Aristotle. |
 | agent | [`illustrator`](../.claude/agents/illustrator.md) | Draws a small, correct SVG diagram for one teaching step (optionally animated), checks it by rendering it in both themes, and returns the finished SVG. |
 | agent | [`researcher`](../.claude/agents/researcher.md) | Fact-checks claims and scopes topics for the tutor. |
@@ -75,22 +75,22 @@ The method is in `.claude/`: skills Claude follows and subagents it calls. See [
 | Tool | What it does |
 |---|---|
 | `list_topics` | List every topic the learner has studied, with how much of each map is solid and where the last session left off. |
-| `get_topic` | Read a topic's knowledge map (every concept, its status, prerequisites, notes and check record), the last handoff, recent sessions, and the phrases he asked Aristotle to explain and the questions he asked on passages while reading it. |
-| `read_about` | Read what he wrote about himself on Aristotle's About you page: what he does, his projects, his sport or work, what he wants. |
-| `list_roadmaps` | List his roadmaps: ordered paths of topics planned with him, with how far along each one is. |
+| `get_topic` | Read a topic's knowledge map (every concept, its status, prerequisites, notes and check record), the last handoff, recent sessions, and the phrases they asked Aristotle to explain and the questions they asked on passages while reading it. |
+| `read_about` | Read what the learner wrote about themselves on Aristotle's About you page: what they do, their projects, their sport or work, what they want. |
+| `list_roadmaps` | List the learner's roadmaps: ordered paths of topics planned with them, with how far along each one is. |
 | `get_roadmap` | Read a roadmap: its goal, and every step in order with its goal, why it comes there, and the state of the step's topic. |
 | `save_roadmap` | Create a roadmap, or replace the steps of an existing one (pass its slug as `roadmap`): reordering, adding and dropping steps all go through here. |
-| `save_mission` | Create a Praxis mission, or rewrite one (pass its id as `mission`): a real task he does outside the app that puts a step's (or a whole roadmap's) concepts to work for his own advantage, in one of his projects, his training, on his computer, or anywhere when nothing of his fits. |
-| `list_missions` | List his Praxis missions with their status: open (to do), debriefed (he reported back: review it), reviewed, dropped. |
-| `review_mission` | Close a mission he has debriefed: a verdict, your critique (shown to him on the mission), and a result per concept it used. |
+| `save_mission` | Create a Praxis mission, or rewrite one (pass its id as `mission`): a real task the learner does outside the app that puts a step's (or a whole roadmap's) concepts to work for their own advantage, in one of their projects, their training, on their computer, or anywhere when nothing of theirs fits. |
+| `list_missions` | List the learner's Praxis missions with their status: open (to do), debriefed (they reported back: review it), reviewed, dropped. |
+| `review_mission` | Close a mission they have debriefed: a verdict, your critique (shown to them on the mission), and a result per concept it used. |
 | `start_session` | Start a session in Aristotle. |
-| `due_reviews` | List solid concepts that are due for review ("fading"), least likely to be recalled first, with an estimate of his chance of recalling each now. |
-| `record_practice` | Record how he did on review questions and training problems, after you have judged his answers. |
+| `due_reviews` | List solid concepts that are due for review ("fading"), least likely to be recalled first, with an estimate of their chance of recalling each now. |
+| `record_practice` | Record how the learner did on review questions and training problems, after you have judged their answers. |
 | `update_map` | Add, change or remove concepts on the current topic's knowledge map, which Aristotle draws as a graph. |
 | `show` | Show content in Aristotle: one teaching step, the plan, a summary, or feedback on an answer. |
 | `quiz` | Ask one or more graded multiple-choice questions in Aristotle and wait for the answers. |
-| `ask` | Ask the learner to write an answer in Aristotle and wait for it: a problem to solve without help, a concept to explain in his own words, or something to recall from memory. |
-| `collect_answers` | Get answers the learner gave in Aristotle after a `quiz` or `ask` call stopped waiting, for example because he stepped away and came back. |
+| `ask` | Ask the learner to write an answer in Aristotle and wait for it: a problem to solve without help, a concept to explain in their own words, or something to recall from memory. |
+| `collect_answers` | Get answers the learner gave in Aristotle after a `quiz` or `ask` call stopped waiting, for example because they stepped away and came back. |
 | `preview_svg` | Render an SVG to an image and look at it before showing it to the learner: check that labels are legible and not overlapping, that nothing is cut off, and that the drawing says what it should. |
 | `find_images` | Search Wikimedia Commons for real images (anatomical plates, photos, diagrams) and return only files whose licence allows reuse: public domain, CC0, CC BY, CC BY-SA. |
 | `view_image` | Look at an image from find_images, with a grid of 10% lines drawn over it (labelled 10 to 90 along the top and left edges). |
@@ -305,7 +305,7 @@ Only for the interface (and the tests); Claude Code uses MCP.
 | [`install-service.sh`](../scripts/install-service.sh) | Runs Aristotle at login as a systemd user service, so https://aristotle.test (and Claude Code in its terminal drawer) is always there without starting anything first. |
 | [`release.ts`](../scripts/release.ts) | Ships what is committed here to the app you learn in, without ever running half-finished code. |
 | [`seed.ts`](../scripts/seed.ts) | Fills the dev instance's data with a fixture (scripts/fixtures/<name>.ts, "demo" by default) by replaying it through a throwaway server's MCP endpoint, exactly as Claude Code would teach it. |
-| [`setup-hostname.sh`](../scripts/setup-hostname.sh) | Gives Aristotle a clean URL: https://aristotle.test Same pattern as bancada.test and playground.test on this machine: 1. |
+| [`setup-hostname.sh`](../scripts/setup-hostname.sh) | Gives Aristotle a clean URL: https://aristotle.test How it works: 1. |
 | [`tls.sh`](../scripts/tls.sh) | Makes the certificate for https://aristotle.test, as the user (no root), in .aristotle/tls. |
 
 #### Tests (`tests/`)

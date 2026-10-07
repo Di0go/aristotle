@@ -628,7 +628,7 @@ test('a Praxis mission is set, debriefed in the interface, and reviewed into pra
   assert.match(textOf(await call('list_missions', { status: 'debriefed' })), /rewrite-the-field-equations-in-forms/);
   assert.match(
     textOf(await call('list_missions', { mission: 'rewrite-the-field-equations-in-forms' })),
-    /His debrief .*\n.*dF = 0 and d\*F = J/,
+    /Their debrief .*\n.*dF = 0 and d\*F = J/,
   );
 
   const reviewed = textOf(
@@ -747,9 +747,9 @@ test('a question on a passage is answered with its paragraph, kept with its step
   assert.match(aside.answer, /Lesson: Asked topic/);
   assert.match(aside.answer, /Step: The pacemaker/);
   assert.match(aside.answer, /The paragraph it is in: "It fires at about 100/);
-  assert.match(aside.answer, /His question: Why does it vary\?/);
+  assert.match(aside.answer, /Their question: Why does it vary\?/);
   assert.equal((await get<Aside[]>('/api/asides')).length, 1);
-  assert.match(textOf(await call('get_topic', { topic: 'asked-topic' })), /questions he asked on passages[\s\S]*"Why does it vary\?"/i);
+  assert.match(textOf(await call('get_topic', { topic: 'asked-topic' })), /questions they asked on passages[\s\S]*"Why does it vary\?"/i);
 
   assert.equal((await post({ passage: 'x', question: '  ' })).status, 400);
   assert.equal((await fetch(`${BASE}/api/asides/${aside.id}`, { method: 'DELETE' })).status, 200);
@@ -773,7 +773,7 @@ test('his notes on a step and his About you page are kept, and read by the tutor
   assert.equal((await get<StepNote[]>('/api/notes')).find((n) => n.step === step.id)?.text, 'Like a metronome.');
   assert.match(
     textOf(await call('get_topic', { topic: 'noted-topic' })),
-    /His own notes on steps[\s\S]*Step 1 · The pacemaker: Like a metronome\./,
+    /Their own notes on steps[\s\S]*Step 1 · The pacemaker: Like a metronome\./,
   );
   // An emptied notebook is removed.
   await put('/api/notes', { topic: 'noted-topic', step: step.id, text: '  ' });
@@ -794,7 +794,7 @@ test('a course keeps where he will use it, and says so to the tutor', async () =
       steps: [{ title: 'Used step', goal: 'Know it' }],
     }),
   );
-  assert.match(saved, /Where he will use it: In my sparring rounds/);
+  assert.match(saved, /Where they will use it: In my sparring rounds/);
   // Saving again without `use` keeps it.
   const again = textOf(
     await call('save_roadmap', {
@@ -805,7 +805,7 @@ test('a course keeps where he will use it, and says so to the tutor', async () =
       steps: [{ title: 'Used step', goal: 'Know it' }],
     }),
   );
-  assert.match(again, /Where he will use it: In my sparring rounds/);
+  assert.match(again, /Where they will use it: In my sparring rounds/);
   assert.equal((await get<Roadmap>('/api/roadmaps/used-course')).use, 'In my sparring rounds');
 });
 
@@ -825,10 +825,10 @@ test('the chat beside a class sees where he is, keeps the conversation, and the 
   assert.equal(res.status, 200);
   const answer = (await res.json()) as ChatMessage;
   // The request Claude Code got: where he is, the class and its map, his screen, and his message.
-  assert.match(answer.text, /Where he is now: Chatted topic · Step 1: The pacemaker/);
+  assert.match(answer.text, /Where they are now: Chatted topic · Step 1: The pacemaker/);
   assert.match(answer.text, /The class: Chatted topic/);
-  assert.match(answer.text, /What is on his screen:\nIt fires on its own\./);
-  assert.match(answer.text, /His message: Why does it beat on its own\?/);
+  assert.match(answer.text, /What is on their screen:\nIt fires on its own\./);
+  assert.match(answer.text, /Their message: Why does it beat on its own\?/);
   const thread = await get<ChatMessage[]>('/api/chats/chatted-topic');
   assert.deepEqual(
     thread.map((m) => m.role),
@@ -844,7 +844,7 @@ test('the chat beside a class sees where he is, keeps the conversation, and the 
   const tagged = (await (
     await say({ text: 'And @The pacemaker?', mentions: 'Concept "The pacemaker" (solid)', tags: ['@The pacemaker'] })
   ).json()) as ChatMessage;
-  assert.match(tagged.text, /What he tagged with @ in his message:\nConcept "The pacemaker"/);
+  assert.match(tagged.text, /What they tagged with @ in their message:\nConcept "The pacemaker"/);
   assert.deepEqual((await get<ChatMessage[]>('/api/chats/chatted-topic'))[2].mentions, ['@The pacemaker']);
   // Nothing is being written, so there is nothing to stop; clearing starts the chat over.
   assert.equal(

@@ -16,11 +16,11 @@ flowchart LR
     P -. "what fails goes back to shaky" .-> M
 ```
 
-- **teach** probes what he knows, plans the map of what depends on what, then teaches one reasoning step per `show`, checking each with `quiz` or `ask` before moving on. It ends with `end_session` and a handoff.
+- **teach** probes what the learner knows, plans the map of what depends on what, then teaches one reasoning step per `show`, checking each with `quiz` or `ask` before moving on. It ends with `end_session` and a handoff.
 - **review** practises concepts whose FSRS card says they are fading, by recall in writing, and records results with `record_practice`.
-- **train** gives problems just above his level and moves the topic's training level as he solves them cleanly.
-- **roadmap** plans an ordered path of topics with him (draft, then active), each step a topic.
-- **praxis** designs a mission that puts a finished step to work in his own life, and reviews his debrief.
+- **train** gives problems just above their level and moves the topic's training level as they solve them cleanly.
+- **roadmap** plans an ordered path of topics with them (draft, then active), each step a topic.
+- **praxis** designs a mission that puts a finished step to work in their own life, and reviews their debrief.
 
 ## Skills and subagents
 
@@ -29,8 +29,8 @@ flowchart LR
 |---|---|---|
 | skill | [`praxis`](../.claude/skills/praxis/SKILL.md) | Praxis missions in Aristotle. |
 | skill | [`review`](../.claude/skills/review/SKILL.md) | Spaced review in Aristotle. |
-| skill | [`roadmap`](../.claude/skills/roadmap/SKILL.md) | Plan a roadmap with Diogo in Aristotle: an ordered path of topics towards something bigger, each with its own goal, agreed with him before any of it is taught. |
-| skill | [`teach`](../.claude/skills/teach/SKILL.md) | Teach Diogo something in Aristotle so it is understood, not memorised. |
+| skill | [`roadmap`](../.claude/skills/roadmap/SKILL.md) | Plan a roadmap with the learner in Aristotle: an ordered path of topics towards something bigger, each with its own goal, agreed with them before any of it is taught. |
+| skill | [`teach`](../.claude/skills/teach/SKILL.md) | Teach the learner something in Aristotle so it is understood, not memorised. |
 | skill | [`train`](../.claude/skills/train/SKILL.md) | Training sets in Aristotle. |
 | agent | [`illustrator`](../.claude/agents/illustrator.md) | Draws a small, correct SVG diagram for one teaching step (optionally animated), checks it by rendering it in both themes, and returns the finished SVG. |
 | agent | [`researcher`](../.claude/agents/researcher.md) | Fact-checks claims and scopes topics for the tutor. |
@@ -40,14 +40,14 @@ flowchart LR
 
 These are in [`CLAUDE.md`](../CLAUDE.md) because they hold whichever skill is running:
 
-- He reads and answers **in Aristotle, not the terminal**: teaching through `show`, graded checks through `quiz`, open questions through `ask`. Terminal replies are a line or two.
+- The learner reads and answers **in Aristotle, not the terminal**: teaching through `show`, graded checks through `quiz`, open questions through `ask`. Terminal replies are a line or two.
 - **One reasoning step per `show`**, then a check.
 - **The knowledge map stays true** (`update_map`): what is solid, what is shaky and why, what rests on what.
-- **No stop button: a sitting closes itself.** If `quiz` or `ask` returns "No answer yet" (no answer within `ARISTOTLE_WAIT_MS`, 15 minutes), he has stepped away: the map is brought up to date, `end_session` writes the handoff, and the turn ends. The question stays open; answering it brings Claude back to continue (`collect_answers` first).
-- **Questions outlive their session.** One left unanswered stays answerable in the class page after the session ends. When he answers one that no tool call is waiting for, Aristotle tells Claude: "collect my answers" if its session is still going, otherwise it continues the topic (or the review or training). So `teach`, `review` and `train` call `collect_answers` before `start_session`, which would otherwise leave those answers in the old session.
-- **Every course ends with its final mission, on its own**: when the last class is done, `teach` hands to `praxis`, which designs and saves the capstone without proposing it first. Missions for single classes only when he asks. Planning a course asks where he will use it (`use`), and `read_about` (his About you page) comes before anything inferred, so missions fit anyone.
-- **The chat beside a lesson is not the tutor**: a second Claude answers him while he reads, with his screen as context, without moving the lesson or giving away a check's answer. `get_topic` shows the tutor what he said there.
-- **What he wondered about reaches the tutor**: `get_topic` lists the phrases he glossed and the questions he asked on passages of the topic. Both are gaps he noticed himself, worth a check or a step.
+- **No stop button: a sitting closes itself.** If `quiz` or `ask` returns "No answer yet" (no answer within `ARISTOTLE_WAIT_MS`, 15 minutes), they have stepped away: the map is brought up to date, `end_session` writes the handoff, and the turn ends. The question stays open; answering it brings Claude back to continue (`collect_answers` first).
+- **Questions outlive their session.** One left unanswered stays answerable in the class page after the session ends. When they answer one that no tool call is waiting for, Aristotle tells Claude: "collect my answers" if its session is still going, otherwise it continues the topic (or the review or training). So `teach`, `review` and `train` call `collect_answers` before `start_session`, which would otherwise leave those answers in the old session.
+- **Every course ends with its final mission, on its own**: when the last class is done, `teach` hands to `praxis`, which designs and saves the capstone without proposing it first. Missions for single classes only when they ask. Planning a course asks where they will use it (`use`), and `read_about` (their About you page) comes before anything inferred, so missions fit anyone.
+- **The chat beside a lesson is not the tutor**: a second Claude answers them while they read, with their screen as context, without moving the lesson or giving away a check's answer. `get_topic` shows the tutor what they said there.
+- **What they wondered about reaches the tutor**: `get_topic` lists the phrases they glossed and the questions they asked on passages of the topic. Both are gaps they noticed themselves, worth a check or a step.
 - **Hover cards are the tutor's to write** (a highlighted term carries its definition inside the highlight): `{{term|definition}}` and `[[concept-id]]` only exist where Claude puts them, so `show` answers a teaching step that has neither with a reminder to add them in the next steps.
 - **Claude Code starts when Aristotle opens**, idle in the terminal drawer, so the first request never waits for it to boot; what is sent while it starts is typed in once it is ready.
 - **Pictures for anything physical, spatial or timed** (in `teach`): an explorable first, then the visual kit, a real image as a `plate`, and an illustrator SVG last. A `flow` that moves real things draws them (`art`, `carries`, `makes`: glucose in, electrons along, ATP out), and their numbers are facts like any other.

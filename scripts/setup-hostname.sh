@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Gives Aristotle a clean URL: https://aristotle.test
 #
-# Same pattern as bancada.test and playground.test on this machine:
+# How it works:
 #   1. /etc/hosts maps aristotle.test to its own loopback address, 127.0.0.82.
 #   2. /etc/aristotle.nft redirects 127.0.0.82:80 to Aristotle on 127.0.0.1:4747, and :443 to its HTTPS on :4748.
 #   3. aristotle-nome.service loads that rule at boot.
@@ -12,7 +12,7 @@
 # rule and unit, and its old authority (left by tls.sh as .aristotle/tls/retired-ca.crt).
 #
 # Run scripts/tls.sh first (as yourself), then as root:
-#   pkexec bash /home/diogo/Projects/Learn/scripts/setup-hostname.sh
+#   sudo bash scripts/setup-hostname.sh   (or pkexec bash "$PWD/scripts/setup-hostname.sh")
 # Safe to run again.
 # To undo: systemctl disable --now aristotle-nome.service, delete /etc/aristotle.nft and the unit,
 # remove the aristotle.test lines from /etc/hosts, trust anchor --remove .aristotle/tls/ca.crt, and delete .aristotle/tls.

@@ -293,7 +293,7 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ro
  */
 function chatContext(thread: string, where?: string, page?: string, step?: string, mentions?: string): string {
   const topic = gym.topics.get(thread);
-  const parts = [`Where he is now: ${where ?? (topic ? `the class ${topic.title}` : 'outside any class (Home, the map…)')}`];
+  const parts = [`Where they are now: ${where ?? (topic ? `the class ${topic.title}` : 'outside any class (Home, the map…)')}`];
   if (topic) {
     const by = (s: string) => topic.concepts.filter((c) => c.status === s).map((c) => c.label);
     parts.push(
@@ -301,12 +301,12 @@ function chatContext(thread: string, where?: string, page?: string, step?: strin
       `On its map: solid: ${by('solid').join(', ') || 'none yet'}; shaky: ${by('shaky').join(', ') || 'none'}; not yet: ${by('unknown').join(', ') || 'none'}.`,
     );
   }
-  if (page) parts.push(`What is on his screen:\n${page}`);
-  if (mentions) parts.push(`What he tagged with @ in his message:\n${mentions.slice(0, 8000)}`);
+  if (page) parts.push(`What is on their screen:\n${page}`);
+  if (mentions) parts.push(`What they tagged with @ in their message:\n${mentions.slice(0, 8000)}`);
   const note = step && topic ? gym.notes.of(topic.slug).find((n) => n.step === step) : undefined;
-  if (note) parts.push(`His own notes on this step:\n${note.text}`);
+  if (note) parts.push(`Their own notes on this step:\n${note.text}`);
   const about = gym.notes.about().trim();
-  if (about) parts.push(`About him, in his words:\n${about}`);
+  if (about) parts.push(`About them, in their words:\n${about}`);
   return parts.join('\n\n');
 }
 

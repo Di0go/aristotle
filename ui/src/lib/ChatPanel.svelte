@@ -50,7 +50,7 @@
       kind: 'Concept',
       hint: { solid: 'solid', fading: 'fading', shaky: 'shaky', unknown: 'not yet' }[markOf(c)],
       context: () =>
-        `Concept "${c.label}" (${markOf(c)} on his map)${c.summary ? `: ${c.summary}` : ''}${c.note ? `\nWhat to watch: ${c.note}` : ''}${c.deps.length ? `\nBuilds on: ${c.deps.join(', ')}` : ''}`,
+        `Concept "${c.label}" (${markOf(c)} on their map)${c.summary ? `: ${c.summary}` : ''}${c.note ? `\nWhat to watch: ${c.note}` : ''}${c.deps.length ? `\nBuilds on: ${c.deps.join(', ')}` : ''}`,
     }));
     const others: Mention[] = Object.values(feed.topics).map((t) => ({
       label: t.title,
@@ -222,14 +222,14 @@
           const r = i.responses?.[n];
           const picked = r
             ? r.choice === null
-              ? "he said he didn't know"
-              : `he picked "${q.options[r.choice]}" (${r.correct ? 'right' : 'wrong'})`
+              ? "they said they didn't know"
+              : `they picked "${q.options[r.choice]}" (${r.correct ? 'right' : 'wrong'})`
             : 'not answered yet';
           return `Check: ${q.question}\nOptions: ${q.options.join(' | ')}\n${picked}`;
         })
         .join('\n');
     }
-    if (i.type === 'ask') return `Question: ${i.prompt}\n${i.answeredAt ? `His answer: ${i.response ?? ''}` : 'Not answered yet.'}`;
+    if (i.type === 'ask') return `Question: ${i.prompt}\n${i.answeredAt ? `Their answer: ${i.response ?? ''}` : 'Not answered yet.'}`;
     return '';
   }
 </script>
