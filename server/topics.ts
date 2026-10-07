@@ -395,6 +395,6 @@ function setStatus(concept: Concept, status: ConceptStatus, nowIso: string) {
 
 /** "Other Topic/Some Concept" -> "other-topic/some-concept"; plain ids are slugified. */
 function normalizeDep(dep: string): string {
-  const [a, b] = dep.split('/');
+  const [a = '', b] = dep.split('/');
   return b === undefined ? slugify(a) : `${slugify(a)}/${slugify(b)}`;
 }

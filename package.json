@@ -5,7 +5,7 @@
   "description": "A personal tutor: Claude Code teaches, this app is where you learn.",
   "license": "MIT",
   "engines": {
-    "node": ">=24"
+    "node": ">=24.2"
   },
   "scripts": {
     "dev": "node scripts/dev.ts",
@@ -15,9 +15,9 @@
     "app": "node server/control.ts",
     "serve": "node server/index.ts",
     "build": "vite build",
-    "check": "svelte-check --tsconfig ./tsconfig.json --fail-on-warnings",
-    "lint": "biome check . && prettier --check \"ui/src/**/*.svelte\"",
-    "format": "biome check --write . && prettier --write --log-level warn \"ui/src/**/*.svelte\"",
+    "check": "svelte-check --tsconfig ./tsconfig.json --fail-on-warnings --incremental && tsc -p tsconfig.server.json",
+    "lint": "biome check . && prettier --check --cache \"ui/src/**/*.svelte\"",
+    "format": "biome check --write . && prettier --write --cache --log-level warn \"ui/src/**/*.svelte\"",
     "test": "node --test 'tests/*.test.ts'",
     "docs:gen": "node scripts/docs.ts",
     "gates": "node scripts/gates.ts",
@@ -44,7 +44,6 @@
   "devDependencies": {
     "@biomejs/biome": "^2.5.15",
     "@sveltejs/vite-plugin-svelte": "^7.3.1",
-    "@types/dompurify": "^3.2.0",
     "@types/node": "^26.6.4",
     "@types/ws": "^8.18.2",
     "prettier": "^3.9.9",
@@ -57,6 +56,9 @@
   "pnpm": {
     "onlyBuiltDependencies": [
       "node-pty"
-    ]
+    ],
+    "overrides": {
+      "mermaid>katex": "^0.19.0"
+    }
   }
 }

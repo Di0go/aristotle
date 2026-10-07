@@ -321,4 +321,5 @@ Only for the interface (and the tests); Claude Code uses MCP.
 |---|---|
 | [`docs.test.ts`](../tests/docs.test.ts) | The docs stay true: every doc is in the index, every link resolves, every command and setting is documented, and code that changed since the last release came with a change to the docs that describe it. |
 | [`mcp.test.ts`](../tests/mcp.test.ts) | End-to-end: a real server, a real MCP client in Claude Code's place, and HTTP calls in the interface's place. |
+| [`unit.test.ts`](../tests/unit.test.ts) | Unit tests for the pure pieces the end-to-end tests only reach indirectly: slugs (old ids must keep working), the write queue that carries on after a failure, the append log that retries, the lean map, and the socket table. |
 <!-- /generated -->

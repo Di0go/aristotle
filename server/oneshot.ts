@@ -18,7 +18,9 @@ export class OneshotError extends Error {}
 
 /** Claude Code's answer to `request`, under the instructions in `system`. */
 export function oneshot(system: string, request: string): Promise<string> {
-  const [file, ...rest] = ONESHOT_CMD ? ONESHOT_CMD.split(' ') : ['claude', ...headlessArgs(system, ['--no-session-persistence'])];
+  const [file = 'claude', ...rest] = ONESHOT_CMD
+    ? ONESHOT_CMD.split(' ')
+    : ['claude', ...headlessArgs(system, ['--no-session-persistence'])];
   return limited(async () => {
     const cwd = await claudeCwd();
     return new Promise<string>((resolve, reject) => {

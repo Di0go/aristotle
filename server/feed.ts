@@ -128,20 +128,20 @@ export class SessionCache<T> {
   async values(): Promise<T[]> {
     const names = await sessionFiles();
     const out: T[] = new Array(names.length);
-    const stale: number[] = [];
+    const stale: { i: number; name: string }[] = [];
     for (const [i, name] of names.entries()) {
       const file = path.join(SESSIONS_DIR, name);
       const cached = this.entries.get(file);
       if (cached && cached.version === (logVersions.get(file) ?? 0)) out[i] = cached.value;
-      else stale.push(i);
+      else stale.push({ i, name });
     }
     // The logs not read yet (all of them, the first time), a batch at a time, yielding in between.
     for (let at = 0; at < stale.length; at += READ_BATCH) {
       await Promise.all(
-        stale.slice(at, at + READ_BATCH).map(async (i) => {
-          const file = path.join(SESSIONS_DIR, names[i]);
+        stale.slice(at, at + READ_BATCH).map(async ({ i, name }) => {
+          const file = path.join(SESSIONS_DIR, name);
           const version = logVersions.get(file) ?? 0;
-          const value = this.derive(await readSession(file), names[i].replace(/\.jsonl$/, ''));
+          const value = this.derive(await readSession(file), name.replace(/\.jsonl$/, ''));
           this.entries.set(file, { version, value });
           out[i] = value;
         }),
@@ -222,7 +222,7 @@ export class Feed {
     const at = this.items.findIndex((i) => i.id === id);
     for (let i = at; i >= 0; i--) {
       const item = this.items[i];
-      if (item.type === 'block' && item.kind === 'step') return item.title;
+      if (item?.type === 'block' && item.kind === 'step') return item.title;
     }
     return undefined;
   }
@@ -239,7 +239,7 @@ export class Feed {
     if (item.answeredAt) throw new AnswerError('Already answered');
     if (picks.length !== item.questions.length) throw new AnswerError('One pick per question');
     const responses = item.questions.map((q, i): QuizResponse => {
-      const { choice, note } = picks[i];
+      const { choice, note } = picks[i] ?? { choice: null };
       if (choice !== null && !(Number.isInteger(choice) && choice >= 0 && choice < q.options.length)) {
         throw new AnswerError(`Invalid choice for question ${i + 1}`);
       }
@@ -381,7 +381,7 @@ function activeMinutes(record: SessionRecord): number {
     .sort((a, b) => a - b);
   let total = 0;
   for (let i = 1; i < ms.length; i++) {
-    const gap = ms[i] - ms[i - 1];
+    const gap = (ms[i] ?? 0) - (ms[i - 1] ?? 0);
     if (gap <= IDLE_MS) total += gap;
   }
   return Math.round(total / 60_000);

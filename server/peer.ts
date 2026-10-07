@@ -44,10 +44,10 @@ function rows(): Row[] {
     }
     for (const line of text.split('\n').slice(1)) {
       // sl local_address rem_address st tx_queue:rx_queue tr:tm->when retrnsmt uid ...
-      const f = line.trim().split(/\s+/);
-      if (f.length < 8) continue;
-      const [hex, portHex] = f[1].split(':');
-      out.push({ address: decode(hex), port: Number.parseInt(portHex, 16), state: f[3], uid: Number(f[7]) });
+      const [, local = '', , state = '', , , , uid = ''] = line.trim().split(/\s+/);
+      const [hex = '', portHex = ''] = local.split(':');
+      if (!uid) continue;
+      out.push({ address: decode(hex), port: Number.parseInt(portHex, 16), state, uid: Number(uid) });
     }
   }
   return out;
@@ -61,7 +61,7 @@ function decode(hex: string): string {
   // IPv4 mapped into IPv6 (::ffff:a.b.c.d) is the same endpoint as a.b.c.d.
   if (bytes.slice(0, 10).every((b) => b === 0) && bytes[10] === 255 && bytes[11] === 255) return bytes.slice(12).join('.');
   const groups: string[] = [];
-  for (let i = 0; i < 16; i += 2) groups.push(((bytes[i] << 8) | bytes[i + 1]).toString(16));
+  for (let i = 0; i < 16; i += 2) groups.push((((bytes[i] ?? 0) << 8) | (bytes[i + 1] ?? 0)).toString(16));
   return groups.join(':');
 }
 

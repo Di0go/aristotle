@@ -875,12 +875,15 @@ function notAnswered(): CallToolResult {
 
 /** The options in a random order, with `correct` following the right one. */
 function shuffle(q: QuizQuestion): QuizQuestion {
+  // Fisher-Yates, by swapping the indices.
   const order = q.options.map((_, i) => i);
   for (let i = order.length - 1; i > 0; i--) {
     const j = randomInt(i + 1);
-    [order[i], order[j]] = [order[j], order[i]];
+    const swap = order[i] as number;
+    order[i] = order[j] as number;
+    order[j] = swap;
   }
-  return { ...q, options: order.map((i) => q.options[i]), correct: order.indexOf(q.correct) };
+  return { ...q, options: order.map((i) => q.options[i] as string), correct: order.indexOf(q.correct) };
 }
 
 /** SVG to PNG with rsvg-convert, on Aristotle's card colours, so currentColor renders as it would in Aristotle. */
@@ -928,7 +931,7 @@ function renderBoth(svg: string): Promise<Buffer> {
 
 /** Every id in an SVG, and every reference to one (url(#…), href="#…", SMIL begin="id.end"), with `suffix` added. */
 function renameIds(svg: string, suffix: string): string {
-  const ids = [...svg.matchAll(/\sid\s*=\s*["']([^"']+)["']/g)].map((m) => m[1]);
+  const ids = [...svg.matchAll(/\sid\s*=\s*["']([^"']+)["']/g)].map((m) => m[1] ?? '').filter(Boolean);
   let out = svg;
   for (const id of ids) {
     const e = id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -972,7 +975,7 @@ function roadmapContext(gym: Gym, slug: string): string {
       const earlier = before.length
         ? ` Earlier steps: ${before.map((s) => `${s.topic} (${stepState(gym.topics.get(s.topic)).replace('-', ' ')})`).join(', ')}; reuse their concepts as "topic/id" prerequisites instead of reteaching them.`
         : ' It is the first step.';
-      return `\n\nThis topic is step ${index + 1} of ${roadmap.steps.length} of the roadmap "${roadmap.title}" (${roadmap.slug}). Step goal: ${roadmap.steps[index].goal}.${earlier} Call get_roadmap for the whole path.`;
+      return `\n\nThis topic is step ${index + 1} of ${roadmap.steps.length} of the roadmap "${roadmap.title}" (${roadmap.slug}). Step goal: ${roadmap.steps[index]?.goal}.${earlier} Call get_roadmap for the whole path.`;
     })
     .join('');
 }

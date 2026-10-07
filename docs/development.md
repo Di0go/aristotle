@@ -63,16 +63,16 @@ Claude Code in the drawer runs in the release copy, so lessons use the released 
 
 ## Gates
 
-`pnpm gates` runs every check, cheapest first: generated docs current, lint and format (Biome, and Prettier for `.svelte`), types, the build, then the tests (which serve the built pages). The same list runs:
+`pnpm gates` runs every check: generated docs current, lint and format (Biome, and Prettier for `.svelte`), types, the build, and the tests (which serve the built pages). The ones that don't depend on each other run side by side, the tests start as soon as the build is done, each one's output is shown only if it fails, and the first failure stops the rest ([`scripts/gates.ts`](../scripts/gates.ts)). Types and Prettier keep caches (`svelte-check --incremental` in `.svelte-check/`, Prettier's in `node_modules/.cache`), so a second run is much quicker than the first. The same list runs:
 
 - on **commit**, quick ones only (`pnpm gates --quick`, [`.githooks/pre-commit`](../.githooks/pre-commit));
 - on **push** ([`.githooks/pre-push`](../.githooks/pre-push));
 - in **CI** ([`.github/workflows/ci.yml`](../.github/workflows/ci.yml)), with a read-only token, no credentials left on disk, and actions pinned to commits that [Dependabot](../.github/dependabot.yml) proposes updates to;
 - before every **release**.
 
-The single commands: `pnpm lint` (read only: Biome lints and checks the formatting of TypeScript, CSS and JSON, Prettier the formatting of `.svelte` files), `pnpm format` (apply both), `pnpm check` (types, through `svelte-check`, which also type-checks and lints the `.svelte` files), `pnpm test`, `pnpm build`.
+The single commands: `pnpm lint` (read only: Biome lints and checks the formatting of TypeScript, CSS and JSON, Prettier the formatting of `.svelte` files), `pnpm format` (apply both), `pnpm check` (types, through `svelte-check`, which also type-checks and lints the `.svelte` files, then the server once more with `noUncheckedIndexedAccess`, [`tsconfig.server.json`](../tsconfig.server.json)), `pnpm test`, `pnpm build`.
 
-`pnpm test` is end to end ([`tests/mcp.test.ts`](../tests/mcp.test.ts)): a real server on a throwaway data folder, a real MCP client in Claude Code's place (and the real bridge, driven over stdio, for cancelling), HTTP calls in the interface's place, a shell in the terminal's place. Besides the teaching tools it covers the security lines (origins, hosts, fetch metadata, content types, headers, a malformed WebSocket frame) and the data's safety (a write refused by the disk, a line torn by a crash, an unreadable file, titles in other scripts). [`tests/docs.test.ts`](../tests/docs.test.ts) checks the docs.
+`pnpm test` runs [`tests/unit.test.ts`](../tests/unit.test.ts) (slugs, the write queue and append log, the lean map) and, end to end, [`tests/mcp.test.ts`](../tests/mcp.test.ts): a real server on a throwaway data folder and free ports (so two runs never share a server), a real MCP client in Claude Code's place (and the real bridge, driven over stdio, for cancelling), HTTP calls in the interface's place, a shell in the terminal's place. Besides the teaching tools it covers the security lines (origins, hosts, fetch metadata, content types, headers, a malformed WebSocket frame) and the data's safety (a write refused by the disk, a line torn by a crash, an unreadable file, titles in other scripts). [`tests/docs.test.ts`](../tests/docs.test.ts) checks the docs.
 
 `pnpm serve` runs the server in the foreground, for debugging it on its own.
 
@@ -94,9 +94,9 @@ The server keeps its compiled code in Node's compile cache (`NODE_COMPILE_CACHE`
 | `pnpm app` | `node server/control.ts` |
 | `pnpm serve` | `node server/index.ts` |
 | `pnpm build` | `vite build` |
-| `pnpm check` | `svelte-check --tsconfig ./tsconfig.json --fail-on-warnings` |
-| `pnpm lint` | `biome check . && prettier --check "ui/src/**/*.svelte"` |
-| `pnpm format` | `biome check --write . && prettier --write --log-level warn "ui/src/**/*.svelte"` |
+| `pnpm check` | `svelte-check --tsconfig ./tsconfig.json --fail-on-warnings --incremental && tsc -p tsconfig.server.json` |
+| `pnpm lint` | `biome check . && prettier --check --cache "ui/src/**/*.svelte"` |
+| `pnpm format` | `biome check --write . && prettier --write --cache --log-level warn "ui/src/**/*.svelte"` |
 | `pnpm test` | `node --test 'tests/*.test.ts'` |
 | `pnpm docs:gen` | `node scripts/docs.ts` |
 | `pnpm gates` | `node scripts/gates.ts` |
@@ -121,6 +121,7 @@ Every setting is an environment variable with a default. `.env` is not read: set
 | `ARISTOTLE_SETTINGS` | This install's own choices, kept out of git: settings.json in the state directory (for example {"accent": "red"}). | [`config.ts`](../server/config.ts) |
 | `ARISTOTLE_VITE_PORT` | The Vite dev server's port (vite.config.ts), which proxies to this server in dev. | [`config.ts`](../server/config.ts) |
 | `ARISTOTLE_BACKUP` | Commit data/ after quiet periods (server/backup.ts). | [`config.ts`](../server/config.ts) |
+| `ARISTOTLE_TERMINAL_QUIET_MS` | How long a just-started Claude Code must be quiet before messages are typed into it (terminal.ts); short in tests. | [`config.ts`](../server/config.ts) |
 | `ARISTOTLE_CLAUDE_CMD` | The command the terminal drawer runs (server/terminal.ts); tests swap in a shell. | [`config.ts`](../server/config.ts) |
 | `ARISTOTLE_ONESHOT_MODEL` | The model for glosses and his questions on a passage (server/oneshot.ts): an alias Claude Code knows, on his own login. | [`config.ts`](../server/config.ts) |
 | `ARISTOTLE_GLOSS_IMAGES` | Whether a gloss may carry a picture from Wikimedia Commons, when one would help (off in the tests: no network). | [`config.ts`](../server/config.ts) |

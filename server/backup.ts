@@ -99,7 +99,7 @@ function describe(porcelain: string): string {
     // Each line is a two-letter status and a space, then the path.
     const file = line.slice(3).trim();
     const [, dir, name] = /^(topics|roadmaps|missions)\/([^/]+)\.json$/.exec(file) ?? [];
-    if (dir) named[dir as keyof typeof named].add(name);
+    if (dir && name) named[dir as keyof typeof named].add(name);
     if (/^sessions\//.test(file)) sessions++;
   }
   const parts = [...named.topics];

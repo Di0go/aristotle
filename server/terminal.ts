@@ -4,13 +4,13 @@
 import pty from 'node-pty';
 import type { IPty } from 'node-pty';
 import type { WebSocket } from 'ws';
-import { CLAUDE_CMD as COMMAND, INSTANCE, ROOT } from './config.ts';
+import { CLAUDE_CMD as COMMAND, INSTANCE, ROOT, TERMINAL_QUIET_MS } from './config.ts';
 import { claudeEnv } from './oneshot.ts';
 
 /** Output kept for clients that connect later, so the drawer shows the whole recent screen. */
 const BUFFER_LIMIT = 256 * 1024;
 /** A just-started Claude Code is taken to be ready for input once its output has been quiet this long… */
-const READY_QUIET_MS = 1200;
+const READY_QUIET_MS = TERMINAL_QUIET_MS;
 /** …or after this long, whichever comes first. */
 const READY_MAX_MS = 8000;
 
@@ -50,7 +50,7 @@ export class Terminal {
   /** Starts Claude Code; `prompt` becomes its first message. */
   start(resume = false, prompt?: string) {
     if (this.proc) return;
-    const [file, ...args] = COMMAND.split(' ');
+    const [file = 'claude', ...args] = COMMAND.split(' ');
     if (resume) args.push('--continue');
     if (prompt) args.push(prompt);
     this.buffer = '';

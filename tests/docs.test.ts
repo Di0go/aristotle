@@ -61,10 +61,17 @@ test('code changed since the last release came with its docs', (t) => {
   // The release tag marks what is live; without it (a fresh clone, CI without tags) there is nothing to compare.
   const base = git('rev-parse', '--verify', '--quiet', 'refs/tags/live');
   if (!base) return t.skip('no live tag');
-  const changed = git('diff', '--name-only', `${base}..HEAD`)?.split('\n').filter(Boolean) ?? [];
-  const messages = git('log', '--format=%B', `${base}..HEAD`) ?? '';
-  if (NO_DOCS.test(messages)) return;
-  const missing = undocumented(changed);
+  // Each commit's files, except a commit that says why it needs no docs ("Docs: none -- <why>"): that one
+  // exempts its own files, not every other commit's. A doc changed by any commit counts.
+  const log = git('log', '--name-only', '--format=%x00%B%x01', `${base}..HEAD`) ?? '';
+  const changed = new Set<string>();
+  for (const entry of log.split('\0').filter(Boolean)) {
+    const [message, files = ''] = entry.split('\x01');
+    for (const file of files.split('\n').filter(Boolean)) {
+      if (!NO_DOCS.test(message) || file.endsWith('.md')) changed.add(file);
+    }
+  }
+  const missing = undocumented([...changed]);
   assert.deepEqual(
     missing.map((m) => m.name),
     [],

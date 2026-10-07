@@ -8,6 +8,7 @@ import { after, before, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
 import http from 'node:http';
+import net from 'node:net';
 import https from 'node:https';
 import { chmod, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -34,9 +35,10 @@ import type {
   TopicSummary,
 } from '../shared/types.ts';
 
-const PORT = 4799;
-const TLS_PORT = 4798;
-const BASE = `http://localhost:${PORT}`;
+// Free ports, found per run: two runs at once (a push and a release, two worktrees) never share a server.
+let PORT = 0;
+let TLS_PORT = 0;
+let BASE = '';
 
 let server: ChildProcess;
 let dataDir: string;
@@ -44,6 +46,8 @@ let tlsDir: string;
 let client: Client;
 
 before(async () => {
+  [PORT, TLS_PORT] = await Promise.all([freePort(), freePort()]);
+  BASE = `http://localhost:${PORT}`;
   dataDir = await mkdtemp(path.join(tmpdir(), 'aristotle-test-'));
   // A certificate from the real script, marked as trusted the way setup-hostname.sh does.
   tlsDir = await mkdtemp(path.join(tmpdir(), 'aristotle-tls-'));
@@ -58,6 +62,7 @@ after(async () => {
   await client.close();
   server.kill();
   await rm(dataDir, { recursive: true, force: true });
+  await rm(path.join(dataDir, '..', `${path.basename(dataDir)}-claude`), { recursive: true, force: true });
   await rm(tlsDir, { recursive: true, force: true });
 });
 
@@ -71,7 +76,9 @@ async function startServer() {
       ARISTOTLE_DATA_DIR: dataDir,
       ARISTOTLE_TLS_DIR: tlsDir,
       ARISTOTLE_TLS_PORT: String(TLS_PORT),
-      ARISTOTLE_WAIT_MS: '1500',
+      ARISTOTLE_WAIT_MS: '800',
+      ARISTOTLE_TERMINAL_QUIET_MS: '300',
+      ARISTOTLE_CLAUDE_CWD: path.join(dataDir, '..', `${path.basename(dataDir)}-claude`),
       // A plain shell in Claude Code's place, so the terminal tests can type into it.
       ARISTOTLE_CLAUDE_CMD: 'bash --norc --noprofile',
       // cat in Claude Code's place for glosses: the gloss is the request it was sent.
@@ -83,11 +90,24 @@ async function startServer() {
   });
   for (let i = 0; i < 50; i++) {
     try {
-      if ((await fetch(`${BASE}/api/health`)).ok) return;
+      // Ours, not whatever else may hold the port.
+      const health = (await (await fetch(`${BASE}/api/health`)).json()) as { pid?: number };
+      if (health.pid === server.pid) return;
     } catch {}
     await sleep(100);
   }
   throw new Error('Server did not start');
+}
+
+/** A port nothing listens on right now. */
+function freePort(): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const probe = net.createServer().listen(0, '127.0.0.1', () => {
+      const { port } = probe.address() as net.AddressInfo;
+      probe.close(() => resolve(port));
+    });
+    probe.on('error', reject);
+  });
 }
 
 async function restart() {
@@ -341,7 +361,7 @@ test('rejects requests from other sites', async () => {
   const plain = await fetch(`${BASE}/api/answer`, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: '{}' });
   assert.equal(plain.status, 415);
   // Another name for this machine (DNS rebinding), or our port on another name.
-  for (const host of ['evil.example:4799', `localhost:5173`, `LOCALHOST.:${PORT}`]) {
+  for (const host of [`evil.example:${PORT}`, `localhost:5173`, `LOCALHOST.:${PORT}`]) {
     const status = await new Promise<number>((resolve, reject) => {
       http
         .get({ host: '127.0.0.1', port: PORT, path: '/api/state', headers: { host } }, (res) => resolve(res.statusCode!))

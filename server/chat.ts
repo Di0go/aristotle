@@ -171,7 +171,7 @@ export class Chats {
     const resume = Boolean(t.session);
     const session = t.session ?? randomUUID();
     // Always the same private folder (oneshot.ts claudeCwd), so a session can be resumed.
-    const [file, ...rest] = ONESHOT_CMD
+    const [file = 'claude', ...rest] = ONESHOT_CMD
       ? ONESHOT_CMD.split(' ')
       : [
           'claude',

@@ -96,7 +96,7 @@ export async function findImages(query: string, limit = 8): Promise<{ images: Fo
       title: p.title.replace(/^File:/, '').slice(0, MAX_FIELD),
       page: info.descriptionurl ?? `https://commons.wikimedia.org/wiki/${encodeURIComponent(p.title)}`,
       // Without Commons' tracking parameters.
-      src: (info.thumburl ?? info.url ?? '').split('?')[0],
+      src: (info.thumburl ?? info.url ?? '').split('?')[0] ?? '',
       width: info.thumbwidth ?? 0,
       height: info.thumbheight ?? 0,
       license,
@@ -119,7 +119,7 @@ export async function viewImage(src: string, width = 0, height = 0): Promise<Buf
   // No redirects (they could lead anywhere), a time limit, and never more than MAX_IMAGE_BYTES read into memory.
   const res = await fetch(url, { headers: { 'User-Agent': UA }, redirect: 'error', signal: AbortSignal.timeout(TIMEOUT_MS) });
   if (!res.ok) throw new Error(`The image host answered ${res.status}`);
-  const type = (res.headers.get('content-type') ?? '').split(';')[0].trim();
+  const type = (res.headers.get('content-type') ?? '').split(';')[0]?.trim() ?? '';
   if (!/^image\/(jpeg|png|gif|webp|svg\+xml)$/.test(type)) throw new Error(`Not an image (${type || 'no type'}).`);
   if (Number(res.headers.get('content-length') ?? 0) > MAX_IMAGE_BYTES) throw new Error('The image is too large to view.');
   const bytes = await readCapped(res, MAX_IMAGE_BYTES);

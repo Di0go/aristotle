@@ -92,6 +92,8 @@ export const ALLOWED_ORIGINS: ReadonlySet<string> = new Set([
 
 /** Commit data/ after quiet periods (server/backup.ts). Off in dev: its data is disposable. */
 export const BACKUP = !DEV && process.env.ARISTOTLE_BACKUP !== 'off';
+/** How long a just-started Claude Code must be quiet before messages are typed into it (terminal.ts); short in tests. */
+export const TERMINAL_QUIET_MS = Number(process.env.ARISTOTLE_TERMINAL_QUIET_MS ?? 1200);
 /** The command the terminal drawer runs (server/terminal.ts); tests swap in a shell. */
 export const CLAUDE_CMD = process.env.ARISTOTLE_CLAUDE_CMD ?? 'claude';
 
