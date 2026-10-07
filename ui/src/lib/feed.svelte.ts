@@ -175,7 +175,8 @@ class LiveFeed {
     this.reloading = true;
     this.again = false;
     this.held = [];
-    this.sessionList = null;
+    // Back after a disconnection, anything may have changed; on the first load, a list asked for a moment ago is current.
+    if (this.loaded) this.sessionList = null;
     try {
       const threads = Object.keys(this.chats);
       const [state, topics, roadmaps, missions, glosses, asides, notes, about, chats] = await Promise.all([

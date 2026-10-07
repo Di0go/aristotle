@@ -547,11 +547,11 @@
     flex-direction: column;
     align-items: flex-start;
     gap: 8px;
-    min-height: 92px;
+    min-height: 112px;
   }
 
   .sk-panel {
     gap: 12px;
-    min-height: 196px;
+    min-height: 240px;
   }
 </style>

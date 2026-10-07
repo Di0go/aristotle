@@ -47,7 +47,7 @@
           aria-label="{i + 1}: {m.label}">{i + 1}</button
         >
         {#if on === i}
-          <span class="pin-label" style:left="{m.x}%" style:top="{m.y}%">{m.label}</span>
+          <span class="pin-label" class:left={m.x > 55} style:left="{m.x}%" style:top="{m.y}%">{m.label}</span>
         {/if}
       {/each}
     </div>
@@ -128,6 +128,11 @@
     white-space: nowrap;
     box-shadow: var(--shadow);
     pointer-events: none;
+  }
+
+  /* On the right half it opens to the left, so it stays inside the lesson's box (which clips what leaves it). */
+  .pin-label.left {
+    transform: translate(calc(-100% - 16px), -50%);
   }
 
   .key {
