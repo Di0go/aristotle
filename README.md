@@ -45,15 +45,9 @@ A real stretch of a lesson, start to finish. A quiz whose wrong options are mist
 
 Understanding is not something you can be handed. It is built by **struggling with the material at the edge of what you can do**, the way a muscle is built by load. AI is the equipment: it finds that edge, loads it, and checks the result honestly. The idea comes from Eero Alvar's [Bodybuilding for the Mind](https://www.youtube.com/watch?v=o0DtxUJ6rAc).
 
-```mermaid
-flowchart LR
-    L["<b>Learn</b><br/>one reasoning step,<br/>then a check"] --> M["<b>Map</b><br/>what holds, what's shaky,<br/>what rests on what"]
-    M --> R["<b>Review</b><br/>recall it just<br/>as it starts to fade"]
-    M --> T["<b>Train</b><br/>problems just past<br/>what you can do"]
-    R --> P["<b>Praxis</b><br/>use it for real,<br/>in your own life"]
-    T --> P
-    P -. "what fails in practice<br/>goes back to shaky" .-> M
-```
+<p align="center">
+  <picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/method-dark.svg"><img src="docs/images/method-light.svg" alt="Diagram of the method: Learn (one reasoning step, then a check) leads to Map (what holds, what's shaky, what rests on what). The Map leads to Review (recall it just as it starts to fade) and to Train (problems just past what you can do), and both lead to Praxis (use it for real, in your own life). A dotted line loops from Praxis back to the Map: what fails in practice goes back to shaky." width="876"></picture>
+</p>
 
 | | What happens | Why |
 |---|---|---|
@@ -179,14 +173,9 @@ Then Aristotle lives at **https://aristotle.test**. The certificate authority is
 
 ## How it works
 
-```mermaid
-flowchart LR
-    CC["Claude Code<br/><i>the tutor</i>"] -- "stdio" --> B["server/bridge.ts"]
-    B -- "MCP over HTTP" --> S["Node server<br/>127.0.0.1:4747"]
-    S <-- "live events (SSE)" --> UI["Browser<br/><i>Svelte 5</i>"]
-    S -- "pseudo-terminal<br/>over WebSocket" --> UI
-    S <--> D[("data/<br/>plain files")]
-```
+<p align="center">
+  <picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/architecture-dark.svg"><img src="docs/images/architecture-light.svg" alt="Diagram of how it works: Claude Code, the tutor, talks over stdio to server/bridge.ts, which talks MCP over HTTP to the Node server on 127.0.0.1:4747. The server and the browser (Svelte 5) exchange live events over SSE, and the server streams a pseudo-terminal to the browser over a WebSocket. The server reads and writes data/, plain files." width="874"></picture>
+</p>
 
 - **Claude Code is the tutor; the server is the classroom.** The server exposes its tools over [MCP](https://modelcontextprotocol.io) (`show`, `quiz`, `ask`, `update_map`, `record_practice`, `save_roadmap`, `save_mission`, `review_mission` and more), and the bridge starts it on demand. A question waits for your answer in the browser and hands it back to Claude, so the tutor reacts to what you actually wrote.
 - **The method lives in skills** (`.claude/skills/`): `teach`, `review`, `train`, `roadmap` and `praxis`. A `researcher` subagent fact-checks claims before they are taught, and an `illustrator` subagent draws diagrams and checks them rendered in both themes.
