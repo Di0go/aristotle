@@ -46,7 +46,9 @@ const MATH_AND_DIAGRAMS =
   'The visual kit (prefer it to hand-drawn SVG; each is a fenced block of JSON, drawn and animated by Aristotle): ' +
   '```balance (two forces on one value: {title, left:{label,detail}, right:{label,detail}, unit, min, max, neutral, neutralLabel, states:[{label, left:0-1, right:0-1, value, note}]}), ' +
   '```timeline (things over time, log scale by default: {title, scale:"log"|"linear", from:"0.5s", to:"2h", marks:["1s","1min"], lanes:[{label, start, end, peak?, note?}]}), ' +
-  '```flow (a pathway: {title, direction:"LR"|"TB", nodes:[{id,label,sub?}], edges:[{from,to,label?,kind:"a"|"b"|"slow"}], steps:[{caption, on:[node ids]}]}), ' +
+  '```flow (a pathway: {title, direction:"LR"|"TB", nodes:[{id,label,sub?,art?,makes?:[…]}], edges:[{from,to,label?,kind:"a"|"b"|"slow",carries?}], steps:[{caption, on:[node ids]}]}; ' +
+  'art draws a thing in its box, carries draws what travels an arrow, makes draws what rises out of a box, all from a set of drawings: ' +
+  'glucose, pyruvate, atp, adp, nadh, fadh2, co2, o2, h2o, electron, proton (any other name is drawn as a labelled chip). Use them whenever the pathway moves real things), ' +
   '```plate (a real image with numbered markers: {title, src, alt, credit, license, source, markers:[{x:%, y:%, label, detail?}]}; take images from find_images, which checks the licence, and place markers with view_image). ' +
   'Hand-built interactive figures (explorables): ```explorable {"id":"heart-rate","age":24,"start":"resting"|"asleep"|"called"|"round"|"transplant"} (brake and accelerator sliders driving a beating heart and its trace; shows the brake is fast and the accelerator slow) and ' +
   '```explorable {"id":"stress-hormones","minutes":10,"second":false} (heart rate, adrenaline and cortisol over two hours after a stressor, with a second-round option).';

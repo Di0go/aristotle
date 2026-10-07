@@ -44,6 +44,10 @@ A kit figure is a component that draws a fenced JSON block, so Claude can use it
 3. Teach Claude its JSON: add it to the visual kit sentence in `MATH_AND_DIAGRAMS` in [`server/mcp.ts`](../server/mcp.ts), with every field.
 4. Try it in the dev instance: have the `aristotle-dev` MCP server `show` a block, or add a step to [`scripts/fixtures/demo.ts`](../scripts/fixtures/demo.ts) and `pnpm seed --force`.
 
+## Add a drawing to the flow's glyphs
+
+A new molecule or particle for `art`, `carries` and `makes` goes in [`Glyph.svelte`](../ui/src/lib/kit/Glyph.svelte): a branch drawing it around (0, 0) with the `atom` and `bond` snippets, its half size in `EXTENT`, its formula in `NAMES`, and any other spellings in `ALIASES`. Then add its name to the list of drawings in the `flow` sentence of `MATH_AND_DIAGRAMS` in [`server/mcp.ts`](../server/mcp.ts).
+
 ## Add an explorable
 
 An explorable is a hand-built interactive figure for one topic, placed in a lesson after the step that teaches its concept.

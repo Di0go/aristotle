@@ -372,10 +372,25 @@
 :root {
   /* the second ink in a figure, for the opposing force or the other route */
   --kit-b: #c98a1e;
+  /* atoms in the kit's molecule glyphs (kit/Glyph.svelte), in the usual CPK colours */
+  --atom-c: #4a4f57;
+  --atom-o: #e0473e;
+  --atom-h: #ffffff;
+  --atom-n: #3f6fd8;
+  --atom-p: #e8902a;
+  --atom-edge: rgba(0, 0, 0, 0.35);
+  --electron: #2f9be0;
 }
 
 :root[data-theme='dark'] {
   --kit-b: #e0a84a;
+  --atom-c: #8b919b;
+  --atom-o: #f0645b;
+  --atom-h: #eef0f2;
+  --atom-n: #6e95ef;
+  --atom-p: #f2a649;
+  --atom-edge: rgba(0, 0, 0, 0.55);
+  --electron: #5cc0ff;
 }
 
 /* The frame */

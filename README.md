@@ -34,12 +34,12 @@ It runs on your Claude subscription. No API keys, no accounts, no cloud: everyth
 
 ## See it teach
 
-One turn of a real lesson, start to finish. You answer an open question in your own words. Claude reads what you wrote, says what was right and what to refine, and marks the concept solid on your map. The next step arrives with its check, a quiz whose wrong options are mistakes you would really make. You pick one of them, the explanation tells you why, and the map records that the idea is shaky again.
+A real stretch of a lesson, start to finish. A quiz whose wrong options are mistakes you would really make: you pick one, the explanation tells you why, and your map marks the idea shaky. The next step arrives with a diagram that plays out the answer. Then an open question you answer in your own words; Claude reads what you wrote, says what you got right, and the idea goes back to solid.
 
 <p align="center">
-  <picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/lesson-loop-dark.webp"><img src="docs/images/lesson-loop-light.webp" alt="Recording of a lesson step: the learner types an answer about why the heart still races two minutes after a fright, Claude prepares the next step, its critique appears and the map marks the concept solid; then a new step, Coming back down, with a quiz; the learner picks a wrong option, sees the right one and the explanation, and the map marks the vagal brake shaky." width="100%"></picture>
+  <picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/lesson-loop-dark.webp"><img src="docs/images/lesson-loop-light.webp" alt="Recording of a lesson: the learner picks a wrong option in a quiz about what brings the heart rate down after a sparring round, sees the right answer and the explanation, and the map marks the vagal brake shaky; the next step, Two speeds on the way down, plays a timeline of the brake, the accelerator, adrenaline and cortisol; the learner writes an answer in their own words, Claude critiques it and the map marks the vagal brake solid again." width="100%"></picture>
 </p>
-<p align="center"><sub>Recorded in the demo library, in focus mode. The tutor's turns go through the same MCP tools Claude Code calls (<code>show</code>, <code>update_map</code>, <code>quiz</code>).</sub></p>
+<p align="center"><sub>Recorded in the demo library, in focus mode. The tutor's turns go through the same MCP tools Claude Code calls (<code>quiz</code>, <code>ask</code>, <code>show</code>, <code>update_map</code>).</sub></p>
 
 ## The method
 
@@ -82,8 +82,8 @@ Any subject, at any depth. Here is one lesson from each of four courses, in medi
 </table>
 
 ### Chemistry · How cells release energy
-<p><a href="docs/images/chem-flow-dark.webp"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/chem-flow-dark.webp"><img src="docs/images/chem-flow-light.webp" alt="Recording of a flow from glucose to ATP: walked through one stage at a time, glycolysis, the Krebs cycle, the electron transport chain and oxygen, each with a caption."></picture></a></p>
-<p><b>Flows.</b> A pathway you walk through one stage at a time, each lit up with what happens there and where: glycolysis in the cytoplasm, the Krebs cycle in the matrix, the chain on the inner membrane that makes most of the ATP.</p>
+<p><a href="docs/images/chem-flow-dark.webp"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/chem-flow-dark.webp"><img src="docs/images/chem-flow-light.webp" alt="Recording of a flow from glucose to ATP: a glucose molecule in the glycolysis box, pyruvate molecules travelling to the Krebs cycle, NADH carriers to the electron transport chain and electrons to oxygen, with ATP, CO₂ and water rising from the boxes; then walked through one stage at a time."></picture></a></p>
+<p><b>Flows.</b> A pathway you walk through one stage at a time, with the things it moves drawn as themselves: glucose in its ring, pyruvate and NADH riding the arrows, electrons on their way to oxygen, ATP, CO₂ and water rising out of the stage that makes them.</p>
 
 ### Physics · Falling with air resistance
 <table>

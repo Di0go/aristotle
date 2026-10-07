@@ -83,7 +83,7 @@ Visual kit, a fenced block in the figure's language:
 |---|---|---|
 | `balance` | [`Balance.svelte`](../ui/src/lib/kit/Balance.svelte) | Two forces pulling one value: a dial with a needle, a bar for each force, and states to step through (or two sliders to try it yourself). |
 | `timeline` | [`Timeline.svelte`](../ui/src/lib/kit/Timeline.svelte) | Things that happen over time, on one axis (logarithmic when they span seconds to hours). |
-| `flow` | [`Flow.svelte`](../ui/src/lib/kit/Flow.svelte) | A pathway: boxes and arrows laid out automatically, signals travelling along the arrows (fast or slow), and optional steps that light up one part of it at a time. |
+| `flow` | [`Flow.svelte`](../ui/src/lib/kit/Flow.svelte) | A pathway: boxes and arrows laid out automatically, signals travelling along the arrows (fast or slow), optional drawings of what is in each box, travels each arrow or comes out of a box, and optional steps that light up one part of it at a time. |
 | `plate` | [`Plate.svelte`](../ui/src/lib/kit/Plate.svelte) | A real image (an anatomical plate, a photo) with numbered markers: point at one, or at its line in the key, and both light up with its label. |
 
 Explorables, a fenced `explorable` block with `{"id": …}`:
@@ -93,5 +93,7 @@ Explorables, a fenced `explorable` block with `{"id": …}`:
 | `heart-rate` | Brake, accelerator and your heart |
 | `stress-hormones` | Two hours after a stressor |
 <!-- /generated -->
+
+A `flow` can draw the things it moves, not only name them: `art` puts a drawing in a box, `carries` sends one along an arrow in place of the plain pulse, and `makes` lifts drawings out of a lit box. They come from [`Glyph.svelte`](../ui/src/lib/kit/Glyph.svelte): molecules as balls and sticks in the usual atom colours (`--atom-*` tokens in `prose.css`, one set per theme), electrons, protons, ATP and the electron carriers. A name it does not know is drawn as a chip with the name in it, so any subject can use the fields.
 
 Everything is sanitised (DOMPurify) after rendering; an SVG may animate but never animate a link.

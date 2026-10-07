@@ -260,7 +260,8 @@ Only for the interface (and the tests); Claude Code uses MCP.
 | File | What it is |
 |---|---|
 | [`Balance.svelte`](../ui/src/lib/kit/Balance.svelte) | Two forces pulling one value: a dial with a needle, a bar for each force, and states to step through (or two sliders to try it yourself). |
-| [`Flow.svelte`](../ui/src/lib/kit/Flow.svelte) | A pathway: boxes and arrows laid out automatically, signals travelling along the arrows (fast or slow), and optional steps that light up one part of it at a time. |
+| [`Flow.svelte`](../ui/src/lib/kit/Flow.svelte) | A pathway: boxes and arrows laid out automatically, signals travelling along the arrows (fast or slow), optional drawings of what is in each box, travels each arrow or comes out of a box, and optional steps that light up one part of it at a time. |
+| [`Glyph.svelte`](../ui/src/lib/kit/Glyph.svelte) | Small drawings of the things a pathway moves: molecules as balls and sticks in the usual atom colours, electrons and protons, ATP with its phosphates, and the electron carriers. |
 | [`Plate.svelte`](../ui/src/lib/kit/Plate.svelte) | A real image (an anatomical plate, a photo) with numbered markers: point at one, or at its line in the key, and both light up with its label. |
 | [`Timeline.svelte`](../ui/src/lib/kit/Timeline.svelte) | Things that happen over time, on one axis (logarithmic when they span seconds to hours). |
 
