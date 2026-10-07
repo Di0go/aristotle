@@ -179,8 +179,10 @@ class LiveFeed {
       this.chats[event.thread] = [];
       delete this.chatDrafts[event.thread];
     } else if (event.type === 'chat-delta') {
-      this.chatDrafts[event.thread] = { id: event.id, text: event.text };
-    } else {
+      const draft = this.chatDrafts[event.thread];
+      const before = draft?.id === event.id ? draft.text : '';
+      this.chatDrafts[event.thread] = { id: event.id, text: event.text ?? before + (event.delta ?? '') };
+    } else if (event.type === 'item') {
       this.upsert(event.item);
     }
   }

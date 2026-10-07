@@ -105,6 +105,8 @@ export type PublicItem = BlockItem | PublicQuizItem | AskItem | MapItem;
 export interface FeedState {
   session: Session | null;
   items: PublicItem[];
+  /** Problems the learner should know about (a backup that keeps failing, a data file skipped as unreadable). */
+  warnings?: string[];
 }
 
 /** What the live feed (/api/events) sends: a change to the session, or to any stored record. */
@@ -114,18 +116,31 @@ export type FeedEvent =
   | { type: 'topic'; topic: Topic }
   | { type: 'roadmap'; roadmap: Roadmap }
   | { type: 'mission'; mission: Mission }
-  /** Every gloss, after one is added or removed. */
+  /** Every gloss, after one is added or removed. Being replaced by gloss / gloss-removed. */
   | { type: 'glosses'; glosses: Gloss[] }
-  /** Every question he asked on a passage, after one is added or removed. */
+  /** A gloss added or rewritten. */
+  | { type: 'gloss'; gloss: Gloss }
+  | { type: 'gloss-removed'; id: string }
+  /** Every question he asked on a passage, after one is added or removed. Being replaced by aside / aside-removed. */
   | { type: 'asides'; asides: Aside[] }
-  /** His notes on every step, after one changes. */
+  /** A question on a passage, added or answered. */
+  | { type: 'aside'; aside: Aside }
+  | { type: 'aside-removed'; id: string }
+  /** His notes on every step, after one changes. Being replaced by note / note-removed. */
   | { type: 'notes'; notes: StepNote[] }
+  /** A step's notebook, saved. */
+  | { type: 'note'; note: StepNote }
+  /** A step's notebook, emptied. */
+  | { type: 'note-removed'; topic: string; step: string }
+  /** The current warnings (see FeedState), whenever they change; [] when all is well again. */
+  | { type: 'warnings'; warnings: string[] }
   /** His own words about himself (the About you page), after he edits them. */
   | { type: 'about'; about: string }
   /** A message in a chat, his or Aristotle's, once it is complete. */
   | { type: 'chat'; thread: string; message: ChatMessage }
-  /** Aristotle's answer as it is being written: the text so far. */
-  | { type: 'chat-delta'; thread: string; id: string; text: string }
+  /** Aristotle's answer as it is being written: `delta` is the text added since the last event (`text`, the text
+   * so far, is being retired). The complete message follows as a `chat` event. */
+  | { type: 'chat-delta'; thread: string; id: string; delta?: string; text?: string }
   /** A chat was started over. */
   | { type: 'chat-cleared'; thread: string };
 
@@ -152,8 +167,14 @@ export interface Concept {
   solidSince?: string;
   /** Spaced-review schedule, from the first time it became solid. */
   review?: ReviewState;
+  /** Newest last. In /api/map and topic events only the newest LEAN_EVIDENCE entries are sent (see evidenceTotal). */
   evidence: Evidence[];
+  /** How many evidence entries there are in all, when the list above was shortened; /api/topics/:slug sends them all. */
+  evidenceTotal?: number;
 }
+
+/** How many evidence entries per concept the live map carries (/api/map, topic events). */
+export const LEAN_EVIDENCE = 5;
 
 export interface Evidence {
   at: string;
