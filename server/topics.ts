@@ -323,8 +323,12 @@ export function describeTopic(topic: Topic): string {
     const asks = count((e) => e.kind === 'ask');
     const practice = ev.filter((e) => e.kind === 'practice' && e.practice !== 'mission');
     const applied = ev.filter((e) => e.practice === 'mission');
+    // Only the counts that aren't zero: "checks: 2 right, 1 written", not four numbers per concept.
+    const checks = [right && `${right} right`, wrong && `${wrong} wrong`, dk && `${dk} don't know`, asks && `${asks} written`].filter(
+      Boolean,
+    );
     const record =
-      (ev.length ? ` | checks: ${right} right, ${wrong} wrong, ${dk} don't know, ${asks} written` : '') +
+      (checks.length ? ` | checks: ${checks.join(', ')}` : '') +
       (practice.length ? ` | practice: ${practice.map((e) => e.result).join(' ')}` : '') +
       (applied.length ? ` | used in Praxis: ${applied.map((e) => e.result).join(' ')}` : '');
     const fading = isFading(c);

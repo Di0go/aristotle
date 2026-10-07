@@ -159,7 +159,7 @@ Only for the interface (and the tests); Claude Code uses MCP.
 | [`gym.ts`](../server/gym.ts) | Ties the live feed to the knowledge maps: answers become evidence on concepts, map changes show up in the feed, practice moves review schedules and training levels, and data/ is backed up. |
 | [`images.ts`](../server/images.ts) | Real images for lessons, from Wikimedia Commons, with their licences checked before Claude may use them. |
 | [`index.ts`](../server/index.ts) | The Aristotle server: the interface, its live feed, and the MCP endpoint Claude Code connects to. |
-| [`mcp.ts`](../server/mcp.ts) | The tools Claude Code uses to teach through the interface: one MCP server per request (server/index.ts), over the stores in Gym. |
+| [`mcp.ts`](../server/mcp.ts) | The tools Claude Code uses to teach through the interface: one MCP server per request (server/index.ts), over the stores in Gym; the tools themselves are defined once. |
 | [`missions.ts`](../server/missions.ts) | Praxis missions: one JSON file per mission in data/missions/. |
 | [`notes.ts`](../server/notes.ts) | His own words: a notebook per step (what he writes in the panel beside a step, kept with that step) in data/notes.json, and his About you page (what he does, his projects, what he wants) in data/about.md. |
 | [`oneshot.ts`](../server/oneshot.ts) | One question to Claude Code, answered in a few seconds and forgotten: `claude -p` on his own login, headless and locked down (no tools, no MCP servers, no settings or hooks, no saved session, run from a private folder outside any project). |

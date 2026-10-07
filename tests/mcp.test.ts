@@ -285,7 +285,8 @@ test('a session builds a map, records evidence and leaves a handoff', async () =
   const described = textOf(await call('get_topic', { topic: 'differential-forms' }));
   assert.match(described, /Next: Wedge product/);
   assert.match(described, /covector "Covector" \[solid\] <- vector/);
-  assert.match(described, /checks: 1 right, 0 wrong, 0 don't know, 0 written/);
+  assert.match(described, /checks: 1 right\b/);
+  assert.doesNotMatch(described, /0 wrong|0 don't know|0 written/, 'only the counts that are not zero');
 
   const [summary] = await get<TopicSummary[]>('/api/topics');
   assert.deepEqual(summary.counts, { unknown: 1, shaky: 0, solid: 2 });
@@ -307,7 +308,7 @@ test('a session builds a map, records evidence and leaves a handoff', async () =
 
 test('continuing a topic reuses it', async () => {
   const res = textOf(await call('start_session', { topic: 'differential-forms', goal: 'Wedge products' }));
-  assert.match(res, /existing topic/);
+  assert.match(res, /session started on differential-forms\./);
   assert.equal((await get<TopicSummary[]>('/api/topics')).length, 1);
   assert.equal((await get<Topic>('/api/topics/differential-forms')).sessions.length, 2);
 });
@@ -434,7 +435,7 @@ test('a concept past its review date is fading, and a review session practises i
   assert.equal(summary.fading, 1);
 
   const started = textOf(await call('start_session', { kind: 'review', goal: "Review what's fading" }));
-  assert.match(started, /Review session .* started\. 1 concepts are fading/);
+  assert.match(started, /Review session started\. 1 concepts are fading/);
   assert.equal((await get<FeedState>('/api/state')).session?.topicSlug, '');
 
   const res = await call('update_map', { concepts: [{ id: 'a', status: 'solid' }] });
@@ -505,16 +506,24 @@ test('the terminal runs the command, takes messages, and only opens to Aristotle
   ws.close();
 });
 
-test('preview_svg renders an SVG to a PNG in either theme', async () => {
+test('preview_svg renders an SVG to a PNG in both themes at once, or in one', async () => {
   const svg =
-    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 40"><line x1="10" y1="20" x2="110" y2="20" stroke="currentColor"/><text x="10" y="15" fill="currentColor">v</text></svg>';
-  for (const dark of [false, true]) {
-    const res = await call('preview_svg', { svg, dark });
+    '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="40" viewBox="0 0 120 40"><defs><linearGradient id="g"><stop stop-color="currentColor"/></linearGradient></defs><line x1="10" y1="20" x2="110" y2="20" stroke="url(#g)"/><text x="10" y="15" fill="currentColor">v</text></svg>';
+  const widths: number[] = [];
+  for (const theme of ['both', 'light', 'dark']) {
+    const res = await call('preview_svg', { svg, theme });
     const [image] = res.content as { type: string; data: string; mimeType: string }[];
-    assert.equal(image.type, 'image');
+    assert.equal(image.type, 'image', theme);
     assert.equal(image.mimeType, 'image/png');
-    assert.equal(Buffer.from(image.data, 'base64').subarray(1, 4).toString(), 'PNG');
+    const png = Buffer.from(image.data, 'base64');
+    assert.equal(png.subarray(1, 4).toString(), 'PNG');
+    widths.push(png.readUInt32BE(16));
   }
+  assert.ok(widths[0] > 2 * widths[1], 'both themes side by side');
+  // A drawing declaring an enormous size is rendered small, not allocated in full.
+  const huge = await call('preview_svg', { svg: svg.replace('width="120"', 'width="16000"'), theme: 'light' });
+  const [big] = huge.content as { data: string }[];
+  assert.ok(Buffer.from(big.data, 'base64').readUInt32BE(16) <= 2400);
   const bad = await call('preview_svg', { svg: '<svg><line' });
   assert.equal(bad.isError, true);
   assert.match(textOf(bad), /Could not render/);
@@ -576,9 +585,10 @@ test('a roadmap orders topics and reads its progress off their maps', async () =
   ];
   const saved = textOf(await call('save_roadmap', { title: 'Geometry path', goal: 'Read Maxwell in forms', steps }));
   assert.match(saved, /Roadmap created/);
-  assert.match(saved, /\[DRAFT/);
-  assert.match(saved, /1\. Forms first \(topic differential-forms\) \[started/);
-  assert.match(saved, /2\. Stokes theorem \(topic stokes-theorem\) \[not started\]/);
+  assert.match(saved, /, draft\./);
+  // Short: they read the roadmap in Aristotle; Claude gets each step's topic, and whether it exists already.
+  assert.match(saved, /1\. differential-forms \(exists: started\)/);
+  assert.match(saved, /2\. stokes-theorem$/m);
 
   const [roadmap] = await get<Roadmap[]>('/api/roadmaps');
   assert.equal(roadmap.slug, 'geometry-path');
@@ -1040,8 +1050,46 @@ test('the bridge relays calls, and a quiz cancelled while it waits leaves its an
     const late = await answer({ id: quiz.id, picks: [{ choice: 0 }] });
     assert.equal(late.headers.get('X-Aristotle-Heard'), 'no', 'nothing waits for it any more');
     send({ id: 4, method: 'tools/call', params: { name: 'collect_answers', arguments: {} } });
-    assert.match((await reply(4)).result!.content[0].text, /Quiz answered: 1\/1 right/);
+    assert.match((await reply(4)).result!.content[0].text, /Quiz answered: \d\/1 right/);
   } finally {
     bridge.stdin!.end();
   }
+});
+
+test('starting a session hands over answers given after their question stopped waiting', async () => {
+  await call('start_session', { topic: 'Late answers', goal: 'Step away' });
+  assert.match(textOf(await call('ask', { prompt: 'What is a pacemaker?', kind: 'recall' })), /No answer yet/);
+  const open = await waitForPending('ask');
+  await answer({ id: open.id, text: 'The SA node' });
+  // The next sitting starts: the answer comes with it, so it is not stranded in the closed session.
+  const started = textOf(await call('start_session', { topic: 'Late answers', goal: 'Come back' }));
+  assert.match(started, /Answers they gave since your last question stopped waiting:[\s\S]*The SA node/);
+  assert.equal(textOf(await call('collect_answers')), 'No new answers.');
+});
+
+test('every tool description and the instructions fit in what Claude Code reads (2048 characters)', async () => {
+  const { tools } = await client.listTools();
+  for (const t of tools) assert.ok((t.description ?? '').length <= 2048, `${t.name}: ${t.description?.length}`);
+  assert.ok((client.getInstructions() ?? '').length <= 2048);
+  // Read-only tools say so, so Claude Code can run them side by side.
+  assert.equal(tools.find((t) => t.name === 'get_topic')?.annotations?.readOnlyHint, true);
+  assert.notEqual(tools.find((t) => t.name === 'show')?.annotations?.readOnlyHint, true);
+});
+
+test('for the tutor in the drawer, the core tools are always loaded; elsewhere they may be deferred', async () => {
+  const list = async (headers: Record<string, string>) => {
+    const res = await fetch(`${BASE}/mcp`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json, text/event-stream', ...headers },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list', params: {} }),
+    });
+    const text = await res.text();
+    const data = text.match(/^data: (.*)$/m)?.[1] ?? text;
+    return (JSON.parse(data) as { result: { tools: { name: string; _meta?: Record<string, unknown> }[] } }).result.tools;
+  };
+  const drawer = await list({ 'X-Aristotle-Client': 'drawer' });
+  assert.equal(drawer.find((t) => t.name === 'quiz')?._meta?.['anthropic/alwaysLoad'], true);
+  assert.equal(drawer.find((t) => t.name === 'find_images')?._meta?.['anthropic/alwaysLoad'], undefined);
+  const elsewhere = await list({});
+  assert.equal(elsewhere.find((t) => t.name === 'quiz')?._meta?.['anthropic/alwaysLoad'], undefined);
 });

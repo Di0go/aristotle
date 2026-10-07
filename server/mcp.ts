@@ -1,10 +1,12 @@
-// The tools Claude Code uses to teach through the interface: one MCP server per request (server/index.ts),
-// over the stores in Gym. The descriptions are all Claude knows of each tool, so they carry the teaching rules too.
+// The tools Claude Code uses to teach through the interface: one MCP server per request (server/index.ts), over the
+// stores in Gym; the tools themselves are defined once. The descriptions are all Claude knows of each tool, so they
+// carry the teaching rules too. Claude Code cuts a description at 2048 characters: keep each under (a test checks).
 
 import { randomInt } from 'node:crypto';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
 import type { CallToolResult, ServerNotification, ServerRequest } from '@modelcontextprotocol/sdk/types.js';
+import { AjvJsonSchemaValidator } from '@modelcontextprotocol/sdk/validation/ajv';
 import * as z from 'zod';
 import { KEEPALIVE_MS, URL_CLEAN, WAIT_MS } from './config.ts';
 import type { Gym } from './gym.ts';
@@ -28,6 +30,15 @@ const text = (t: string): CallToolResult => ({ content: [{ type: 'text', text: t
 const error = (t: string): CallToolResult => ({ ...text(t), isError: true });
 const image = (png: Buffer): CallToolResult => ({ content: [{ type: 'image', data: png.toString('base64'), mimeType: 'image/png' }] });
 const noSession = () => error('No session: call start_session first.');
+/** Tools that only read: Claude Code may run several of them at once. */
+const READ_ONLY = { readOnlyHint: true } as const;
+/**
+ * The tools every lesson uses. For the tutor in Aristotle's drawer they are always loaded, never deferred behind tool
+ * search, which saves a search turn or two at the start of every sitting (a dev session elsewhere still defers them).
+ */
+const CORE = new Set(['start_session', 'get_topic', 'collect_answers', 'show', 'quiz', 'ask', 'update_map', 'end_session']);
+/** Shared by every per-request server: building a validator is most of what creating one costs. */
+const VALIDATOR = new AjvJsonSchemaValidator();
 
 /** Aristotle's card colours, so a previewed SVG looks as it will in the lesson. */
 const THEME = {
@@ -41,12 +52,12 @@ const MATH_AND_DIAGRAMS =
   '```mermaid code blocks as diagrams, and inline <svg> elements (which may animate with SMIL <animate>; Aristotle adds play and replay buttons). ' +
   'Hover cards: {{term|short definition}} marks a term with a definition they can hover (inside a ==highlight== too: =={{term|definition}}==); [[concept-id]], [[other-topic/concept-id]] or [[concept-id|text]] links a concept on the map and shows its preview. ' +
   'Also: ==highlighted text==; callouts as Obsidian writes them (> [!idea] Title, then > lines; kinds: idea, key, why, context, example, you, careful, term, note); ' +
-  '<figure> with <figcaption> around a drawing; ![alt](https://… "caption") for an image with a caption (only images you have checked exist, e.g. Wikimedia Commons); ' +
+  '<figure> with <figcaption> around a drawing; ![alt](https://upload.wikimedia.org/… "caption") for an image with a caption (Wikimedia Commons only: the page shows no other host); ' +
   'and ```sequence code blocks: Markdown frames split by lines of ---, which they step through with Next and Back. ' +
   'The visual kit (prefer it to hand-drawn SVG; each is a fenced block of JSON, drawn and animated by Aristotle): ' +
   '```balance (two forces on one value: {title, left:{label,detail}, right:{label,detail}, unit, min, max, neutral, neutralLabel, states:[{label, left:0-1, right:0-1, value, note}]}), ' +
   '```timeline (things over time, log scale by default: {title, scale:"log"|"linear", from:"0.5s", to:"2h", marks:["1s","1min"], lanes:[{label, start, end, peak?, note?}]}), ' +
-  '```flow (a pathway: {title, direction:"LR"|"TB", nodes:[{id,label,sub?,art?,makes?:[…]}], edges:[{from,to,label?,kind:"a"|"b"|"slow",carries?}], steps:[{caption, on:[node ids]}]}; ' +
+  '```flow (a pathway: {title, direction:"LR"|"TB", nodes:[{id,label,sub?,art?,makes?:[…]}], edges:[{from,to,label?,kind:"a" main|"b" opposing|"slow" dashed,carries?}], steps:[{caption, on:[node ids]}]}; ' +
   'art draws a thing in its box, carries draws what travels an arrow, makes draws what rises out of a box, all from a set of drawings: ' +
   'glucose, pyruvate, atp, adp, nadh, fadh2, co2, o2, h2o, electron, proton (any other name is drawn as a labelled chip). Use them whenever the pathway moves real things), ' +
   '```plate (a real image with numbered markers: {title, src, alt, credit, license, source, markers:[{x:%, y:%, label, detail?}]}; take images from find_images, which checks the licence, and place markers with view_image). ' +
@@ -68,25 +79,49 @@ const leadParam = z
     concept: z.string().optional(),
   })
   .optional()
-  .describe('A teaching step to show just before the question, in the same call (saves a round trip): the step and its check together');
-
-/** The MCP server with every tool, bound to this server's stores. */
-export function createMcpServer(gym: Gym): McpServer {
-  const mcp = new McpServer(
-    { name: 'aristotle', version: '0.3.0' },
-    {
-      instructions:
-        `Aristotle is the learner's interface at ${URL_CLEAN}. They read and answer there, not in the terminal: ` +
-        'teaching content goes in `show`, graded questions in `quiz`, open questions in `ask`, and what they know goes on the map with `update_map` ' +
-        '(Aristotle draws the map). Keep terminal replies to a line or two.',
-    },
+  .describe(
+    'A step to show just before the question, in the same call. Prefer a separate `show` just before this call in the same message: it appears as soon as it is written, not after the whole question is',
   );
+
+type ToolDef = { name: string; config: Parameters<McpServer['registerTool']>[1]; handler: Parameters<McpServer['registerTool']>[2] };
+let defined: { gym: Gym; tools: ToolDef[] } | undefined;
+
+const INSTRUCTIONS =
+  `Aristotle is the learner's interface at ${URL_CLEAN}. They read and answer there, not in the terminal: ` +
+  'teaching content goes in `show`, graded questions in `quiz`, open questions in `ask`, and what they know goes on the map with `update_map` ' +
+  "(Aristotle draws the map). Keep terminal replies to a line or two. If these tools are deferred, load a sitting's set in one ToolSearch: " +
+  'select:mcp__aristotle__start_session,mcp__aristotle__get_topic,mcp__aristotle__collect_answers,mcp__aristotle__show,mcp__aristotle__quiz,' +
+  'mcp__aristotle__ask,mcp__aristotle__update_map,mcp__aristotle__record_practice,mcp__aristotle__end_session';
+
+/**
+ * The MCP server with every tool, bound to this server's stores; a fresh one per request (stateless). `drawer`: the
+ * request comes from the tutor in Aristotle's terminal drawer (the bridge says so), whose core tools load up front.
+ */
+export function createMcpServer(gym: Gym, { drawer = false } = {}): McpServer {
+  if (defined?.gym !== gym) defined = { gym, tools: defineTools(gym) };
+  const mcp = new McpServer({ name: 'aristotle', version: '0.3.0' }, { instructions: INSTRUCTIONS, jsonSchemaValidator: VALIDATOR });
+  for (const { name, config, handler } of defined.tools) {
+    const always = drawer && CORE.has(name) ? { _meta: { 'anthropic/alwaysLoad': true } } : {};
+    mcp.registerTool(name, { ...(config as object), ...always } as never, handler as never);
+  }
+  return mcp;
+}
+
+/** Every tool, with its schemas built once: `mcp` here only collects the definitions. */
+function defineTools(gym: Gym): ToolDef[] {
+  const tools: ToolDef[] = [];
+  const mcp = {
+    registerTool: (name: string, config: ToolDef['config'], handler: ToolDef['handler']) => {
+      tools.push({ name, config, handler });
+    },
+  } as unknown as Pick<McpServer, 'registerTool'>;
 
   // Topics and roadmaps: reading them, and planning a roadmap with him
 
   mcp.registerTool(
     'list_topics',
     {
+      annotations: READ_ONLY,
       title: 'List topics',
       description: 'List every topic the learner has studied, with how much of each map is solid and where the last session left off.',
     },
@@ -100,6 +135,7 @@ export function createMcpServer(gym: Gym): McpServer {
   mcp.registerTool(
     'get_topic',
     {
+      annotations: READ_ONLY,
       title: 'Read a topic',
       description:
         "Read a topic's knowledge map (every concept, its status, prerequisites, notes and check record), the last handoff, recent sessions, " +
@@ -122,11 +158,11 @@ export function createMcpServer(gym: Gym): McpServer {
       const praxis = missions.length ? `\n\nPraxis missions:\n${missions.map(summarizeMission).join('\n')}` : '';
       const questions = gym.asides.of(t.slug);
       const asides = questions.length
-        ? `\n\nQuestions they asked on passages (answered on the spot; what they wondered about):\n${questions.map((q) => `- "${q.question}" (${q.at.slice(0, 10)})`).join('\n')}`
+        ? `\n\nQuestions they asked on passages (answered on the spot; what they wondered about):\n${newest(questions, (q) => `- "${q.question}" (${q.at.slice(0, 10)})`)}`
         : '';
       const written = gym.notes.of(t.slug);
       const notebook = written.length
-        ? `\n\nTheir own notes on steps (their words, kept beside the step):\n${written.map((n) => `- ${n.title ?? gym.feed.stepTitleOf(n.step) ?? 'a step'}: ${n.text.replace(/\s+/g, ' ').slice(0, 300)}`).join('\n')}`
+        ? `\n\nTheir own notes on steps (their words, kept beside the step):\n${newest(written, (n) => `- ${n.title ?? gym.feed.stepTitleOf(n.step) ?? 'a step'}: ${n.text.replace(/\s+/g, ' ').slice(0, 300)}`)}`
         : '';
       const talk = gym.chats
         .get(t.slug)
@@ -137,7 +173,7 @@ export function createMcpServer(gym: Gym): McpServer {
         : '';
       const asked = gym.glosses.of(t.slug);
       const glosses = asked.length
-        ? `\n\nPhrases they selected and asked to have explained (gaps they noticed themselves):\n${asked.map((g) => `- "${g.text}" (${g.at.slice(0, 10)})`).join('\n')}`
+        ? `\n\nPhrases they selected and asked to have explained (gaps they noticed themselves):\n${newest(asked, (g) => `- "${g.text}" (${g.at.slice(0, 10)})`)}`
         : '';
       return text(
         `${describeTopic(t)}\n\nRecent sessions:\n${recent.join('\n') || '(none)'}${praxis}${glosses}${asides}${notebook}${chat}${roadmapContext(gym, t.slug)}`,
@@ -148,6 +184,7 @@ export function createMcpServer(gym: Gym): McpServer {
   mcp.registerTool(
     'read_about',
     {
+      annotations: READ_ONLY,
       title: 'Read About you',
       description:
         "Read what the learner wrote about themselves on Aristotle's About you page: what they do, their projects, their sport or work, what they want. " +
@@ -164,6 +201,7 @@ export function createMcpServer(gym: Gym): McpServer {
   mcp.registerTool(
     'list_roadmaps',
     {
+      annotations: READ_ONLY,
       title: 'List roadmaps',
       description: "List the learner's roadmaps: ordered paths of topics planned with them, with how far along each one is.",
     },
@@ -185,6 +223,7 @@ export function createMcpServer(gym: Gym): McpServer {
   mcp.registerTool(
     'get_roadmap',
     {
+      annotations: READ_ONLY,
       title: 'Read a roadmap',
       description:
         "Read a roadmap: its goal, and every step in order with its goal, why it comes there, and the state of the step's topic.",
@@ -241,8 +280,16 @@ export function createMcpServer(gym: Gym): McpServer {
     async ({ roadmap, title, goal, status, use, steps }) => {
       if (roadmap && !gym.roadmaps.get(roadmap)) return error(`No roadmap "${roadmap}" to replace; omit \`roadmap\` to create one.`);
       const { roadmap: r, created } = await gym.roadmaps.save({ title, goal, status, use, steps }, roadmap);
+      // They read the roadmap in Aristotle; Claude only needs each step's topic slug, and where one already exists.
+      const list = r.steps.map((s, i) => {
+        const t = gym.topics.get(s.topic);
+        return `${i + 1}. ${s.topic}${t ? ` (exists: ${stepState(t).replace('-', ' ')})` : ''}`;
+      });
+      const where = r.use
+        ? `Where they will use it: ${r.use}`
+        : 'Where they will use it: (not asked yet: ask them, and save it with `use`)';
       return text(
-        `Roadmap ${created ? 'created' : 'updated'} (${URL_CLEAN}/#/roadmaps/${r.slug}):\n${describeRoadmap(r, (slug) => gym.topics.get(slug))}`,
+        `Roadmap ${created ? 'created' : 'updated'} (${URL_CLEAN}/#/roadmaps/${r.slug}), ${r.status}. ${where}\nSteps:\n${list.join('\n')}`,
       );
     },
   );
@@ -300,6 +347,7 @@ export function createMcpServer(gym: Gym): McpServer {
   mcp.registerTool(
     'list_missions',
     {
+      annotations: READ_ONLY,
       title: 'List Praxis missions',
       description:
         "List the learner's Praxis missions with their status: open (to do), debriefed (they reported back: review it), reviewed, dropped. " +
@@ -370,9 +418,10 @@ export function createMcpServer(gym: Gym): McpServer {
       title: 'Start a session',
       description:
         'Start a session in Aristotle. Clears the "Now" view and opens a new session log. ' +
-        'kind "learn" (a lesson) and "train" (problems) are on one topic: pass an existing topic slug to continue it (check `list_topics` first), ' +
+        'kind "learn" (a lesson) and "train" (problems) are on one topic: pass an existing topic slug to continue it, ' +
         'or a new title to create one. kind "review" practises fading concepts across all topics and takes no topic. ' +
-        'Call it when a sitting starts and whenever the topic or kind changes.',
+        'Call it when a sitting starts and whenever the topic or kind changes; continuing a topic, send it with `get_topic` in one message. ' +
+        'It also hands over any answers given after a question stopped waiting, so no `collect_answers` is needed first.',
       inputSchema: {
         kind: z.enum(['learn', 'review', 'train']).default('learn'),
         topic: z
@@ -385,24 +434,29 @@ export function createMcpServer(gym: Gym): McpServer {
     },
     async ({ kind, topic, goal, topic_goal }) => {
       if (kind !== 'review' && !topic) return error(`A ${kind} session needs a topic.`);
+      // Answers given since the last call stopped waiting belong to the session about to close: hand them over now,
+      // or they would be out of collect_answers' reach once the new session starts.
+      const late = await deliverLate(gym);
       const { session, topic: t, created } = await gym.startSession(topic ?? '', goal, topic_goal, kind);
+      const answers = late ? `\n\nAnswers they gave since your last question stopped waiting:\n\n${late}` : '';
       if (!t) {
         const fading = gym.topics.fading();
         return text(
-          `Review session ${session.id} started. ${fading.length} concepts are fading:\n${fading.map(formatFading).join('\n') || '(none)'}`,
+          `Review session started. ${fading.length} concepts are fading:\n${fading.map(formatFading).join('\n') || '(none)'}${answers}`,
         );
       }
-      const onRoadmap = roadmapContext(gym, t.slug);
       if (created)
-        return text(`New topic "${t.title}" (${t.slug}) created; ${kind} session ${session.id} started. The map is empty.${onRoadmap}`);
-      const s = formatSummary(gym.topics.list().find((x) => x.slug === t.slug)!);
-      return text(`${kind} session ${session.id} started on an existing topic:\n${s}\nCall get_topic for the full map.${onRoadmap}`);
+        return text(
+          `New topic "${t.title}" (${t.slug}) created; ${kind} session started. The map is empty.${roadmapContext(gym, t.slug)}${answers}`,
+        );
+      return text(`${kind} session started on ${t.slug}.${answers}`);
     },
   );
 
   mcp.registerTool(
     'due_reviews',
     {
+      annotations: READ_ONLY,
       title: 'List fading concepts',
       description:
         'List solid concepts that are due for review ("fading"), least likely to be recalled first, with an estimate of their chance of recalling each now. ' +
@@ -507,11 +561,11 @@ export function createMcpServer(gym: Gym): McpServer {
       title: 'Show the learner something',
       description:
         'Show content in Aristotle: one teaching step, the plan, a summary, or feedback on an answer. ' +
-        'Use one call per reasoning step rather than one long message. ' +
-        MATH_AND_DIAGRAMS +
-        ' Returns immediately.',
+        'Use one call per reasoning step rather than one long message. A step that a quiz or ask checks goes in its own `show`, ' +
+        'just before that call in the same message, so it appears while the question is still being written. ' +
+        'Returns immediately. Everything the Markdown can hold (maths, diagrams, hover cards, callouts, the visual kit, explorables) is listed under `markdown`.',
       inputSchema: {
-        markdown: z.string().min(1).describe('The content, in Markdown'),
+        markdown: z.string().min(1).describe(`The content, in Markdown. ${MATH_AND_DIAGRAMS}`),
         title: z
           .string()
           .optional()
@@ -552,6 +606,7 @@ export function createMcpServer(gym: Gym): McpServer {
         'Write every option as a bare claim of similar length and form, with no reasoning in it, so the right one cannot be spotted by its wording; ' +
         'put the reasoning in `explanation`. Each wrong option should be a mistake they might really make. ' +
         'Tag each question with its map `concept` so the answer is recorded on the map. ' +
+        'Send the step it checks as a `show` just before this call, in the same message. ' +
         SAME_MARKDOWN,
       inputSchema: {
         questions: z
@@ -631,16 +686,7 @@ export function createMcpServer(gym: Gym): McpServer {
         'Get answers the learner gave in Aristotle after a `quiz` or `ask` call stopped waiting, ' +
         'for example because they stepped away and came back. Call it when they say they are back or have answered.',
     },
-    async () => {
-      const late = gym.feed.undelivered();
-      if (late.length === 0) return text('No new answers.');
-      const parts: string[] = [];
-      for (const item of late) {
-        parts.push(item.type === 'quiz' ? formatQuiz(item, gym) : formatAsk(item));
-        await gym.feed.markDelivered(item.id);
-      }
-      return text(parts.join('\n\n---\n\n'));
-    },
+    async () => text((await deliverLate(gym)) || 'No new answers.'),
   );
 
   // Pictures: checking a drawing, finding and reading real images
@@ -648,19 +694,20 @@ export function createMcpServer(gym: Gym): McpServer {
   mcp.registerTool(
     'preview_svg',
     {
+      annotations: READ_ONLY,
       title: 'Preview an SVG',
       description:
         'Render an SVG to an image and look at it before showing it to the learner: check that labels are legible and not overlapping, ' +
         'that nothing is cut off, and that the drawing says what it should. Aristotle shows inline SVG in light and dark themes; ' +
-        'use currentColor for lines and text so they follow the theme, and preview with dark: true to check.',
+        'use currentColor for lines and text so they follow the theme. By default both themes come back side by side in one image, light on the left.',
       inputSchema: {
         svg: z.string().min(1).describe('The SVG markup, starting with <svg'),
-        dark: z.boolean().default(false).describe("Render on the dark theme's background and text colour"),
+        theme: z.enum(['both', 'light', 'dark']).default('both').describe('Which theme to render on: both side by side, or one'),
       },
     },
-    async ({ svg, dark }) => {
+    async ({ svg, theme }) => {
       try {
-        return image(await renderSvg(svg, dark));
+        return image(theme === 'both' ? await renderBoth(svg) : await renderSvg(svg, theme === 'dark'));
       } catch (err) {
         return error(`Could not render the SVG: ${(err as Error).message}`);
       }
@@ -670,6 +717,7 @@ export function createMcpServer(gym: Gym): McpServer {
   mcp.registerTool(
     'find_images',
     {
+      annotations: READ_ONLY,
       title: 'Find a real image',
       description:
         'Search Wikimedia Commons for real images (anatomical plates, photos, diagrams) and return only files whose licence allows reuse: ' +
@@ -708,6 +756,7 @@ export function createMcpServer(gym: Gym): McpServer {
   mcp.registerTool(
     'view_image',
     {
+      annotations: READ_ONLY,
       title: 'Look at an image',
       description:
         'Look at an image from find_images, with a grid of 10% lines drawn over it (labelled 10 to 90 along the top and left edges). ' +
@@ -753,10 +802,27 @@ export function createMcpServer(gym: Gym): McpServer {
     },
   );
 
-  return mcp;
+  return tools;
 }
 
 // Helpers for the tools
+
+/** The newest RECENT of a list (oldest first), one line each, with how many older ones were left out. */
+function newest<T>(list: T[], line: (item: T) => string): string {
+  const shown = list.slice(-RECENT).map(line).join('\n');
+  return list.length > RECENT ? `(${list.length - RECENT} older not shown)\n${shown}` : shown;
+}
+const RECENT = 10;
+
+/** Answers given after their call stopped waiting, as Claude reads them, marked delivered; '' when there are none. */
+async function deliverLate(gym: Gym): Promise<string> {
+  const parts: string[] = [];
+  for (const item of gym.feed.undelivered()) {
+    parts.push(item.type === 'quiz' ? formatQuiz(item, gym) : formatAsk(item));
+    await gym.feed.markDelivered(item.id);
+  }
+  return parts.join('\n\n---\n\n');
+}
 
 /** The step that leads into a question, when it comes in the same call. */
 async function showLead(gym: Gym, lead?: { markdown: string; title?: string; concept?: string }) {
@@ -801,7 +867,7 @@ function notAnswered(): CallToolResult {
   const minutes = Math.round(WAIT_MS / 60_000);
   return text(
     `No answer yet: they haven't answered in Aristotle within ${minutes} minutes, so they have stepped away. ` +
-      'Close the sitting now, without asking them anything: a final `update_map` if this sitting changed what they hold, then ' +
+      'Close the sitting now, without asking them anything: in one message, a final `update_map` if this sitting changed what they hold and ' +
       '`end_session` with the handoff. The question stays open in Aristotle; when they answer it, you are asked to continue ' +
       'and `collect_answers` gives you their answer. Then end your turn.',
   );
@@ -834,6 +900,44 @@ function renderSvg(svg: string, dark: boolean): Promise<Buffer> {
     maxBuffer: 20 * 1024 * 1024,
     timeout: 15_000,
   });
+}
+
+/**
+ * The drawing on both themes, side by side in one image (light left, dark right): one look instead of two. The dark
+ * copy's ids are renamed, so its gradients and animations point at its own defs.
+ */
+function renderBoth(svg: string): Promise<Buffer> {
+  const size = svgSize(svg);
+  const w = size.width || 600;
+  const h = size.height || 400;
+  const gap = 12;
+  const copy = (source: string, theme: { background: string; ink: string }, x: number) => {
+    const body = source.replace(/<\?xml[^>]*>/, '').replace(/<svg\b[^>]*>/, (tag) => {
+      const rest = tag.replace(/\s(width|height|x|y|color)\s*=\s*(["'])[^"']*\2/g, '').replace(/^<svg/, '');
+      return `<svg x="${x}" y="0" width="${w}" height="${h}" color="${theme.ink}"${rest.replace(/>$/, '')}>`;
+    });
+    return `<rect x="${x}" y="0" width="${w}" height="${h}" fill="${theme.background}"/>${body}`;
+  };
+  const total = 2 * w + gap;
+  const combined =
+    `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${total}" height="${h}">` +
+    `<rect width="${total}" height="${h}" fill="#7f7f7f"/>${copy(svg, THEME.light, 0)}${copy(renameIds(svg, '-dark'), THEME.dark, w + gap)}</svg>`;
+  const scale = total * 2 > MAX_RENDER * 1.4 ? ['--width', String(Math.round(MAX_RENDER * 1.4)), '--keep-aspect-ratio'] : ['--zoom', '2'];
+  return rsvgConvert(combined, [...scale, '--format', 'png'], { maxBuffer: 20 * 1024 * 1024, timeout: 15_000 });
+}
+
+/** Every id in an SVG, and every reference to one (url(#…), href="#…", SMIL begin="id.end"), with `suffix` added. */
+function renameIds(svg: string, suffix: string): string {
+  const ids = [...svg.matchAll(/\sid\s*=\s*["']([^"']+)["']/g)].map((m) => m[1]);
+  let out = svg;
+  for (const id of ids) {
+    const e = id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    out = out
+      .replace(new RegExp(`(\\sid\\s*=\\s*["'])${e}(["'])`, 'g'), `$1${id}${suffix}$2`)
+      .replace(new RegExp(`#${e}(?=["')\\s])`, 'g'), `#${id}${suffix}`)
+      .replace(new RegExp(`(["';\\s])${e}\\.(begin|end|click)`, 'g'), `$1${id}${suffix}.$2`);
+  }
+  return out;
 }
 
 /** The largest side, in pixels, a previewed drawing is rendered at. */

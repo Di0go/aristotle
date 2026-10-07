@@ -1,17 +1,20 @@
 // Claude Code's Stop hook (.claude/settings.json): before Claude finishes a turn in which it changed code, the
 // generated docs are rewritten, and if a changed zone's prose docs were not touched, Claude is sent back to
 // update them (or to say why nothing needs to change). So nobody has to ask for "update the docs".
-// Only files changed since this session started count, so a teaching session never trips it.
+// Only files changed since this session started count, and never in Aristotle's drawer (a lesson, not development).
 
 import { execFileSync } from 'node:child_process';
 import { readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
-import { undocumented } from './doc-zones.ts';
+import { NO_DOCS, undocumented } from './doc-zones.ts';
 import { generate } from './docs.ts';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 const git = (...args: string[]) => execFileSync('git', args, { cwd: ROOT, encoding: 'utf8' });
 
+// The tutor in Aristotle's terminal drawer (server/terminal.ts sets this): a lesson, where commits released meanwhile
+// must never send it off to write docs.
+if (process.env.ARISTOTLE_DRAWER) process.exit(0);
 const input = JSON.parse(readFileSync(0, 'utf8') || '{}') as { stop_hook_active?: boolean; transcript_path?: string };
 // Already sent back once this turn: let it stop, rather than loop.
 if (input.stop_hook_active) process.exit(0);
@@ -25,9 +28,14 @@ const pending = porcelain(git('status', '--porcelain', '-z', '--untracked-files=
     return true; // deleted
   }
 });
-const committed = git('log', `--since=${new Date(since).toISOString()}`, '--name-only', '--format=')
-  .split('\n')
-  .filter(Boolean);
+// Files of the commits made since, except those whose message says why no docs changed ("Docs: none -- <why>").
+const committed = git('log', `--since=${new Date(since).toISOString()}`, '--name-only', '--format=%x00%B%x01')
+  .split('\0')
+  .filter(Boolean)
+  .flatMap((entry) => {
+    const [message, files = ''] = entry.split('\x01');
+    return NO_DOCS.test(message) ? [] : files.split('\n').filter(Boolean);
+  });
 const changed = [...new Set([...pending, ...committed])];
 // Only Markdown changed (or nothing): no code to keep the docs in step with.
 if (!changed.some((f) => !f.endsWith('.md'))) process.exit(0);
@@ -50,12 +58,19 @@ if (missing.length) {
 }
 process.exit(0);
 
-/** When this session started: the first entry of its transcript, or three hours ago if that can't be read. */
+/**
+ * When this session started: the first entry of its transcript that carries a time (the first lines may not: a mode
+ * line, a file-history snapshot), or three hours ago if none can be read.
+ */
 function sessionStart(): number {
   try {
-    const first = readFileSync(input.transcript_path ?? '', 'utf8').split('\n', 1)[0];
-    const at = Date.parse((JSON.parse(first) as { timestamp?: string }).timestamp ?? '');
-    if (at) return at;
+    for (const line of readFileSync(input.transcript_path ?? '', 'utf8').split('\n', 50)) {
+      if (!line.trim()) continue;
+      try {
+        const at = Date.parse((JSON.parse(line) as { timestamp?: string }).timestamp ?? '');
+        if (at) return at;
+      } catch {}
+    }
   } catch {}
   return Date.now() - 3 * 3600_000;
 }

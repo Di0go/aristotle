@@ -72,7 +72,7 @@ Claude Code in the drawer runs in the release copy, so lessons use the released 
 
 The single commands: `pnpm lint` (read only: Biome lints and checks the formatting of TypeScript, CSS and JSON, Prettier the formatting of `.svelte` files), `pnpm format` (apply both), `pnpm check` (types, through `svelte-check`, which also type-checks and lints the `.svelte` files), `pnpm test`, `pnpm build`.
 
-`pnpm test` is end to end ([`tests/mcp.test.ts`](../tests/mcp.test.ts)): a real server on a throwaway data folder, a real MCP client in Claude Code's place, HTTP calls in the interface's place, a shell in the terminal's place. [`tests/docs.test.ts`](../tests/docs.test.ts) checks the docs.
+`pnpm test` is end to end ([`tests/mcp.test.ts`](../tests/mcp.test.ts)): a real server on a throwaway data folder, a real MCP client in Claude Code's place (and the real bridge, driven over stdio, for cancelling), HTTP calls in the interface's place, a shell in the terminal's place. Besides the teaching tools it covers the security lines (origins, hosts, fetch metadata, content types, headers, a malformed WebSocket frame) and the data's safety (a write refused by the disk, a line torn by a crash, an unreadable file, titles in other scripts). [`tests/docs.test.ts`](../tests/docs.test.ts) checks the docs.
 
 `pnpm serve` runs the server in the foreground, for debugging it on its own.
 
@@ -125,6 +125,7 @@ Every setting is an environment variable with a default. `.env` is not read: set
 | `ARISTOTLE_ONESHOT_CMD` | A command that reads a question on stdin and prints the answer, in place of Claude Code (oneshot.ts); tests swap one in. | [`config.ts`](../server/config.ts) |
 | `ARISTOTLE_WAIT_MS` | How long quiz and ask wait for an answer before handing control back to Claude. | [`config.ts`](../server/config.ts) |
 | `ARISTOTLE_CLAUDE_CWD` |  | [`config.ts`](../server/config.ts) |
+| `ARISTOTLE_DRAWER` | The tutor in Aristotle's terminal drawer (server/terminal.ts sets this): a lesson, where commits released meanwhile must never send it off to write docs. | [`claude-stop-hook.ts`](../scripts/claude-stop-hook.ts) |
 | `ARISTOTLE_RELEASE_DIR` | Where the release copy lives: a Git worktree of this repository that the live service runs. | [`release.ts`](../scripts/release.ts) |
 <!-- /generated -->
 

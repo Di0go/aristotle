@@ -9,7 +9,6 @@ import https from 'node:https';
 import type { Socket } from 'node:net';
 import path from 'node:path';
 import type { Duplex } from 'node:stream';
-import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { WebSocketServer } from 'ws';
 import {
   ACCENT,
@@ -34,7 +33,6 @@ import { AsideError } from './asides.ts';
 import { ChatError } from './chat.ts';
 import { GlossError } from './glosses.ts';
 import { Gym } from './gym.ts';
-import { createMcpServer } from './mcp.ts';
 import { MissionError } from './missions.ts';
 import { socketOwner } from './peer.ts';
 import { Search } from './search.ts';
@@ -132,8 +130,10 @@ async function handleMcp(req: http.IncomingMessage, res: http.ServerResponse) {
     res.writeHead(405, { Allow: 'POST' }).end();
     return;
   }
-  // Stateless: a fresh server per request, so a restart never strands Claude Code's connection.
-  const mcp = createMcpServer(gym);
+  // Stateless: a fresh server per request, so a restart never strands Claude Code's connection. The bridge says when
+  // it serves the tutor in the drawer, whose core tools then load up front (mcp.ts).
+  const { createMcpServer, StreamableHTTPServerTransport } = await mcpModules();
+  const mcp = createMcpServer(gym, { drawer: req.headers['x-aristotle-client'] === 'drawer' });
   const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
   res.on('close', () => {
     void transport.close();
@@ -141,6 +141,19 @@ async function handleMcp(req: http.IncomingMessage, res: http.ServerResponse) {
   });
   await mcp.connect(transport);
   await transport.handleRequest(req, res);
+}
+
+/**
+ * The MCP SDK and the tools, loaded once on first use rather than at start (a sixth of a second the interface need
+ * not wait for); warmed up just after the server starts listening.
+ */
+let mcpLoading: Promise<typeof import('./mcp.ts') & typeof import('@modelcontextprotocol/sdk/server/streamableHttp.js')> | undefined;
+function mcpModules() {
+  mcpLoading ??= Promise.all([import('./mcp.ts'), import('@modelcontextprotocol/sdk/server/streamableHttp.js')]).then(([a, b]) => ({
+    ...a,
+    ...b,
+  }));
+  return mcpLoading;
 }
 
 /** The interface's JSON API. Every route is listed in docs/architecture.md (generated from the checks below). */
@@ -491,6 +504,7 @@ server6.on('error', (err: NodeJS.ErrnoException) => {
 server.listen(PORT, HOST, () => {
   mkdirSync(path.dirname(PID_FILE), { recursive: true });
   writeFileSync(PID_FILE, String(process.pid));
+  setImmediate(() => void mcpModules());
   console.log(`${new Date().toISOString()} Aristotle (${INSTANCE}) running at ${URL_CLEAN} (http://localhost:${PORT})`);
 });
 tls?.listen(TLS_PORT, HOST);

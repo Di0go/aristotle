@@ -26,7 +26,7 @@ Aristotle plays SMIL animation in SVG (`<animate>`, `<animateTransform>`, `<anim
 
 ## Check it
 
-Render it with `preview_svg`, once in light and once with `dark: true`, and look. Fix and re-render until:
+Render it with `preview_svg` (one call shows it on both themes, light on the left and dark on the right) and look. Fix and re-render until:
 
 - nothing overlaps, nothing is cut off at the edges, and every label is readable in both themes;
 - the picture shows the idea at a glance, with nothing that could mislead.

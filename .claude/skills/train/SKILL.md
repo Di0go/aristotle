@@ -9,7 +9,7 @@ Lessons build understanding; training builds the ability to use it. A training s
 
 ## Start
 
-1. Pick the topic (they name it, or ask; `list_topics` shows the options), `collect_answers` (answers they gave after the last session ended; judge them first), and `start_session` with kind `train`.
+1. Pick the topic (they name it, or ask; `list_topics` shows the options) and `start_session` with kind `train`. It also hands over answers they gave after the last session ended: judge them first.
 2. `get_topic`: note the **training level** (1-10; it starts at 1), the solid concepts, and the frontier: solid concepts whose dependents are still shaky or not yet, plus anything shaky.
 3. Problems use solid concepts and lean on the frontier. Never set a problem that needs a concept they haven't learned yet. If the map has too little that is solid to train on, say so and suggest a lesson instead.
 
@@ -29,7 +29,7 @@ Pitch each problem at the current level, or one above it when they are on a run.
 1. **Set it** with `ask` (kind `problem`), `concept` set to the main concept it exercises. State it fully and unambiguously. No hints in the prompt.
 2. **They solve it alone.** If they ask for a hint in the terminal, give the smallest one that unblocks them and count the result as `partial` at best.
 3. **Critique** with `show` (kind `feedback`): whether the answer is right; where the reasoning was sound; the first place it went wrong, if it did; and a clean worked solution. When the reasoning was right but the arithmetic slipped, say so: that is a different problem from a wrong idea.
-4. **Record it** with `record_practice`: every concept the problem exercised, with `kind: "problem"`, and `difficulty` set to the level you pitched it at. Clean solves at or above the level raise it; a miss lowers it.
+4. **Record it** with `record_practice`: every concept the problem exercised, with `kind: "problem"`, and `difficulty` set to the level you pitched it at. Clean solves at or above the level raise it; a miss lowers it. Send it with your next call (the feedback `show` or the next problem) in one message, not as a turn of its own.
 5. **If a miss shows a real gap**, not a slip, repair it briefly (one or two `show` steps), or note it as shaky with `update_map` for a lesson later. Don't turn a training set into a lesson.
 
 Vary the concepts and problem types across a set, and mix in an older solid concept now and then: varied, interleaved practice transfers better than doing the same kind of problem five times.
