@@ -1,8 +1,10 @@
 <script lang="ts">
   // The small bar along the bottom: what's going on, in a few words.
   import { claude } from './claude.svelte.ts';
+  import { classes } from './classes.svelte.ts';
   import { feed } from './feed.svelte.ts';
   import { countsOf, placeOf } from './library.ts';
+  import { link } from './router.svelte.ts';
 
   let dev = $state(false);
 
@@ -33,7 +35,9 @@
       >
     {/if}
   </span>
-  {#if feed.pending}<span class="turn">Your turn</span>{:else if live && claude.busy}<span class="work">Claude is working…</span>{/if}
+  {#if feed.pending}<a class="turn" href={classes.sittingHref() ?? link.now()}>Your turn</a>{:else if live && claude.busy}<span class="work"
+      >Claude is working…</span
+    >{/if}
   {#if topic && counts.total}<span>{counts.solid} of {counts.total} solid</span>{/if}
   {#if place}<span>class {place.index + 1} of {place.roadmap.steps.length}</span>{/if}
   <button class="claude" onclick={() => claude.toggle()} title="The terminal Claude Code runs in (Ctrl+`)">

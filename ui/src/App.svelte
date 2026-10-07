@@ -26,6 +26,8 @@
   // Pages other than Now load on first visit (the map pages bring the graph layout engine with them).
   type Page = () => Promise<{ default: Component<Record<string, unknown>> }>;
   const pages: Record<string, Page> = {
+    review: () => import('./pages/Practice.svelte') as never,
+    train: () => import('./pages/Practice.svelte') as never,
     progress: () => import('./pages/Progress.svelte') as never,
     map: () => import('./pages/KnowledgeMap.svelte') as never,
     roadmaps: () => import('./pages/Roadmaps.svelte') as never,
@@ -64,6 +66,8 @@
   /** What the current page is told: its slug or id, and for a topic the selected concept. */
   const pageProps = $derived.by((): Record<string, unknown> => {
     const r = router.route;
+    if (r.page === 'review') return { kind: 'review' };
+    if (r.page === 'train') return { kind: 'train', slug: r.slug };
     if (r.page === 'topic') return { slug: r.slug, concept: r.concept };
     if (r.page === 'step') return { slug: r.slug, number: r.number };
     if ('slug' in r) return { slug: r.slug };
@@ -126,7 +130,7 @@
         <svg viewBox="0 0 18 18" aria-hidden="true"><path d="M3 5h12M3 9h12M3 13h12" /></svg>
       </button>
       <a class="mobile-brand" href={link.now()}><Logo size={20} class="mobile-mark" />aristotle</a>
-      {#if feed.pending}<a class="turn" href={classes.liveHref() ?? link.now()}>Your turn</a>{/if}
+      {#if feed.pending}<a class="turn" href={classes.sittingHref() ?? link.now()}>Your turn</a>{/if}
       <button class="mobile-search" onclick={() => searchBox.toggle(true)} aria-label="Search">
         <svg viewBox="0 0 18 18" aria-hidden="true"><path d="M7.5 3a4.5 4.5 0 1 0 0 9a4.5 4.5 0 1 0 0-9M10.8 10.8l4 4" /></svg>
       </button>

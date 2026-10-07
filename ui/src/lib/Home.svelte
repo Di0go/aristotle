@@ -33,6 +33,8 @@
    */
   const teaching = $derived(feed.session?.kind === 'learn' && feed.liveSlug && (inProgress || feed.pending) ? feed.session : null);
   const teachingPage = $derived(teaching ? (classes.pages(teaching.topicSlug)?.at(-1) ?? null) : null);
+  /** A review or a training set still open (going on, or left with a question waiting): each has its own page. */
+  const practising = $derived(feed.session && !feed.session.endedAt && feed.session.kind !== 'learn' ? feed.session : null);
   /** With nothing being taught: the class he studied last, still unfinished, to continue. */
   const lastClass = $derived(
     topics
@@ -198,6 +200,25 @@
           <button class="primary small" onclick={() => actions.review()}>Review now</button>
         </p>
       {/if}
+    {:else if practising}
+      {@const review = practising.kind === 'review'}
+      <a class="now sheet live" href={classes.sittingHref() ?? link.review()}>
+        <span class="live-dot" aria-hidden="true"></span>
+        <span class="now-text">
+          <span class="now-k">{feed.pending ? 'Your turn' : inProgress ? 'Going on now' : 'Left for later'}</span>
+          <span class="now-title">{review ? 'Review' : `Training: ${practising.topic}`}</span>
+          <span class="muted"
+            >{feed.pending
+              ? inProgress
+                ? 'A question is waiting for your answer.'
+                : `A question has been waiting since ${ago(feed.pending.at)}; answer it whenever you like.`
+              : inProgress
+                ? 'Claude is on it.'
+                : `Left ${ago(new Date(feed.lastActivity).toISOString())}; pick it up whenever you like.`}</span
+          >
+        </span>
+        <span class="primary">{feed.pending ? 'Answer it' : 'Open it'}</span>
+      </a>
     {:else if fading}
       <!-- Spaced review comes first: recalling a concept just as it fades is what makes it last. -->
       <section class="now sheet">

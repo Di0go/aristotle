@@ -31,7 +31,8 @@ export type Op =
   | { op: 'add'; item: Item }
   | { op: 'answer'; id: string; at: string; responses?: QuizResponse[]; response?: string }
   | { op: 'delivered'; id: string }
-  | { op: 'end'; at: string; handoff: Handoff };
+  /** The session closed: with its handoff, or without one when it was left open and the next session closed it. */
+  | { op: 'end'; at: string; handoff?: Handoff };
 
 type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
 type NewItem = DistributiveOmit<Item, 'id' | 'at'>;
@@ -194,6 +195,9 @@ export class Feed {
       goal,
       startedAt: now.toISOString(),
     };
+    // A sitting left open (Claude Code stopped mid-lesson, a question never answered) closes as the next one starts, so
+    // only one is ever going on; it has no handoff, since nobody wrote one. Its questions stay answerable.
+    if (this.session && !this.session.endedAt) await this.commit({ op: 'end', at: now.toISOString() });
     await mkdir(SESSIONS_DIR, { recursive: true });
     this.file = path.join(SESSIONS_DIR, `${session.id}.jsonl`);
     await this.commit({ op: 'session', session });

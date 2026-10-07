@@ -1,7 +1,11 @@
-// Hash routing: #/, #/progress, #/map, #/roadmaps, #/roadmaps/<slug>, #/lesson/<slug>, #/lesson/<slug>/<step>, #/topics, #/topics/<slug>?c=<concept>, #/log, #/log/<session>, #/praxis, #/praxis/<mission>, #/about.
+// Hash routing: #/, #/review, #/train/<slug>, #/progress, #/map, #/roadmaps, #/roadmaps/<slug>, #/lesson/<slug>, #/lesson/<slug>/<step>, #/topics, #/topics/<slug>?c=<concept>, #/log, #/log/<session>, #/praxis, #/praxis/<mission>, #/about.
 
 export type Route =
   | { page: 'now' }
+  /** Spaced review: what is fading, and the review going on, if any. */
+  | { page: 'review' }
+  /** Training sets on one class. */
+  | { page: 'train'; slug: string }
   | { page: 'progress' }
   | { page: 'map' }
   | { page: 'roadmaps' }
@@ -33,6 +37,8 @@ export const router = new Router();
 
 export const link = {
   now: () => '#/',
+  review: () => '#/review',
+  train: (slug: string) => `#/train/${encodeURIComponent(slug)}`,
   progress: () => '#/progress',
   map: () => '#/map',
   roadmaps: () => '#/roadmaps',
@@ -64,6 +70,8 @@ function parse(hash: string): Route {
   if (parts[0] === 'log') return { page: 'log' };
   if (parts[0] === 'praxis' && parts[1]) return { page: 'mission', id: parts[1] };
   if (parts[0] === 'praxis') return { page: 'praxis' };
+  if (parts[0] === 'review') return { page: 'review' };
+  if (parts[0] === 'train' && parts[1]) return { page: 'train', slug: parts[1] };
   if (parts[0] === 'progress') return { page: 'progress' };
   if (parts[0] === 'about') return { page: 'about' };
   if (parts[0] === 'map') return { page: 'map' };

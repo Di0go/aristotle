@@ -39,6 +39,15 @@ class Classes {
     return last ? link.step(slug, last.number) : link.lesson(slug);
   }
 
+  /** Where the open sitting is, whatever its kind: the step being taught, Review, or the training set's page. */
+  sittingHref(): string | null {
+    const s = feed.session;
+    if (!s || s.endedAt) return null;
+    if (s.kind === 'review') return link.review();
+    if (s.kind === 'train') return link.train(s.topicSlug);
+    return this.liveHref();
+  }
+
   private async load(slug: string) {
     if (this.loading.has(slug)) return;
     this.loading.add(slug);

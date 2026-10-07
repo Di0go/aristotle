@@ -1196,3 +1196,15 @@ test('find_images keeps only reusable files, credits them, and frames what Commo
   const title = found.split('\n')[1] ?? '';
   assert.ok(title.length < 260, `a title is cut short (${title.length})`);
 });
+
+test('a sitting left open closes, without a handoff, when the next one starts', async () => {
+  await call('start_session', { topic: 'Left open', goal: 'Walk away mid-lesson' });
+  await call('show', { markdown: 'A step {{x|y}}', title: 'A step' });
+  await call('start_session', { kind: 'review', goal: 'Review' });
+  const [review, left] = await get<SessionSummary[]>('/api/sessions');
+  assert.equal(review?.kind, 'review');
+  assert.ok(!review?.endedAt, 'the new one is going on');
+  assert.equal(left?.topicSlug, 'left-open');
+  assert.ok(left?.endedAt, 'the one left open is closed');
+  assert.equal(left?.handoff, undefined, 'nobody wrote a handoff for it');
+});

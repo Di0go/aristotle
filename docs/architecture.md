@@ -197,7 +197,8 @@ Only for the interface (and the tests); Claude Code uses MCP.
 | [`Lesson.svelte`](../ui/src/pages/Lesson.svelte) | A class: where he is, with the one thing to do next; its steps, one line each with how its checks went; and beside them what it teaches (its concepts), with the other ways to work on it. |
 | [`Log.svelte`](../ui/src/pages/Log.svelte) | The log: every session, grouped by day, each linking to its full record. |
 | [`Mission.svelte`](../ui/src/pages/Mission.svelte) | One Praxis mission: why it matters, what to do, when it's done, the concepts it uses; then his debrief and Claude's review. |
-| [`Now.svelte`](../ui/src/pages/Now.svelte) | Home (#/). |
+| [`Now.svelte`](../ui/src/pages/Now.svelte) | Home (#/): always the dashboard. |
+| [`Practice.svelte`](../ui/src/pages/Practice.svelte) | Review (#/review) and training sets (#/train/<slug>): sittings that belong to no lesson, each in its own place. |
 | [`Praxis.svelte`](../ui/src/pages/Praxis.svelte) | Praxis: what he learned, put to work. |
 | [`Progress.svelte`](../ui/src/pages/Progress.svelte) | Progress: what is solid over time, activity by week, and what is fading. |
 | [`Roadmap.svelte`](../ui/src/pages/Roadmap.svelte) | One course (a roadmap, in the data) as a route: its classes in order down a line, each with its goal, why it sits there, and its progress. |
@@ -256,7 +257,7 @@ Only for the interface (and the tests); Claude Code uses MCP.
 | [`library.ts`](../ui/src/lib/library.ts) | The hierarchy everything hangs on: roadmaps hold steps, a step is a topic, a topic holds concepts. |
 | [`markdown.ts`](../ui/src/lib/markdown.ts) | Markdown with LaTeX maths, sanitised. |
 | [`maths.svelte.ts`](../ui/src/lib/maths.svelte.ts) | KaTeX, loaded just after the first paint (or when first needed, if sooner) instead of on the startup path. |
-| [`router.svelte.ts`](../ui/src/lib/router.svelte.ts) | Hash routing: #/, #/progress, #/map, #/roadmaps, #/roadmaps/<slug>, #/lesson/<slug>, #/lesson/<slug>/<step>, #/topics, #/topics/<slug>?c=<concept>, #/log, #/log/<session>, #/praxis, #/praxis/<mission>, #/about. |
+| [`router.svelte.ts`](../ui/src/lib/router.svelte.ts) | Hash routing: #/, #/review, #/train/<slug>, #/progress, #/map, #/roadmaps, #/roadmaps/<slug>, #/lesson/<slug>, #/lesson/<slug>/<step>, #/topics, #/topics/<slug>?c=<concept>, #/log, #/log/<session>, #/praxis, #/praxis/<mission>, #/about. |
 | [`search.svelte.ts`](../ui/src/lib/search.svelte.ts) | Whether the search palette is open: Ctrl+K or / anywhere, the ribbon's search button, or "Search" on selected text. |
 | [`steps.ts`](../ui/src/lib/steps.ts) | A class as he reads it: one page per step, in order, whatever sitting each was taught in. |
 | [`storage.ts`](../ui/src/lib/storage.ts) | Browser storage helpers: moving a setting saved under the app's old name (Mind Gym) to its new key. |

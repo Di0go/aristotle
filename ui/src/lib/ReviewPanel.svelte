@@ -1,5 +1,7 @@
 <script lang="ts">
-  // During a review session: what has been practised so far, and what is still fading.
+  // During a review session: what has been practised so far, and what is still fading. It folds away like the panel
+  // beside a step ("Hide »", bench.svelte.ts), and closes like it on a narrow screen (×).
+  import { bench } from './bench.svelte.ts';
   import { refetching } from './feed.svelte.ts';
   import { link } from './router.svelte.ts';
   import type { ReviewQueue } from '../../../shared/types.ts';
@@ -21,7 +23,11 @@
   );
 </script>
 
-<button class="close bench-close" onclick={onclose} aria-label="Close">×</button>
+<div class="queue-top">
+  <span class="bench-title">The queue</span>
+  <button class="close bench-close" onclick={onclose} aria-label="Close">×</button>
+  <button class="link fold" onclick={() => bench.toggle(true)} title="Hide this panel">Hide »</button>
+</div>
 {#if queue}
   {#if queue.practised.length}
     <section class="bench-section">
@@ -57,3 +63,22 @@
 {:else}
   <p class="muted">Loading…</p>
 {/if}
+
+<style>
+  .queue-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 18px;
+  }
+
+  .fold {
+    font-size: 0.8rem;
+    color: var(--faint);
+  }
+
+  .fold:hover {
+    color: var(--fg);
+    text-decoration: none;
+  }
+</style>

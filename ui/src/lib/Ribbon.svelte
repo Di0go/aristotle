@@ -6,12 +6,14 @@
   import { link, router } from './router.svelte.ts';
   import { searchBox } from './search.svelte.ts';
   import { ACCENTS, theme } from './theme.svelte.ts';
+  import { isFading } from '../../../shared/types.ts';
 
   /** The places, each with its icon (20×20, stroked) and its name under it. Everything else is reached from them. */
   const HOME = 'M4 4.5h12v11H4zM7 8.5h6M7 11.5h4';
   const YOU = 'M10 4a3 3 0 1 0 0 6a3 3 0 1 0 0-6M4.5 16.5c.8-3 3-4.5 5.5-4.5s4.7 1.5 5.5 4.5';
   const COURSES = 'M4 4h3.5v12H4zM8.5 4H12v12H8.5zM13.2 4.6l3.2-.9 3 11.6-3.2.9z';
   const MAP = 'M5 6.5a1.8 1.8 0 1 0 0-.01M15 5.5a1.8 1.8 0 1 0 0-.01M10 15a1.8 1.8 0 1 0 0-.01M6.8 6.3l6.4-.8M6 8.2l3 5.2M14 7.2l-3 5.9';
+  const REVIEW = 'M15.5 8A5.8 5.8 0 0 0 4.7 7.2M4.5 4.5v2.9h2.9M4.5 12a5.8 5.8 0 0 0 10.8.8M15.5 15.5v-2.9h-2.9';
 
   /** The appearance popover is open. */
   let settings = $state(false);
@@ -19,15 +21,21 @@
   const route = $derived(router.route);
   /** Which place is lit: the map for the map and a class's concepts; Home for Home and what it leads to. */
   const section = $derived(
-    route.page === 'map' || route.page === 'topic'
-      ? 'map'
-      : ['roadmaps', 'roadmap', 'topics'].includes(route.page)
-        ? 'courses'
-        : ['now', 'progress', 'log', 'session', 'praxis', 'mission'].includes(route.page)
-          ? 'now'
-          : '',
+    route.page === 'review' || route.page === 'train'
+      ? 'review'
+      : route.page === 'map' || route.page === 'topic'
+        ? 'map'
+        : ['roadmaps', 'roadmap', 'topics'].includes(route.page)
+          ? 'courses'
+          : ['now', 'progress', 'log', 'session', 'praxis', 'mission'].includes(route.page)
+            ? 'now'
+            : '',
   );
-  const live = $derived(feed.liveSlug !== null);
+  /** A lesson going on (Home points to it); a review going on, or waiting for an answer (Review lights up). */
+  const live = $derived(feed.session?.kind === 'learn' && feed.liveSlug !== null && feed.inProgress);
+  const reviewOpen = $derived(feed.session?.kind === 'review' && !feed.session.endedAt);
+  /** Concepts fading right now, across every class. */
+  const fading = $derived(Object.values(feed.topics).reduce((n, t) => n + t.concepts.filter((c) => isFading(c)).length, 0));
 
   function onWindowKey(e: KeyboardEvent) {
     if (e.key === 'Escape') settings = false;
@@ -40,7 +48,14 @@
   <a class="rib" class:on={section === 'now'} href={link.now()} aria-current={section === 'now' ? 'page' : undefined}>
     <svg viewBox="0 0 20 20" aria-hidden="true"><path d={HOME} /></svg>
     <span class="lbl">Home</span>
-    {#if feed.pending}<i class="pip turn" title="Your turn"></i>{:else if live}<i class="pip"></i>{/if}
+    {#if feed.pending && feed.session?.kind === 'learn'}<i class="pip turn" title="Your turn"></i>{:else if live}<i class="pip"></i>{/if}
+  </a>
+  <a class="rib" class:on={section === 'review'} href={link.review()} aria-current={section === 'review' ? 'page' : undefined}>
+    <svg viewBox="0 0 20 20" aria-hidden="true"><path d={REVIEW} /></svg>
+    <span class="lbl">Review</span>
+    {#if reviewOpen && feed.pending}<i class="pip turn" title="Your turn"></i>{:else if fading}<i class="count" title="{fading} fading"
+        >{fading}</i
+      >{/if}
   </a>
   <a class="rib" class:on={section === 'courses'} href={link.roadmaps()} aria-current={section === 'courses' ? 'page' : undefined}>
     <svg viewBox="0 0 20 20" aria-hidden="true"><path d={COURSES} transform="translate(-1.2 0)" /></svg>
@@ -181,6 +196,21 @@
     height: 6px;
     border-radius: 50%;
     background: var(--acc);
+  }
+
+  /** How many concepts are fading, on Review. */
+  .count {
+    position: absolute;
+    top: 2px;
+    right: 6px;
+    min-width: 15px;
+    padding: 0 4px;
+    border-radius: 8px;
+    background: var(--acc);
+    color: var(--on-acc, #fff);
+    font: 600 0.62rem/15px var(--sans);
+    font-style: normal;
+    text-align: center;
   }
 
   .pip.turn {

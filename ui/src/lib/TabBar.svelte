@@ -12,8 +12,12 @@
   const CLOCK = 'M10 3.5a6.5 6.5 0 1 0 0 13a6.5 6.5 0 1 0 0-13M10 6.8V10l2.4 1.8';
   const BOOKS = 'M4 4h3.5v12H4zM8.5 4H12v12H8.5zM13.2 4.6l3.2-.9 3 11.6-3.2.9z';
   const TARGET = 'M10 3.5a6.5 6.5 0 1 0 0 13a6.5 6.5 0 1 0 0-13M10 6.5a3.5 3.5 0 1 0 0 7a3.5 3.5 0 1 0 0-7';
+  /** Two arrows turning back on themselves: recall, again and again. */
+  const REVIEW = 'M15.5 8A5.8 5.8 0 0 0 4.7 7.2M4.5 4.5v2.9h2.9M4.5 12a5.8 5.8 0 0 0 10.8.8M15.5 15.5v-2.9h-2.9';
   const ICONS: Record<Route['page'], string> = {
     now: NOTE,
+    review: REVIEW,
+    train: REVIEW,
     lesson: NOTE,
     step: NOTE,
     map: GRAPH,
@@ -39,7 +43,11 @@
     const r = routeOf(key);
     switch (r.page) {
       case 'now':
-        return feed.session && !feed.session.endedAt && feed.session.kind !== 'learn' ? feed.session.topic : 'Home';
+        return 'Home';
+      case 'review':
+        return 'Review';
+      case 'train':
+        return `Training: ${topicTitle(r.slug)}`;
       case 'progress':
         return 'Progress';
       case 'map':
