@@ -6,11 +6,11 @@
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { EventEmitter } from 'node:events';
-import { mkdir, readdir, readFile, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { CHATS_DIR, ONESHOT_CMD } from './config.ts';
 import { claudeCwd, claudeEnv, headlessArgs, limited } from './oneshot.ts';
-import { slugify } from './slug.ts';
+import { slugCandidates, slugify } from './slug.ts';
+import { isObject, loadJsonDir, WriteQueue, writeJson } from './store.ts';
 import type { ChatMessage, ChatThread } from '../shared/types.ts';
 
 const TIMEOUT_MS = 180_000;
@@ -32,11 +32,11 @@ const SYSTEM =
 
 export class ChatError extends Error {}
 
-/** A message as it streams: the thread, the answer's id, and the text so far. */
+/** A message as it streams: the thread, the answer's id, and the text added since the last delta. */
 export interface ChatDelta {
   thread: string;
   id: string;
-  text: string;
+  delta: string;
 }
 
 export class Chats {
@@ -44,28 +44,35 @@ export class Chats {
   private busy = new Set<string>();
   /** The Claude Code answering in each thread right now, so he can stop it. */
   private running = new Map<string, { kill: () => void; stopped: boolean }>();
-  private saving = new Map<string, Promise<void>>();
+  private queue = new WriteQueue();
   readonly events = new EventEmitter<{ message: [string, ChatMessage]; delta: [ChatDelta]; cleared: [string] }>();
 
   static async load(): Promise<Chats> {
     const store = new Chats();
-    await mkdir(CHATS_DIR, { recursive: true });
-    for (const file of await readdir(CHATS_DIR)) {
-      if (!file.endsWith('.json')) continue;
-      const t = JSON.parse(await readFile(path.join(CHATS_DIR, file), 'utf8')) as ChatThread;
-      store.threads.set(t.thread, t);
-    }
+    for (const t of await loadJsonDir(CHATS_DIR, isThread)) store.threads.set(t.thread, t);
     return store;
   }
 
   /** A thread's messages, oldest first. */
   get(thread: string): ChatMessage[] {
-    return this.threads.get(threadId(thread))?.messages ?? [];
+    return this.threads.get(this.idOf(thread))?.messages ?? [];
+  }
+
+  /** Resolves once every write queued so far has finished. */
+  idle(): Promise<void> {
+    return this.queue.idle();
+  }
+
+  /** The id a thread is kept under: its slug now, or before Unicode slugs if it was started then. */
+  private idOf(thread: string): string {
+    const id = threadId(thread);
+    if (this.threads.has(id) || !thread.trim()) return id;
+    return slugCandidates(thread).find((s) => this.threads.has(s)) ?? id;
   }
 
   /** Stops the answer being written in a thread; what was written so far is kept, marked stopped. */
   cancel(thread: string): boolean {
-    const run = this.running.get(threadId(thread));
+    const run = this.running.get(this.idOf(thread));
     if (!run) return false;
     run.stopped = true;
     run.kill();
@@ -74,7 +81,7 @@ export class Chats {
 
   /** Starts a thread over: its messages and its Claude Code session are forgotten. */
   async clear(thread: string) {
-    const id = threadId(thread);
+    const id = this.idOf(thread);
     this.cancel(id);
     const t: ChatThread = { thread: id, messages: [] };
     this.threads.set(id, t);
@@ -84,7 +91,7 @@ export class Chats {
 
   /** His message, then Aristotle's answer, streamed as it is written (`delta` events) and kept. */
   async send(thread: string, text: string, context: string, mentions: string[] = []): Promise<ChatMessage> {
-    const id = threadId(thread);
+    const id = this.idOf(thread);
     const body = text.trim().slice(0, MAX_MESSAGE);
     if (!body) throw new ChatError('Write something first');
     if (this.busy.has(id)) throw new ChatError('Aristotle is still answering your last message');
@@ -107,15 +114,15 @@ export class Chats {
       const answerId = randomUUID();
       const request = `${context.slice(0, MAX_CONTEXT)}\n\nTheir message: ${body}`;
       let answer: string;
+      const onDelta = (delta: string) => this.events.emit('delta', { thread: id, id: answerId, delta });
       try {
-        answer = await this.ask(t, request, (so) => this.events.emit('delta', { thread: id, id: answerId, text: so }));
+        answer = await this.ask(t, request, onDelta);
       } catch (err) {
         if (!(err instanceof ChatError) || !t.session || this.running.get(id)?.stopped) throw err;
-        // The saved session is gone (Claude Code's own store was cleared): start a new one, with the recent talk.
+        // The saved session is gone (Claude Code's own store was cleared, or it ran in another folder): start a new
+        // one, with the recent talk.
         t.session = undefined;
-        answer = await this.ask(t, `${recap(t.messages.slice(0, -1))}${request}`, (so) =>
-          this.events.emit('delta', { thread: id, id: answerId, text: so }),
-        );
+        answer = await this.ask(t, `${recap(t.messages.slice(0, -1))}${request}`, onDelta);
       }
       const stopped = answer.endsWith(STOPPED);
       const theirs: ChatMessage = {
@@ -125,6 +132,8 @@ export class Chats {
         at: new Date().toISOString(),
         ...(stopped ? { stopped: true } : {}),
       };
+      // Started over while the answer was being written: it belongs to the chat that was cleared, so it is not kept.
+      if (this.threads.get(id) !== t) return theirs;
       t.messages.push(theirs);
       this.events.emit('message', id, theirs);
       await this.write(t);
@@ -134,8 +143,8 @@ export class Chats {
     }
   }
 
-  /** Runs Claude Code on the thread's session (resumed, or a new one), streaming its text to `onText`. */
-  private ask(t: ChatThread, request: string, onText: (soFar: string) => void): Promise<string> {
+  /** Runs Claude Code on the thread's session (resumed, or a new one), streaming each new piece of text to `onDelta`. */
+  private ask(t: ChatThread, request: string, onDelta: (delta: string) => void): Promise<string> {
     const resume = Boolean(t.session);
     const session = t.session ?? randomUUID();
     // Always the same private folder (oneshot.ts claudeCwd), so a session can be resumed.
@@ -180,7 +189,7 @@ export class Chats {
             const delta = ev.type === 'stream_event' && ev.event?.type === 'content_block_delta' ? ev.event.delta : undefined;
             if (delta?.type === 'text_delta' && delta.text) {
               text += delta.text;
-              onText(text);
+              onDelta(delta.text);
             }
           }
         });
@@ -208,21 +217,20 @@ export class Chats {
     });
   }
 
-  /** Atomic write (temp file + rename), one at a time per thread. */
+  /** Atomic write, one at a time per thread (store.ts). */
   private async write(t: ChatThread) {
-    const file = path.join(CHATS_DIR, `${t.thread}.json`);
-    const next = (this.saving.get(t.thread) ?? Promise.resolve()).then(async () => {
-      await writeFile(`${file}.tmp`, `${JSON.stringify(t, null, 2)}\n`);
-      await rename(`${file}.tmp`, file);
-    });
-    this.saving.set(t.thread, next);
-    await next;
+    await this.queue.run(t.thread, () => writeJson(path.join(CHATS_DIR, `${t.thread}.json`), t));
   }
 }
 
 /** A class's slug, or "home" for talk away from any class. */
 export function threadId(thread: string): string {
-  return slugify(thread) || 'home';
+  return thread.trim() ? slugify(thread) : 'home';
+}
+
+/** The shape a chat file must have to be loaded. */
+function isThread(v: unknown): v is ChatThread {
+  return isObject(v) && typeof v.thread === 'string' && Array.isArray(v.messages);
 }
 
 /** The last few exchanges, for a session started over. */

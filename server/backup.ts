@@ -8,6 +8,7 @@ import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { promisify } from 'node:util';
 import { BACKUP, DATA_DIR } from './config.ts';
+import { warnings } from './warnings.ts';
 
 const run = promisify(execFile);
 const git = (...args: string[]) => run('git', args, { cwd: DATA_DIR, timeout: 60_000 });
@@ -19,6 +20,8 @@ export interface BackupStatus {
   enabled: boolean;
   lastAt?: string;
   lastError?: string;
+  /** When the current run of failures began; gone after a run that works. */
+  failingSince?: string;
   pending: boolean;
 }
 
@@ -69,10 +72,15 @@ export class Backup {
         if (ahead > 0) await git('push', '--quiet');
       }
       this.status = { enabled: true, pending: false, lastAt: new Date().toISOString() };
+      warnings.set('backup', undefined);
     } catch (err) {
       const message = (err as { stderr?: string; message: string }).stderr?.trim() || (err as Error).message;
       console.error(`${new Date().toISOString()} Backup failed: ${message}`);
-      this.status = { ...this.status, pending: false, lastError: message };
+      const since = this.status.failingSince ?? new Date().toISOString();
+      this.status = { ...this.status, pending: false, lastError: message, failingSince: since };
+      // Said where the learner looks, not only in a log nobody reads: a backup that silently stops is worse than none.
+      const when = new Date(since).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' });
+      warnings.set('backup', `Backup has failed since ${when}: ${message.split('\n').at(-1)}`);
     } finally {
       this.running = false;
       if (this.again) {

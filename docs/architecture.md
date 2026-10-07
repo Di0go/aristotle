@@ -21,7 +21,7 @@ flowchart LR
 4. For `quiz` and `ask`, the tool call **waits** (up to `ARISTOTLE_WAIT_MS`, sending progress notifications so it does not look idle) until the learner answers in the page (`POST /api/answer`). The answer is recorded as evidence on the concept's map, and returned to Claude as the tool's result. If he is away, the tool returns "No answer yet" and Claude collects it later with `collect_answers`.
 5. `update_map` changes the topic's knowledge map ([`topics.ts`](../server/topics.ts)), which the interface draws; `record_practice` moves spaced-review cards ([`reviews.ts`](../server/reviews.ts), FSRS).
 
-Everything the learner sees is a projection of `data/`: restart the server and the same state comes back.
+Everything the learner sees is a projection of `data/`: restart the server and the same state comes back. The live feed sends one record per change (a `topic`, a `gloss`, an `aside`, a `note`, and their `…-removed`), never a whole list, and `warnings` when something is wrong with the data ([`warnings.ts`](../server/warnings.ts)).
 
 ## The server
 
@@ -30,9 +30,10 @@ A plain Node HTTP server, run directly as TypeScript (Node's type stripping: onl
 - **MCP** is stateless: a fresh `McpServer` per request on the Streamable HTTP transport, so restarting the server never strands Claude Code.
 - **The interface** is the built `dist/ui`, served with long caching for hashed assets.
 - **The terminal**: [`terminal.ts`](../server/terminal.ts) runs `claude` in a pseudo-terminal (node-pty) in the app's folder and streams it over a WebSocket to the drawer. The interface starts it when Aristotle opens; messages sent before it has drawn its screen and gone quiet are held and typed in then.
-- **The chat beside a lesson**: [`chat.ts`](../server/chat.ts) keeps one conversation per class in `data/chats/<thread>.json` and continues it as one Claude Code session (`claude -p --resume`, locked down like the one-shot runner, from the same private folder). Each message is sent with fresh context (where he is, his screen, the class's map, his notes, About you); the answer streams as `chat-delta` events over the live feed, then a `chat` event. The tutor reads the class's chat in `get_topic`.
+- **The chat beside a lesson**: [`chat.ts`](../server/chat.ts) keeps one conversation per class in `data/chats/<thread>.json` and continues it as one Claude Code session (`claude -p --resume`, locked down like the one-shot runner, from the same private folder). Each message is sent with fresh context (where he is, his screen, the class's map, his notes, About you); the answer streams as `chat-delta` events over the live feed (each carrying only the text added since the last), then a `chat` event. Clearing a chat while an answer is being written drops that answer. The tutor reads the class's chat in `get_topic`.
 - **Glosses and questions on a passage**: [`oneshot.ts`](../server/oneshot.ts) runs `claude -p` on his own login, headless and locked down: no tools, no MCP servers, no settings or hooks, no saved session, in a private folder outside any project (`ARISTOTLE_CLAUDE_CWD`, under `~/.cache/aristotle/`), so no project's `CLAUDE.md` is read into it and nobody else can leave one there. At most three of these (with chat answers) run at once. The request goes on stdin; what it prints is the answer. Sonnet by default (`ARISTOTLE_ONESHOT_MODEL`); five to fifteen seconds. [`glosses.ts`](../server/glosses.ts) explains a phrase (phrase, topic, passage); it is also handed up to five licence-checked pictures from Wikimedia Commons ([`images.ts`](../server/images.ts)), by title and description, and names one on a last `IMAGE: n` line only when the phrase is visual and a candidate clearly shows it (`ARISTOTLE_GLOSS_IMAGES=off` turns this off). [`asides.ts`](../server/asides.ts) answers his question on a passage, with the paragraph, the step's title and the topic.
-- **Backup**: [`backup.ts`](../server/backup.ts) commits `data/` (its own Git repository) after quiet periods and pushes if it has a remote.
+- **Stores**: each kind of record has a store in memory that writes through to its files with [`store.ts`](../server/store.ts) (atomic, one write at a time per file, carrying on after a failure) and sets aside a file it can't read rather than failing to start. On SIGTERM the server stops taking requests and waits (up to three seconds) for the stores to finish writing before it exits.
+- **Backup**: [`backup.ts`](../server/backup.ts) commits `data/` (its own Git repository) after quiet periods and pushes if it has a remote; when that keeps failing, the interface shows it.
 
 ### Security model
 
@@ -166,9 +167,11 @@ Only for the interface (and the tests); Claude Code uses MCP.
 | [`reviews.ts`](../server/reviews.ts) | Spaced review of concepts with FSRS: every solid concept carries a review card; when its due date passes, the concept is "fading" until he practises it again. |
 | [`roadmaps.ts`](../server/roadmaps.ts) | Roadmaps: one JSON file per roadmap in data/roadmaps/. |
 | [`search.ts`](../server/search.ts) | Search across everything he has: roadmaps and their steps, topics and their concepts, Praxis missions, and the text of every session (steps, questions and his answers). |
-| [`slug.ts`](../server/slug.ts) | Turns titles into the stable kebab-case ids used for topics, roadmaps, missions and file names. |
+| [`slug.ts`](../server/slug.ts) | Turns titles into the stable kebab-case ids used for topics, roadmaps, missions, glosses, chats and file names. |
+| [`store.ts`](../server/store.ts) | How the stores read and write their files in data/. |
 | [`terminal.ts`](../server/terminal.ts) | Claude Code inside Aristotle: one interactive `claude` running in a pseudo-terminal, streamed to the interface over a WebSocket. |
 | [`topics.ts`](../server/topics.ts) | Knowledge maps: one JSON file per topic in data/topics/. |
+| [`warnings.ts`](../server/warnings.ts) | What the learner should know is wrong with their data: a backup that keeps failing, a file set aside as unreadable. |
 
 #### Shared types (`shared/`)
 

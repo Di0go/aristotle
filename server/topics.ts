@@ -2,13 +2,14 @@
 // so a map can always be explained from its history.
 
 import { EventEmitter } from 'node:events';
-import { mkdir, readdir, readFile, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { TOPICS_DIR } from './config.ts';
 import { gradeReview, retrievability, startReview, type Outcome } from './reviews.ts';
-import { slugify } from './slug.ts';
+import { slugCandidates, slugify } from './slug.ts';
+import { isObject, loadJsonDir, WriteQueue, writeJson } from './store.ts';
 import {
   isFading,
+  LEAN_EVIDENCE,
   type Concept,
   type ConceptStatus,
   type Evidence,
@@ -31,23 +32,26 @@ export interface ConceptInput {
 
 export class Topics {
   private topics = new Map<string, Topic>();
-  private saving = new Map<string, Promise<void>>();
+  private queue = new WriteQueue();
+  /** While batch() runs, writes wait here and happen once, per topic, at its end. */
+  private holding = 0;
+  private held = new Set<string>();
   readonly events = new EventEmitter<{ topic: [Topic] }>();
 
   static async load(): Promise<Topics> {
     const store = new Topics();
-    await mkdir(TOPICS_DIR, { recursive: true });
-    for (const file of await readdir(TOPICS_DIR)) {
-      if (!file.endsWith('.json')) continue;
-      const topic = JSON.parse(await readFile(path.join(TOPICS_DIR, file), 'utf8')) as Topic;
-      store.topics.set(topic.slug, topic);
-    }
+    for (const topic of await loadJsonDir(TOPICS_DIR, isTopic)) store.topics.set(topic.slug, topic);
     return store;
   }
 
-  /** By slug, or by a title that slugifies to one. */
+  /** By slug, or by a title that slugifies to one (as it does now, or did before Unicode slugs). */
   get(slugOrTitle: string): Topic | undefined {
-    return this.topics.get(slugOrTitle) ?? this.topics.get(slugify(slugOrTitle));
+    return (
+      this.topics.get(slugOrTitle) ??
+      slugCandidates(slugOrTitle)
+        .map((s) => this.topics.get(s))
+        .find(Boolean)
+    );
   }
 
   /** Every topic as a summary, most recently changed first. */
@@ -256,19 +260,56 @@ export class Topics {
     return topic;
   }
 
-  /** Atomic write (temp file + rename), one write at a time per topic. */
+  /**
+   * Runs `fn` with topic writes held back, then writes each topic it changed once (and announces it once): a quiz
+   * answer touching five concepts is one write and one event, not five.
+   */
+  async batch<T>(fn: () => Promise<T>): Promise<T> {
+    this.holding++;
+    try {
+      return await fn();
+    } finally {
+      if (--this.holding === 0) {
+        const slugs = [...this.held];
+        this.held.clear();
+        await Promise.all(slugs.map((slug) => this.topics.get(slug)).map((t) => t && this.write(t)));
+      }
+    }
+  }
+
+  /** Resolves once every write queued so far has finished. */
+  idle(): Promise<void> {
+    return this.queue.idle();
+  }
+
+  /** Atomic write, one write at a time per topic (store.ts); held back while a batch runs. */
   private async write(topic: Topic) {
-    const file = path.join(TOPICS_DIR, `${topic.slug}.json`);
-    const previous = this.saving.get(topic.slug) ?? Promise.resolve();
-    const next = previous.then(async () => {
-      const tmp = `${file}.tmp`;
-      await writeFile(tmp, `${JSON.stringify(topic, null, 2)}\n`);
-      await rename(tmp, file);
-    });
-    this.saving.set(topic.slug, next);
-    await next;
+    if (this.holding) {
+      this.held.add(topic.slug);
+      return;
+    }
+    await this.queue.run(topic.slug, () => writeJson(path.join(TOPICS_DIR, `${topic.slug}.json`), topic));
     this.events.emit('topic', topic);
   }
+}
+
+/** The shape a topic file must have to be loaded. */
+function isTopic(v: unknown): v is Topic {
+  return isObject(v) && typeof v.slug === 'string' && typeof v.title === 'string' && Array.isArray(v.concepts) && Array.isArray(v.sessions);
+}
+
+/**
+ * A topic as the live map carries it (/api/map, topic events): each concept's newest LEAN_EVIDENCE evidence entries
+ * only, with the full count. Years of answers would otherwise make every map change megabytes.
+ */
+export function leanTopic(topic: Topic): Topic {
+  if (!topic.concepts.some((c) => c.evidence.length > LEAN_EVIDENCE)) return topic;
+  return {
+    ...topic,
+    concepts: topic.concepts.map((c) =>
+      c.evidence.length > LEAN_EVIDENCE ? { ...c, evidence: c.evidence.slice(-LEAN_EVIDENCE), evidenceTotal: c.evidence.length } : c,
+    ),
+  };
 }
 
 /** The map as Claude reads it: statuses, structure and a short evidence record per concept. */

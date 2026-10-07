@@ -2,10 +2,10 @@
 // progress is read off that topic's map rather than stored twice.
 
 import { EventEmitter } from 'node:events';
-import { mkdir, readdir, readFile, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { ROADMAPS_DIR } from './config.ts';
-import { slugify } from './slug.ts';
+import { slugCandidates, slugify } from './slug.ts';
+import { isObject, loadJsonDir, WriteQueue, writeJson } from './store.ts';
 import { stepState, type Roadmap, type RoadmapStep, type Topic } from '../shared/types.ts';
 
 export interface RoadmapInput {
@@ -20,23 +20,23 @@ const STATE_LABEL = { 'not-started': 'not started', started: 'started', done: 'd
 
 export class Roadmaps {
   private roadmaps = new Map<string, Roadmap>();
-  private saving = new Map<string, Promise<void>>();
+  private queue = new WriteQueue();
   readonly events = new EventEmitter<{ roadmap: [Roadmap] }>();
 
   static async load(): Promise<Roadmaps> {
     const store = new Roadmaps();
-    await mkdir(ROADMAPS_DIR, { recursive: true });
-    for (const file of await readdir(ROADMAPS_DIR)) {
-      if (!file.endsWith('.json')) continue;
-      const roadmap = JSON.parse(await readFile(path.join(ROADMAPS_DIR, file), 'utf8')) as Roadmap;
-      store.roadmaps.set(roadmap.slug, roadmap);
-    }
+    for (const roadmap of await loadJsonDir(ROADMAPS_DIR, isRoadmap)) store.roadmaps.set(roadmap.slug, roadmap);
     return store;
   }
 
-  /** By slug, or by a title that slugifies to one. */
+  /** By slug, or by a title that slugifies to one (as it does now, or did before Unicode slugs). */
   get(slugOrTitle: string): Roadmap | undefined {
-    return this.roadmaps.get(slugOrTitle) ?? this.roadmaps.get(slugify(slugOrTitle));
+    return (
+      this.roadmaps.get(slugOrTitle) ??
+      slugCandidates(slugOrTitle)
+        .map((s) => this.roadmaps.get(s))
+        .find(Boolean)
+    );
   }
 
   /** Most recently changed first. */
@@ -77,19 +77,21 @@ export class Roadmaps {
     return { roadmap, created: !existing };
   }
 
-  /** Atomic write (temp file + rename), one write at a time per roadmap. */
+  /** Resolves once every write queued so far has finished. */
+  idle(): Promise<void> {
+    return this.queue.idle();
+  }
+
+  /** Atomic write, one write at a time per roadmap (store.ts). */
   private async write(roadmap: Roadmap) {
-    const file = path.join(ROADMAPS_DIR, `${roadmap.slug}.json`);
-    const previous = this.saving.get(roadmap.slug) ?? Promise.resolve();
-    const next = previous.then(async () => {
-      const tmp = `${file}.tmp`;
-      await writeFile(tmp, `${JSON.stringify(roadmap, null, 2)}\n`);
-      await rename(tmp, file);
-    });
-    this.saving.set(roadmap.slug, next);
-    await next;
+    await this.queue.run(roadmap.slug, () => writeJson(path.join(ROADMAPS_DIR, `${roadmap.slug}.json`), roadmap));
     this.events.emit('roadmap', roadmap);
   }
+}
+
+/** The shape a roadmap file must have to be loaded. */
+function isRoadmap(v: unknown): v is Roadmap {
+  return isObject(v) && typeof v.slug === 'string' && typeof v.title === 'string' && Array.isArray(v.steps);
 }
 
 /** The roadmap as Claude reads it: each step with the state of its topic. */

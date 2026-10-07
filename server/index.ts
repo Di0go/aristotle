@@ -39,6 +39,7 @@ import { MissionError } from './missions.ts';
 import { socketOwner } from './peer.ts';
 import { Search } from './search.ts';
 import { Terminal } from './terminal.ts';
+import { leanTopic } from './topics.ts';
 import type { AskAnswerBody, AsideBody, FeedEvent, GlossBody, QuizAnswerBody } from '../shared/types.ts';
 
 const gym = await Gym.load();
@@ -181,7 +182,8 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ro
     const topic = gym.topics.get(tail('/api/topics/'));
     return topic ? json(res, 200, topic) : json(res, 404, { error: 'No such topic' });
   }
-  if (req.method === 'GET' && route === '/api/map') return json(res, 200, gym.topics.all());
+  // The live map: each concept's newest evidence only (topics.ts leanTopic); /api/topics/<slug> has all of it.
+  if (req.method === 'GET' && route === '/api/map') return json(res, 200, gym.topics.all().map(leanTopic));
   if (req.method === 'GET' && route === '/api/roadmaps') return json(res, 200, gym.roadmaps.all());
   if (req.method === 'GET' && route.startsWith('/api/roadmaps/')) {
     const roadmap = gym.roadmaps.get(tail('/api/roadmaps/'));
@@ -307,7 +309,7 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ro
   }
 
   // History, progress and search
-  if (req.method === 'GET' && route === '/api/sessions') return json(res, 200, await gym.listSessions());
+  if (req.method === 'GET' && route === '/api/sessions') return json(res, 200, await gym.listSessions(params.get('topic') ?? undefined));
   if (req.method === 'GET' && route.startsWith('/api/sessions/')) {
     const record = await gym.readSession(tail('/api/sessions/'));
     if (!record?.session) return json(res, 404, { error: 'No such session' });
@@ -494,15 +496,22 @@ server.listen(PORT, HOST, () => {
 tls?.listen(TLS_PORT, HOST);
 server6.listen(PORT, HOST6);
 
-/** Closes both servers and removes the pid file, so a later `pnpm app stop` never signals a stale pid. */
-function shutdown() {
-  rmSync(PID_FILE, { force: true });
-  terminal.stop();
+/**
+ * Stops taking requests, lets the stores finish writing (a release restarts the server mid-lesson), then exits and
+ * removes the pid file, so a later `pnpm app stop` never signals a stale pid.
+ */
+let stopping = false;
+async function shutdown() {
+  if (stopping) return;
+  stopping = true;
   for (const s of [server, server6, tls]) {
     s?.close();
     s?.closeAllConnections();
   }
+  await Promise.race([gym.idle(), new Promise((r) => setTimeout(r, 3000))]);
+  rmSync(PID_FILE, { force: true });
+  terminal.stop();
   process.exit(0);
 }
-process.on('SIGTERM', shutdown);
-process.on('SIGINT', shutdown);
+process.on('SIGTERM', () => void shutdown());
+process.on('SIGINT', () => void shutdown());

@@ -13,7 +13,8 @@ import { Chats } from './chat.ts';
 import type { Outcome } from './reviews.ts';
 import { Roadmaps } from './roadmaps.ts';
 import { slugify } from './slug.ts';
-import { Topics, type ConceptInput } from './topics.ts';
+import { leanTopic, Topics, type ConceptInput } from './topics.ts';
+import { warnings } from './warnings.ts';
 import type {
   AskItem,
   Concept,
@@ -75,13 +76,19 @@ export class Gym {
     this.asides = asides;
     this.notes = notes;
     this.chats = chats;
-    topics.events.on('topic', (topic) => feed.events.emit('event', { type: 'topic', topic }));
+    // Each tab keeps a live connection that listens here.
+    feed.events.setMaxListeners(0);
+    topics.events.on('topic', (topic) => feed.events.emit('event', { type: 'topic', topic: leanTopic(topic) }));
     roadmaps.events.on('roadmap', (roadmap) => feed.events.emit('event', { type: 'roadmap', roadmap }));
     missions.events.on('mission', (mission) => feed.events.emit('event', { type: 'mission', mission }));
-    glosses.events.on('glosses', (list) => feed.events.emit('event', { type: 'glosses', glosses: list }));
-    asides.events.on('asides', (list) => feed.events.emit('event', { type: 'asides', asides: list }));
-    notes.events.on('notes', (list) => feed.events.emit('event', { type: 'notes', notes: list }));
+    glosses.events.on('gloss', (gloss) => feed.events.emit('event', { type: 'gloss', gloss }));
+    glosses.events.on('removed', (id) => feed.events.emit('event', { type: 'gloss-removed', id }));
+    asides.events.on('aside', (aside) => feed.events.emit('event', { type: 'aside', aside }));
+    asides.events.on('removed', (id) => feed.events.emit('event', { type: 'aside-removed', id }));
+    notes.events.on('note', (note) => feed.events.emit('event', { type: 'note', note }));
+    notes.events.on('removed', ({ topic, step }) => feed.events.emit('event', { type: 'note-removed', topic, step }));
     notes.events.on('about', (about) => feed.events.emit('event', { type: 'about', about }));
+    warnings.events.on('change', (list) => feed.events.emit('event', { type: 'warnings', warnings: list }));
     chats.events.on('message', (thread, message) => feed.events.emit('event', { type: 'chat', thread, message }));
     chats.events.on('delta', (d) => feed.events.emit('event', { type: 'chat-delta', ...d }));
     chats.events.on('cleared', (thread) => feed.events.emit('event', { type: 'chat-cleared', thread }));
@@ -89,17 +96,33 @@ export class Gym {
     this.backup.schedule(30_000);
   }
 
+  /** Every store, loaded side by side. */
   static async load(): Promise<Gym> {
-    return new Gym(
-      await Feed.load(),
-      await Topics.load(),
-      await Roadmaps.load(),
-      await Missions.load(),
-      await Glosses.load(),
-      await Asides.load(),
-      await Notes.load(),
-      await Chats.load(),
-    );
+    const [feed, topics, roadmaps, missions, glosses, asides, notes, chats] = await Promise.all([
+      Feed.load(),
+      Topics.load(),
+      Roadmaps.load(),
+      Missions.load(),
+      Glosses.load(),
+      Asides.load(),
+      Notes.load(),
+      Chats.load(),
+    ]);
+    return new Gym(feed, topics, roadmaps, missions, glosses, asides, notes, chats);
+  }
+
+  /** Resolves once every store has written what it was asked to (before the server exits). */
+  async idle(): Promise<void> {
+    await Promise.all([
+      this.feed.idle(),
+      this.topics.idle(),
+      this.roadmaps.idle(),
+      this.missions.idle(),
+      this.glosses.idle(),
+      this.asides.idle(),
+      this.notes.idle(),
+      this.chats.idle(),
+    ]);
   }
 
   /** The current session's topic, if it has one on the map. */
@@ -168,18 +191,21 @@ export class Gym {
     const item = await this.feed.answerQuiz(id, picks);
     const session = this.feed.session;
     if (!session) return item;
-    for (const [i, q] of item.questions.entries()) {
-      const r = item.responses?.[i];
-      const found = q.concept ? this.resolve(q.concept) : null;
-      if (!found || !r) continue;
-      await this.topics.recordEvidence(found.topic.slug, found.concept.id, {
-        at: item.answeredAt!,
-        session: session.id,
-        item: item.id,
-        kind: 'quiz',
-        result: r.choice === null ? 'dont-know' : r.correct ? 'right' : 'wrong',
-      });
-    }
+    // One write per topic for the whole quiz, not one per question.
+    await this.topics.batch(async () => {
+      for (const [i, q] of item.questions.entries()) {
+        const r = item.responses?.[i];
+        const found = q.concept ? this.resolve(q.concept) : null;
+        if (!found || !r) continue;
+        await this.topics.recordEvidence(found.topic.slug, found.concept.id, {
+          at: item.answeredAt!,
+          session: session.id,
+          item: item.id,
+          kind: 'quiz',
+          result: r.choice === null ? 'dont-know' : r.correct ? 'right' : 'wrong',
+        });
+      }
+    });
     return item;
   }
 
@@ -211,29 +237,32 @@ export class Gym {
     const changes = new Map<string, MapChange[]>();
     const problems = new Map<string, Outcome[]>();
 
-    for (const r of results) {
-      const found = this.resolve(r.concept);
-      if (!found) {
-        lines.push(`${r.concept}: no such concept (use "topic/concept" outside the session's topic).`);
-        continue;
+    // One write per topic for all the results, not one per result.
+    await this.topics.batch(async () => {
+      for (const r of results) {
+        const found = this.resolve(r.concept);
+        if (!found) {
+          lines.push(`${r.concept}: no such concept (use "topic/concept" outside the session's topic).`);
+          continue;
+        }
+        const { topic, concept } = found;
+        const res = await this.topics.recordPractice(topic.slug, concept.id, r.outcome, {
+          at,
+          session: session.id,
+          practice: r.kind,
+          ...(r.kind === 'problem' && difficulty ? { difficulty } : {}),
+        });
+        if (!res) continue;
+        if (res.change) append(changes, topic.slug, res.change);
+        if (r.kind === 'problem' && difficulty) append(problems, topic.slug, r.outcome);
+        const before = res.recallBefore === undefined ? '' : `, recall was ~${Math.round(res.recallBefore * 100)}%`;
+        const next =
+          res.concept.review && res.concept.status === 'solid'
+            ? `next review ${res.concept.review.due.slice(0, 10)}`
+            : 'not scheduled (not solid)';
+        lines.push(`${topic.slug}/${concept.id}: ${r.outcome}${before}; ${res.change ? 'now shaky; ' : ''}${next}`);
       }
-      const { topic, concept } = found;
-      const res = await this.topics.recordPractice(topic.slug, concept.id, r.outcome, {
-        at,
-        session: session.id,
-        practice: r.kind,
-        ...(r.kind === 'problem' && difficulty ? { difficulty } : {}),
-      });
-      if (!res) continue;
-      if (res.change) append(changes, topic.slug, res.change);
-      if (r.kind === 'problem' && difficulty) append(problems, topic.slug, r.outcome);
-      const before = res.recallBefore === undefined ? '' : `, recall was ~${Math.round(res.recallBefore * 100)}%`;
-      const next =
-        res.concept.review && res.concept.status === 'solid'
-          ? `next review ${res.concept.review.due.slice(0, 10)}`
-          : 'not scheduled (not solid)';
-      lines.push(`${topic.slug}/${concept.id}: ${r.outcome}${before}; ${res.change ? 'now shaky; ' : ''}${next}`);
-    }
+    });
 
     for (const [slug, list] of changes) await this.feed.add({ type: 'map', topic: slug, changes: list });
 
@@ -258,17 +287,23 @@ export class Gym {
     const session = this.feed.session && !this.feed.session.endedAt ? this.feed.session.id : `mission:${mission.id}`;
     const lines: string[] = [];
     const changes = new Map<string, MapChange[]>();
-    for (const r of results) {
-      const found = this.resolveIn(r.concept, mission);
-      if (!found) {
-        lines.push(`${r.concept}: no such concept (use "topic/concept").`);
-        continue;
+    await this.topics.batch(async () => {
+      for (const r of results) {
+        const found = this.resolveIn(r.concept, mission);
+        if (!found) {
+          lines.push(`${r.concept}: no such concept (use "topic/concept").`);
+          continue;
+        }
+        const res = await this.topics.recordPractice(found.topic.slug, found.concept.id, r.outcome, {
+          at,
+          session,
+          practice: 'mission',
+        });
+        if (!res) continue;
+        if (res.change) append(changes, found.topic.slug, res.change);
+        lines.push(`${found.topic.slug}/${found.concept.id}: ${r.outcome}${res.change ? ', now shaky' : ''}`);
       }
-      const res = await this.topics.recordPractice(found.topic.slug, found.concept.id, r.outcome, { at, session, practice: 'mission' });
-      if (!res) continue;
-      if (res.change) append(changes, found.topic.slug, res.change);
-      lines.push(`${found.topic.slug}/${found.concept.id}: ${r.outcome}${res.change ? ', now shaky' : ''}`);
-    }
+    });
     // Checked again: the session may have ended while the results were being recorded.
     if (this.feed.session && !this.feed.session.endedAt) {
       for (const [slug, list] of changes) await this.feed.add({ type: 'map', topic: slug, changes: list });

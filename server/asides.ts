@@ -3,11 +3,10 @@
 
 import { randomUUID } from 'node:crypto';
 import { EventEmitter } from 'node:events';
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
-import path from 'node:path';
 import { ASIDES_FILE } from './config.ts';
 import { OneshotError, oneshot } from './oneshot.ts';
 import { slugify } from './slug.ts';
+import { isObject, loadJson, WriteQueue, writeJson } from './store.ts';
 import type { Aside, AsideBody } from '../shared/types.ts';
 
 const MAX_PASSAGE = 1500;
@@ -25,16 +24,12 @@ export class AsideError extends Error {}
 
 export class Asides {
   private asides: Aside[] = [];
-  private saving: Promise<void> = Promise.resolve();
-  readonly events = new EventEmitter<{ asides: [Aside[]] }>();
+  private queue = new WriteQueue();
+  readonly events = new EventEmitter<{ aside: [Aside]; removed: [string] }>();
 
   static async load(): Promise<Asides> {
     const store = new Asides();
-    try {
-      store.asides = JSON.parse(await readFile(ASIDES_FILE, 'utf8')) as Aside[];
-    } catch (err) {
-      if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
-    }
+    store.asides = await loadJson(ASIDES_FILE, isAsideList, []);
     return store;
   }
 
@@ -81,6 +76,7 @@ export class Asides {
     };
     this.asides = [...this.asides, aside];
     await this.write();
+    this.events.emit('aside', aside);
     return aside;
   }
 
@@ -89,19 +85,23 @@ export class Asides {
     this.asides = this.asides.filter((a) => a.id !== id);
     if (this.asides.length === before) return false;
     await this.write();
+    this.events.emit('removed', id);
     return true;
   }
 
-  /** Atomic write (temp file + rename), one at a time. */
+  /** Resolves once every write queued so far has finished. */
+  idle(): Promise<void> {
+    return this.queue.idle();
+  }
+
+  /** The whole list, written atomically, one write at a time (store.ts). */
   private async write() {
     const list = this.asides;
-    this.saving = this.saving.then(async () => {
-      await mkdir(path.dirname(ASIDES_FILE), { recursive: true });
-      const tmp = `${ASIDES_FILE}.tmp`;
-      await writeFile(tmp, `${JSON.stringify(list, null, 2)}\n`);
-      await rename(tmp, ASIDES_FILE);
-    });
-    await this.saving;
-    this.events.emit('asides', list);
+    await this.queue.run('asides', () => writeJson(ASIDES_FILE, list));
   }
+}
+
+/** The shape asides.json must have to be loaded. */
+function isAsideList(v: unknown): v is Aside[] {
+  return Array.isArray(v) && v.every((a) => isObject(a) && typeof a.id === 'string');
 }

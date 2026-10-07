@@ -2,10 +2,10 @@
 // roadmap) taught out into his life; his debrief and Claude's review close it.
 
 import { EventEmitter } from 'node:events';
-import { mkdir, readdir, readFile, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { MISSIONS_DIR } from './config.ts';
-import { slugify } from './slug.ts';
+import { slugCandidates, slugify } from './slug.ts';
+import { isObject, loadJsonDir, WriteQueue, writeJson } from './store.ts';
 import type { Mission, MissionScope, MissionVerdict } from '../shared/types.ts';
 
 export interface MissionInput {
@@ -27,23 +27,23 @@ const SCOPE = { step: 'step mission', capstone: 'capstone', topic: 'topic missio
 
 export class Missions {
   private missions = new Map<string, Mission>();
-  private saving = new Map<string, Promise<void>>();
+  private queue = new WriteQueue();
   readonly events = new EventEmitter<{ mission: [Mission] }>();
 
   static async load(): Promise<Missions> {
     const store = new Missions();
-    await mkdir(MISSIONS_DIR, { recursive: true });
-    for (const file of await readdir(MISSIONS_DIR)) {
-      if (!file.endsWith('.json')) continue;
-      const mission = JSON.parse(await readFile(path.join(MISSIONS_DIR, file), 'utf8')) as Mission;
-      store.missions.set(mission.id, mission);
-    }
+    for (const mission of await loadJsonDir(MISSIONS_DIR, isMission)) store.missions.set(mission.id, mission);
     return store;
   }
 
-  /** By id, or by a title that slugifies to one. */
+  /** By id, or by a title that slugifies to one (as it does now, or did before Unicode slugs). */
   get(id: string): Mission | undefined {
-    return this.missions.get(id) ?? this.missions.get(slugify(id));
+    return (
+      this.missions.get(id) ??
+      slugCandidates(id)
+        .map((s) => this.missions.get(s))
+        .find(Boolean)
+    );
   }
 
   /** Newest first. */
@@ -130,20 +130,22 @@ export class Missions {
     return mission;
   }
 
-  /** Atomic write (temp file + rename), one write at a time per mission. */
+  /** Resolves once every write queued so far has finished. */
+  idle(): Promise<void> {
+    return this.queue.idle();
+  }
+
+  /** Atomic write, one write at a time per mission (store.ts). */
   private async write(mission: Mission) {
     this.missions.set(mission.id, mission);
-    const file = path.join(MISSIONS_DIR, `${mission.id}.json`);
-    const previous = this.saving.get(mission.id) ?? Promise.resolve();
-    const next = previous.then(async () => {
-      const tmp = `${file}.tmp`;
-      await writeFile(tmp, `${JSON.stringify(mission, null, 2)}\n`);
-      await rename(tmp, file);
-    });
-    this.saving.set(mission.id, next);
-    await next;
+    await this.queue.run(mission.id, () => writeJson(path.join(MISSIONS_DIR, `${mission.id}.json`), mission));
     this.events.emit('mission', mission);
   }
+}
+
+/** The shape a mission file must have to be loaded. */
+function isMission(v: unknown): v is Mission {
+  return isObject(v) && typeof v.id === 'string' && typeof v.title === 'string' && Array.isArray(v.criteria);
 }
 
 /** One line per mission, as Claude reads a list of them. */

@@ -2,12 +2,11 @@
 // on his own login (oneshot.ts). All of them in one file, data/glosses.json.
 
 import { EventEmitter } from 'node:events';
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
-import path from 'node:path';
 import { GLOSS_IMAGES, GLOSSES_FILE } from './config.ts';
 import { type FoundImage, findImages } from './images.ts';
 import { OneshotError, oneshot } from './oneshot.ts';
-import { slugify } from './slug.ts';
+import { slugCandidates, slugify } from './slug.ts';
+import { isObject, loadJson, WriteQueue, writeJson } from './store.ts';
 import type { Gloss, GlossBody, GlossImage } from '../shared/types.ts';
 
 /** Longer than this is a passage, not a phrase: there is nothing short to say about it. */
@@ -29,16 +28,12 @@ export class Glosses {
   private glosses = new Map<string, Gloss>();
   /** Phrases being explained right now, so asking twice runs Claude Code once. */
   private pending = new Map<string, Promise<Gloss>>();
-  private saving: Promise<void> = Promise.resolve();
-  readonly events = new EventEmitter<{ glosses: [Gloss[]] }>();
+  private queue = new WriteQueue();
+  readonly events = new EventEmitter<{ gloss: [Gloss]; removed: [string] }>();
 
   static async load(): Promise<Glosses> {
     const store = new Glosses();
-    try {
-      for (const g of JSON.parse(await readFile(GLOSSES_FILE, 'utf8')) as Gloss[]) store.glosses.set(g.id, g);
-    } catch (err) {
-      if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
-    }
+    for (const g of await loadJson(GLOSSES_FILE, isGlossList, [])) store.glosses.set(g.id, g);
     return store;
   }
 
@@ -57,11 +52,11 @@ export class Glosses {
     const text = clean(body.text);
     if (!text) throw new GlossError('Select a word or phrase first');
     if (text.length > MAX_PHRASE) throw new GlossError(`Select a shorter phrase (${MAX_PHRASE} characters at most)`);
-    const id = slugify(text);
-    if (!id) throw new GlossError('There is nothing to explain in that selection');
-    const known = this.glosses.get(id);
+    const known = this.find(text);
     if (known) return known;
-    const running = this.pending.get(id);
+    // Asked again while it is being written: the same answer (by phrase, not id: "C#" and "C++" share a slug).
+    const key = fold(text);
+    const running = this.pending.get(key);
     if (running) return running;
     const context = body.context ? clean(body.context).slice(0, MAX_CONTEXT) : undefined;
     const topic = body.topic ? slugify(body.topic) : undefined;
@@ -74,7 +69,7 @@ export class Glosses {
         : [];
       const { gloss: written, image } = pickImage(await answer(prompt(text, context, topicTitle, candidates)), candidates, text);
       const gloss: Gloss = {
-        id,
+        id: this.freeId(text),
         text,
         gloss: written,
         ...(context ? { context } : {}),
@@ -82,15 +77,16 @@ export class Glosses {
         ...(image ? { image } : {}),
         at: new Date().toISOString(),
       };
-      this.glosses.set(id, gloss);
+      this.glosses.set(gloss.id, gloss);
       await this.write();
+      this.events.emit('gloss', gloss);
       return gloss;
     })();
-    this.pending.set(id, job);
+    this.pending.set(key, job);
     try {
       return await job;
     } finally {
-      this.pending.delete(id);
+      this.pending.delete(key);
     }
   }
 
@@ -98,21 +94,60 @@ export class Glosses {
   async remove(id: string): Promise<boolean> {
     if (!this.glosses.delete(id)) return false;
     await this.write();
+    this.events.emit('removed', id);
     return true;
   }
 
-  /** Atomic write (temp file + rename), one at a time. */
+  /** Resolves once every write queued so far has finished. */
+  idle(): Promise<void> {
+    return this.queue.idle();
+  }
+
+  /** The gloss of exactly this phrase, under its id now or before Unicode slugs (or a numbered one, see freeId). */
+  private find(text: string): Gloss | undefined {
+    const same = (g: Gloss | undefined) => g && sameText(g.text, text);
+    for (const base of slugCandidates(text)) {
+      for (let n = 1; n <= 50; n++) {
+        const g = this.glosses.get(n === 1 ? base : `${base}-${n}`);
+        if (same(g)) return g;
+      }
+    }
+    return undefined;
+  }
+
+  /** An id for a new phrase: its slug, numbered when another phrase has it ("C#" and "C++" are both "c"). */
+  private freeId(text: string): string {
+    const base = slugify(text);
+    let id = base;
+    for (let n = 2; this.glosses.has(id); n++) id = `${base}-${n}`;
+    return id;
+  }
+
+  /** The whole list, written atomically, one write at a time (store.ts). */
   private async write() {
     const list = this.all();
-    this.saving = this.saving.then(async () => {
-      await mkdir(path.dirname(GLOSSES_FILE), { recursive: true });
-      const tmp = `${GLOSSES_FILE}.tmp`;
-      await writeFile(tmp, `${JSON.stringify(list, null, 2)}\n`);
-      await rename(tmp, GLOSSES_FILE);
-    });
-    await this.saving;
-    this.events.emit('glosses', list);
+    await this.queue.run('glosses', () => writeJson(GLOSSES_FILE, list));
   }
+}
+
+/** The shape glosses.json must have to be loaded. */
+function isGlossList(v: unknown): v is Gloss[] {
+  return Array.isArray(v) && v.every((g) => isObject(g) && typeof g.id === 'string' && typeof g.text === 'string');
+}
+
+/** The same phrase, whatever its case and accents. */
+function sameText(a: string, b: string): boolean {
+  return fold(a) === fold(b);
+}
+
+/** Lower case, no accents, and spaces, hyphens and underscores alike ("heart-rate" is "heart rate"; "C#" isn't "C++"). */
+function fold(s: string): string {
+  return s
+    .normalize('NFKD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .replace(/[\s\-_‐–—]+/g, ' ')
+    .trim();
 }
 
 /** One line, no runs of spaces, no quotes around it. */

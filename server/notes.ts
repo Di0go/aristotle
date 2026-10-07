@@ -3,9 +3,9 @@
 // and course planning read About you before anything else, so they fit whoever uses Aristotle.
 
 import { EventEmitter } from 'node:events';
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
-import path from 'node:path';
+import { readFile } from 'node:fs/promises';
 import { ABOUT_FILE, NOTES_FILE } from './config.ts';
+import { isObject, loadJson, WriteQueue, writeFileAtomic, writeJson } from './store.ts';
 import type { StepNote } from '../shared/types.ts';
 
 const MAX_NOTE = 20_000;
@@ -14,12 +14,12 @@ const MAX_ABOUT = 20_000;
 export class Notes {
   private notes: StepNote[] = [];
   private aboutText = '';
-  private saving: Promise<void> = Promise.resolve();
-  readonly events = new EventEmitter<{ notes: [StepNote[]]; about: [string] }>();
+  private queue = new WriteQueue();
+  readonly events = new EventEmitter<{ note: [StepNote]; removed: [{ topic: string; step: string }]; about: [string] }>();
 
   static async load(): Promise<Notes> {
     const store = new Notes();
-    store.notes = (await readOr(NOTES_FILE, '[]').then(JSON.parse)) as StepNote[];
+    store.notes = await loadJson(NOTES_FILE, isNoteList, []);
     store.aboutText = await readOr(ABOUT_FILE, '');
     return store;
   }
@@ -44,26 +44,29 @@ export class Notes {
       ? { topic, step, ...(title ? { title: title.slice(0, 200) } : {}), text: clean, updated: new Date().toISOString() }
       : null;
     this.notes = note ? [...rest, note] : rest;
-    await this.save(NOTES_FILE, `${JSON.stringify(this.notes, null, 2)}\n`);
-    this.events.emit('notes', this.notes);
+    const list = this.notes;
+    await this.queue.run(NOTES_FILE, () => writeJson(NOTES_FILE, list));
+    if (note) this.events.emit('note', note);
+    else this.events.emit('removed', { topic, step });
     return note;
   }
 
   async setAbout(text: string) {
     this.aboutText = text.slice(0, MAX_ABOUT);
-    await this.save(ABOUT_FILE, this.aboutText.endsWith('\n') || !this.aboutText ? this.aboutText : `${this.aboutText}\n`);
+    const body = this.aboutText.endsWith('\n') || !this.aboutText ? this.aboutText : `${this.aboutText}\n`;
+    await this.queue.run(ABOUT_FILE, () => writeFileAtomic(ABOUT_FILE, body));
     this.events.emit('about', this.aboutText);
   }
 
-  /** Atomic write (temp file + rename), one at a time. */
-  private async save(file: string, body: string) {
-    this.saving = this.saving.then(async () => {
-      await mkdir(path.dirname(file), { recursive: true });
-      await writeFile(`${file}.tmp`, body);
-      await rename(`${file}.tmp`, file);
-    });
-    await this.saving;
+  /** Resolves once every write queued so far has finished. */
+  idle(): Promise<void> {
+    return this.queue.idle();
   }
+}
+
+/** The shape notes.json must have to be loaded. */
+function isNoteList(v: unknown): v is StepNote[] {
+  return Array.isArray(v) && v.every((n) => isObject(n) && typeof n.topic === 'string' && typeof n.step === 'string');
 }
 
 async function readOr(file: string, fallback: string): Promise<string> {

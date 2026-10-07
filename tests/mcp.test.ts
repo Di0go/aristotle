@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
 import http from 'node:http';
 import https from 'node:https';
-import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { chmod, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
@@ -17,6 +17,7 @@ import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/
 import WebSocket from 'ws';
 import { allowed } from '../server/images.ts';
 import type {
+  FeedEvent,
   FeedState,
   Mission,
   Progress,
@@ -895,4 +896,152 @@ test('the chat beside a class sees where he is, keeps the conversation, and the 
   );
   assert.equal((await fetch(`${BASE}/api/chats/chatted-topic`, { method: 'DELETE' })).status, 200);
   assert.deepEqual(await get<ChatMessage[]>('/api/chats/chatted-topic'), []);
+});
+
+// Keeping the learning history safe.
+
+/** The current session's log file. */
+async function currentLog(): Promise<string> {
+  const files = (await readdir(path.join(dataDir, 'sessions'))).filter((f) => f.endsWith('.jsonl')).sort();
+  return path.join(dataDir, 'sessions', files.at(-1)!);
+}
+
+test('a failed write is retried by the next one, and nothing in between is lost', async () => {
+  await call('start_session', { topic: 'Safe writes', goal: 'Survive a full disk' });
+  await call('show', { markdown: 'One {{x|y}}', title: 'One' });
+  const log = await currentLog();
+  await chmod(log, 0o444);
+  try {
+    // The disk refuses: the call fails, and Aristotle says so.
+    const refused = await call('show', { markdown: 'Two {{x|y}}', title: 'Two' });
+    assert.ok(refused.isError || /EACCES|permission/i.test(textOf(refused)));
+    assert.ok((await get<FeedState>('/api/state')).warnings?.some((w) => /session log/.test(w)));
+  } finally {
+    await chmod(log, 0o644);
+  }
+  // The next write carries the one that failed: everything is on disk, in order, and the warning is gone.
+  await call('show', { markdown: 'Three {{x|y}}', title: 'Three' });
+  assert.deepEqual((await get<FeedState>('/api/state')).warnings, []);
+  await restart();
+  const titles = (await get<FeedState>('/api/state')).items.map((i) => (i as { title?: string }).title);
+  assert.deepEqual(titles, ['One', 'Two', 'Three']);
+});
+
+test('a line torn by a crash costs only itself, not the entry written after it', async () => {
+  const log = await currentLog();
+  await writeFile(log, `${await readFile(log, 'utf8')}{"op":"add","item":{"type":"blo`);
+  await restart();
+  await call('show', { markdown: 'After the crash {{x|y}}', title: 'After' });
+  await restart();
+  const titles = (await get<FeedState>('/api/state')).items.map((i) => (i as { title?: string }).title);
+  assert.deepEqual(titles, ['One', 'Two', 'Three', 'After']);
+});
+
+test('an unreadable data file is set aside and reported, and the server still starts', async () => {
+  const bad = path.join(dataDir, 'topics', 'broken.json');
+  await writeFile(bad, '{"slug": "broken", "title": "Bro');
+  await restart();
+  const state = await get<FeedState>('/api/state');
+  assert.ok(
+    state.warnings?.some((w) => /topics\/broken\.json\.unreadable-/.test(w)),
+    JSON.stringify(state.warnings),
+  );
+  const files = await readdir(path.join(dataDir, 'topics'));
+  assert.ok(!files.includes('broken.json'));
+  assert.ok(
+    files.some((f) => f.startsWith('broken.json.unreadable-')),
+    'kept, under another name',
+  );
+  assert.ok((await get<TopicSummary[]>('/api/topics')).length > 0);
+});
+
+test('titles in other scripts make topics of their own instead of merging into "untitled"', async () => {
+  await call('start_session', { topic: 'Ἀρετή', goal: 'Virtue' });
+  await call('start_session', { topic: '日本語の文法', goal: 'Grammar' });
+  await call('start_session', { topic: 'Москва', goal: 'A city' });
+  const slugs = (await get<TopicSummary[]>('/api/topics')).map((t) => t.slug);
+  for (const slug of ['αρετη', '日本語の文法', 'москва']) assert.ok(slugs.includes(slug), `${slug} in ${slugs.join(', ')}`);
+  assert.ok(!slugs.includes('untitled'));
+  // And an old-style id is still found by its title.
+  assert.match(textOf(await call('get_topic', { topic: 'Safe writes' })), /# Safe writes \(safe-writes\)/);
+});
+
+test('the live feed sends one record per change, and warnings as they change', async () => {
+  const events: FeedEvent[] = [];
+  const controller = new AbortController();
+  const res = await fetch(`${BASE}/api/events`, { signal: controller.signal });
+  const reader = res.body!.getReader();
+  void (async () => {
+    let buffer = '';
+    try {
+      for (;;) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer += new TextDecoder().decode(value);
+        for (let i = buffer.indexOf('\n\n'); i !== -1; i = buffer.indexOf('\n\n')) {
+          const data = buffer.slice(0, i).match(/^data: (.*)$/m)?.[1];
+          buffer = buffer.slice(i + 2);
+          if (data) events.push(JSON.parse(data) as FeedEvent);
+        }
+      }
+    } catch {}
+  })();
+  await sleep(100);
+  await fetch(`${BASE}/api/notes`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ topic: 'safe-writes', step: 'x', text: 'mine' }),
+  });
+  await until(() => events.some((e) => e.type === 'note'));
+  assert.ok(!events.some((e) => (e.type as string) === 'notes'), 'no whole list');
+  controller.abort();
+});
+
+test('the bridge relays calls, and a quiz cancelled while it waits leaves its answer for collect_answers', async () => {
+  const bridge = spawn('node', ['server/bridge.ts'], {
+    env: { ...process.env, ARISTOTLE_PORT: String(PORT), ARISTOTLE_DATA_DIR: dataDir, ARISTOTLE_TLS_DIR: tlsDir },
+    stdio: ['pipe', 'pipe', 'inherit'],
+  });
+  const replies = new Map<number, { result?: { content: { text: string }[] }; error?: unknown }>();
+  let buffer = '';
+  bridge.stdout!.on('data', (d) => {
+    buffer += d;
+    for (let i = buffer.indexOf('\n'); i !== -1; i = buffer.indexOf('\n')) {
+      const m = JSON.parse(buffer.slice(0, i));
+      buffer = buffer.slice(i + 1);
+      if (typeof m.id === 'number') replies.set(m.id, m);
+    }
+  });
+  const send = (m: object) => bridge.stdin!.write(`${JSON.stringify({ jsonrpc: '2.0', ...m })}\n`);
+  const reply = async (id: number) => {
+    await until(() => replies.has(id), 10_000);
+    return replies.get(id)!;
+  };
+  try {
+    send({
+      id: 1,
+      method: 'initialize',
+      params: { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 't', version: '0' } },
+    });
+    await reply(1);
+    send({ method: 'notifications/initialized' });
+    send({ id: 2, method: 'tools/call', params: { name: 'start_session', arguments: { topic: 'Bridged', goal: 'Cancel' } } });
+    await reply(2);
+    send({
+      id: 3,
+      method: 'tools/call',
+      params: { name: 'quiz', arguments: { questions: [{ question: 'Q?', options: ['a', 'b'], correct: 0, explanation: 'e' }] } },
+    });
+    const quiz = await waitForPending('quiz');
+    // Esc in Claude Code: the call is dropped, and nothing answers for it.
+    send({ method: 'notifications/cancelled', params: { requestId: 3, reason: 'Esc' } });
+    await sleep(300);
+    assert.ok(!replies.has(3));
+    const late = await answer({ id: quiz.id, picks: [{ choice: 0 }] });
+    assert.equal(late.headers.get('X-Aristotle-Heard'), 'no', 'nothing waits for it any more');
+    send({ id: 4, method: 'tools/call', params: { name: 'collect_answers', arguments: {} } });
+    assert.match((await reply(4)).result!.content[0].text, /Quiz answered: 1\/1 right/);
+  } finally {
+    bridge.stdin!.end();
+  }
 });

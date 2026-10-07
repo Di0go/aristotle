@@ -3,10 +3,12 @@
 
 import { randomUUID } from 'node:crypto';
 import { EventEmitter } from 'node:events';
-import { appendFile, mkdir, readdir, readFile, stat } from 'node:fs/promises';
+import { appendFile, mkdir, open, readdir, readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { SESSIONS_DIR } from './config.ts';
 import { slugify } from './slug.ts';
+import { WriteQueue } from './store.ts';
+import { warnings } from './warnings.ts';
 import {
   isInteractive,
   type AskItem,
@@ -51,12 +53,14 @@ const IDLE_MS = 15 * 60_000;
 /** Rebuilds a session from its log file. */
 export async function readSession(file: string): Promise<SessionRecord> {
   const state: SessionRecord = { session: null, items: [] };
-  const lines = (await readFile(file, 'utf8')).split('\n').filter(Boolean);
-  for (const line of lines) {
+  const lines = (await readFile(file, 'utf8')).split('\n');
+  for (const [i, line] of lines.entries()) {
+    if (!line) continue;
     try {
       applyOp(state, JSON.parse(line) as Op);
     } catch {
-      // A torn last line from a crash: skip it, keep the rest.
+      // A torn line from a crash: skip it, keep the rest.
+      console.error(`${new Date().toISOString()} Skipped unreadable line ${i + 1} of ${path.basename(file)}`);
     }
   }
   return state;
@@ -137,8 +141,10 @@ export class Feed {
   readonly events = new EventEmitter<{ event: [FeedEvent] }>();
   private record: SessionRecord = { session: null, items: [] };
   private file: string | null = null;
-  /** Appends in order, one after another. */
-  private writing: Promise<void> = Promise.resolve();
+  /** Appends in order, one after another, per log. */
+  private queue = new WriteQueue();
+  /** Lines applied in memory but not yet on disk, per log: a failed append is retried by the next one. */
+  private unsaved = new Map<string, string[]>();
   /** Tool calls waiting for an answer, by item id. */
   private waiters = new Map<string, Set<(item: InteractiveItem) => void>>();
 
@@ -157,6 +163,8 @@ export class Feed {
     if (last) {
       feed.file = path.join(SESSIONS_DIR, last);
       feed.record = await readSession(feed.file);
+      // A crash mid-append leaves a last line without its newline: end it, or the next entry would be glued to it.
+      if (!(await endsWithNewline(feed.file))) await appendFile(feed.file, '\n');
     }
     return feed;
   }
@@ -245,6 +253,8 @@ export class Feed {
     const item = findInteractive(this.items, id);
     if (!item) return Promise.resolve(null);
     if (item.answeredAt) return Promise.resolve(item);
+    // Cancelled before it began waiting: an abort listener added now would never fire.
+    if (signal?.aborted) return Promise.resolve(null);
     return new Promise((resolve) => {
       const set = this.waiters.get(id) ?? new Set();
       this.waiters.set(id, set);
@@ -272,18 +282,40 @@ export class Feed {
     return this.items.filter((i): i is InteractiveItem => isInteractive(i) && Boolean(i.answeredAt) && !i.delivered);
   }
 
-  /** The whole current session, as the interface loads it. */
+  /** The whole current session, as the interface loads it, with any warnings about the data. */
   state(): FeedState {
-    return { session: this.session, items: this.items.map(publicItem) };
+    return { session: this.session, items: this.items.map(publicItem), warnings: warnings.list() };
   }
 
-  /** Applies a change in memory, then appends it to the log. */
+  /** Resolves once every append queued so far has finished. */
+  idle(): Promise<void> {
+    return this.queue.idle();
+  }
+
+  /**
+   * Applies a change in memory, then appends it to the log. If the append fails, the line is kept and written with
+   * the next one, so the log catches up with memory as soon as the disk takes writes again.
+   */
   private async commit(op: Op) {
     const file = this.file;
     if (!file) throw new Error('No session file');
     applyOp(this.record, op);
-    this.writing = this.writing.then(() => appendFile(file, `${JSON.stringify(op)}\n`));
-    await this.writing;
+    const pending = this.unsaved.get(file) ?? [];
+    pending.push(JSON.stringify(op));
+    this.unsaved.set(file, pending);
+    await this.queue.run(file, async () => {
+      const lines = this.unsaved.get(file);
+      if (!lines?.length) return;
+      const count = lines.length;
+      try {
+        await appendFile(file, `${lines.join('\n')}\n`);
+      } catch (err) {
+        warnings.set('session-log', `The session log could not be saved (${(err as Error).message}); it is kept in memory and retried.`);
+        throw err;
+      }
+      lines.splice(0, count);
+      warnings.set('session-log', undefined);
+    });
   }
 
   private emit(event: FeedEvent) {
@@ -354,6 +386,20 @@ function activeMinutes(record: SessionRecord): number {
     if (gap <= IDLE_MS) total += gap;
   }
   return Math.round(total / 60_000);
+}
+
+/** Whether a file is empty or ends with a newline. */
+async function endsWithNewline(file: string): Promise<boolean> {
+  const handle = await open(file, 'r');
+  try {
+    const { size } = await handle.stat();
+    if (size === 0) return true;
+    const last = Buffer.alloc(1);
+    await handle.read(last, 0, 1, size - 1);
+    return last[0] === 0x0a;
+  } finally {
+    await handle.close();
+  }
 }
 
 /** Local date and time down to the millisecond, so session files sort in the order they were started. */
