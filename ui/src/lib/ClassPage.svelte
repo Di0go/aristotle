@@ -67,8 +67,19 @@
     }
   });
 
+  // The page stays mounted from step to step: another step starts as if opened afresh, with the panel closed (on a
+  // narrow screen) and the live page followed from its start.
+  let shown: number | null = null;
+  $effect.pre(() => {
+    if (number === shown) return;
+    shown = number;
+    benchOpen = false;
+    count = 0;
+  });
+
   // On the live page, follow it as it grows, unless he has scrolled back up to reread.
   $effect(() => {
+    void number;
     const n = page ? page.warmup.length + page.items.length : 0;
     if (!live || n <= count) {
       count = n;
@@ -143,7 +154,7 @@
             <article class="q">
               <p class="q-q">{a.question}</p>
               <p class="q-p">“{a.passage}”</p>
-              <div class="q-a">{@html renderMarkdown(a.answer)}</div>
+              <div class="q-a md-box">{@html renderMarkdown(a.answer)}</div>
               <button class="link q-x" onclick={() => void asides.remove(a.id)}>Remove</button>
             </article>
           {/each}

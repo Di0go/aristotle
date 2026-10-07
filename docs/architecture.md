@@ -230,7 +230,7 @@ Only for the interface (and the tests); Claude Code uses MCP.
 | [`Logo.svelte`](../ui/src/lib/Logo.svelte) | The mark: the peripatos, the covered walk of the Lyceum where Aristotle's school taught (and, the story goes, walked as it talked). |
 | [`MapGraph.svelte`](../ui/src/lib/MapGraph.svelte) | A topic's knowledge map as a graph: concepts are nodes, arrows run from a prerequisite to what builds on it. |
 | [`MapUpdate.svelte`](../ui/src/lib/MapUpdate.svelte) | A map change, set as a small stamp in the notebook: what moved, and to where. |
-| [`Markdown.svelte`](../ui/src/lib/Markdown.svelte) | Renders lesson Markdown and brings it to life: mermaid diagrams, sequences, explorables and the visual kit's figures. |
+| [`Markdown.svelte`](../ui/src/lib/Markdown.svelte) | Diagrams drawn so far, by look (theme and accent) and source, so a step revisited shows them at once. |
 | [`Quiz.svelte`](../ui/src/lib/Quiz.svelte) | A graded multiple-choice check: options, "I don't know", a note per question, and right or wrong once answered. |
 | [`ReviewPanel.svelte`](../ui/src/lib/ReviewPanel.svelte) | During a review session: what has been practised so far, and what is still fading. |
 | [`Ribbon.svelte`](../ui/src/lib/Ribbon.svelte) | The thin strip on the far left: the main places, Claude, and the look settings. |
@@ -255,12 +255,14 @@ Only for the interface (and the tests); Claude Code uses MCP.
 | [`layout.ts`](../ui/src/lib/layout.ts) | Graph layout shared by the topic maps and the map of everything. |
 | [`library.ts`](../ui/src/lib/library.ts) | The hierarchy everything hangs on: roadmaps hold steps, a step is a topic, a topic holds concepts. |
 | [`markdown.ts`](../ui/src/lib/markdown.ts) | Markdown with LaTeX maths, sanitised. |
+| [`maths.svelte.ts`](../ui/src/lib/maths.svelte.ts) | KaTeX, loaded when first needed (or when the browser is idle after the first paint) instead of on the startup path. |
 | [`router.svelte.ts`](../ui/src/lib/router.svelte.ts) | Hash routing: #/, #/progress, #/map, #/roadmaps, #/roadmaps/<slug>, #/lesson/<slug>, #/lesson/<slug>/<step>, #/topics, #/topics/<slug>?c=<concept>, #/log, #/log/<session>, #/praxis, #/praxis/<mission>, #/about. |
 | [`search.svelte.ts`](../ui/src/lib/search.svelte.ts) | Whether the search palette is open: Ctrl+K or / anywhere, the ribbon's search button, or "Search" on selected text. |
 | [`steps.ts`](../ui/src/lib/steps.ts) | A class as he reads it: one page per step, in order, whatever sitting each was taught in. |
 | [`storage.ts`](../ui/src/lib/storage.ts) | Browser storage helpers: moving a setting saved under the app's old name (Mind Gym) to its new key. |
 | [`tabs.svelte.ts`](../ui/src/lib/tabs.svelte.ts) | Open pages, as tabs. |
 | [`theme.svelte.ts`](../ui/src/lib/theme.svelte.ts) | Look settings: light or dark, and one accent. |
+| [`visible.ts`](../ui/src/lib/visible.ts) | Tells animations when they can be seen: in or near the viewport, with the tab showing. |
 
 #### Visual kit (`ui/src/lib/kit/`)
 

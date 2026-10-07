@@ -13,6 +13,7 @@ import './styles/map.css';
 import './styles/charts.css';
 import { mount } from 'svelte';
 import App from './App.svelte';
+import { maths } from './lib/maths.svelte.ts';
 
 // After a rebuild, an open tab may ask for page chunks that no longer exist. Reload once to get the new build;
 // the flag stops a reload loop if the chunk is still missing, and clears after ten seconds so a later rebuild can reload again.
@@ -35,3 +36,5 @@ setTimeout(() => {
 }, 10_000);
 
 mount(App, { target: document.getElementById('app')! });
+// KaTeX is off the startup path: it loads once the first paint is done, usually before any maths is on screen.
+maths.preload();

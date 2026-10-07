@@ -9,6 +9,63 @@
   overflow-wrap: break-word;
 }
 
+/* Lesson content can't reach outside its box: whatever it positions (fixed, absolute, or with the app's own
+   classes) is clipped to it and placed within it, so it can never cover the page, the drawer or a button.
+   Hover cards, menus and the lightbox live outside it, at the top of the page. The small margin keeps focus rings. */
+.md,
+.md-inline,
+.md-box {
+  contain: paint;
+  overflow-clip-margin: 4px;
+}
+
+.md-inline {
+  display: inline-block;
+  max-width: 100%;
+}
+
+/* Text that could not be rendered is shown as written rather than break the page. */
+.render-failed {
+  white-space: pre-wrap;
+  color: var(--fg-2);
+}
+
+/* A formula waiting for the maths to load: its source, quietly. */
+.math-pending {
+  font-family: var(--mono);
+  font-size: 0.88em;
+  color: var(--faint);
+}
+
+.math-pending.display {
+  display: block;
+  text-align: center;
+}
+
+/* A task list's box (- [ ] and - [x]): drawn, not a form control. */
+.md .task {
+  display: inline-block;
+  width: 0.85em;
+  height: 0.85em;
+  margin-right: 0.35em;
+  vertical-align: -0.08em;
+  border: 1.5px solid var(--rule-strong);
+  border-radius: 3px;
+}
+
+.md .task.done {
+  border-color: var(--acc);
+  background:
+    var(--acc)
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 6.2l2.3 2.3 4.7-5' fill='none' stroke='white' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
+    center / 100% no-repeat;
+}
+
+.md li:has(> .task:first-child),
+.md li:has(> p:first-child > .task:first-child) {
+  list-style: none;
+}
+
 .md > :first-child {
   margin-top: 0;
 }

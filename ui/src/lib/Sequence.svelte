@@ -14,7 +14,7 @@
       .split(/^\s*---\s*$/m)
       .map((f) => f.trim())
       .filter(Boolean)
-      .map(renderMarkdown),
+      .map((frame) => renderMarkdown(frame)),
   );
 
   function go(i: number) {

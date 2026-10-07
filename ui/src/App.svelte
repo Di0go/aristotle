@@ -40,9 +40,16 @@
     about: () => import('./pages/About.svelte') as never,
   };
 
+  /** Each page's code, imported once: the same promise every time, so moving within a page (another step of the
+   * class, another concept) updates it instead of building it again. */
+  const loaded = new Map<string, ReturnType<Page>>();
+
   let railOpen = $state(false);
 
   const route = $derived(router.route);
+  /** #/topics has no page of its own: the roadmaps page has every topic in its table. */
+  const pageName = $derived(route.page === 'topics' ? 'roadmaps' : route.page);
+  const pageModule = $derived(pageName === 'now' ? null : load(pageName));
   /** What the current page is told: its slug or id, and for a topic the selected concept. */
   const pageProps = $derived.by((): Record<string, unknown> => {
     const r = router.route;
@@ -57,6 +64,17 @@
 
   feed.start();
   claude.connect();
+
+  function load(name: string): ReturnType<Page> {
+    let page = loaded.get(name);
+    if (!page) {
+      page = pages[name]();
+      // A chunk that failed to load (the app was rebuilt) is asked for again next time.
+      page.catch(() => loaded.delete(name));
+      loaded.set(name, page);
+    }
+    return page;
+  }
 
   function onKey(e: KeyboardEvent) {
     if (e.ctrlKey && e.key === '`') {
@@ -95,11 +113,10 @@
     </header>
     <TabBar />
     <main class="page-area">
-      {#if route.page === 'now'}
+      {#if !pageModule}
         <Now />
       {:else}
-        <!-- #/topics has no page of its own: the roadmaps page has every topic in its table. -->
-        {#await pages[route.page === 'topics' ? 'roadmaps' : route.page]() then m}
+        {#await pageModule then m}
           {#key pageKey}
             <m.default {...pageProps} />
           {/key}

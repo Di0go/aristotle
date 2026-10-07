@@ -93,7 +93,7 @@
         <p class="error">{q.error}</p>
         <div class="foot"><button class="link" onclick={() => asides.again()}>Try again</button></div>
       {:else if q.answer}
-        <div class="answer">{@html renderMarkdown(q.answer.answer)}</div>
+        <div class="answer md-box">{@html renderMarkdown(q.answer.answer)}</div>
         <div class="foot">
           <span class="hint">{q.item ? 'Kept with this step.' : 'Kept with your questions.'}</span>
           <button class="link" onclick={() => asides.again()}>Ask another</button>

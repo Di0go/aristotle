@@ -1,10 +1,16 @@
 // Markdown with LaTeX maths, sanitised. Mermaid and sequence blocks are left as code and drawn by Markdown.svelte.
 // On top of Markdown: ==highlights==, Obsidian-style callouts (> [!idea] Title), images with a title become
 // captioned figures, and SVG may animate itself (SMIL), as long as it never animates a link.
+//
+// Lesson text is untrusted (a tutor can be prompt-injected), so everything is sanitised, and nothing that could
+// restyle the page (<style>) or post to the API (forms) gets through. Maths is the exception that keeps it fast:
+// KaTeX's output is large and trusted (`trust: false`), so the Markdown is sanitised with a placeholder where each
+// formula goes and KaTeX's HTML is put back afterwards. Results are kept by source, so a page rendered again
+// (a step revisited, a chat answer streaming in) costs nothing for the parts that didn't change.
 
 import { Marked, type TokenizerAndRendererExtension } from 'marked';
-import katex from 'katex';
-import DOMPurify from 'dompurify';
+import DOMPurify, { type Config } from 'dompurify';
+import { maths } from './maths.svelte.ts';
 
 /** SVG animation (SMIL), which DOMPurify drops unless told otherwise. */
 const ANIMATION_TAGS = ['animate', 'animateTransform', 'animateMotion', 'set', 'mpath'];
@@ -31,8 +37,27 @@ const ANIMATION_ATTRS = [
   'keyPoints',
   'type',
 ];
+/** The same tags as the parser may report them (it can lower-case "animateTransform"), for the hooks. */
+const ANIMATING = new Set(ANIMATION_TAGS.map((t) => t.toLowerCase()));
 /** Elements that point at another element by href: allowed only to point inside the same drawing. */
-const REFERENCING = ['use', 'mpath'];
+const REFERENCING = new Set(['use', 'mpath']);
+/** Never in lesson content: <style> could restyle the whole page, and a form could post to the API from here. */
+const FORBID_TAGS = ['style', 'form', 'input', 'button', 'textarea', 'select', 'option'];
+const FORBID_ATTR = ['action', 'formaction'];
+
+const BLOCK_CONFIG: Config & { RETURN_DOM_FRAGMENT: true } = {
+  USE_PROFILES: { html: true, svg: true, svgFilters: true, mathMl: true },
+  ADD_TAGS: [...ANIMATION_TAGS, 'use'],
+  ADD_ATTR: ['target', ...ANIMATION_ATTRS],
+  FORBID_TAGS,
+  FORBID_ATTR,
+  RETURN_DOM_FRAGMENT: true,
+};
+const INLINE_CONFIG: Config = { USE_PROFILES: { html: true, svg: true, mathMl: true }, FORBID_TAGS, FORBID_ATTR };
+
+/** Rendered HTML kept by source, most recently used last. */
+const CACHE_SIZE = 400;
+const cache = new Map<string, string>();
 
 /** Callout kinds: the title used when none is given, and a 16×16 stroked icon. */
 const CALLOUTS: Record<string, { label: string; icon: string }> = {
@@ -60,8 +85,11 @@ const ALIASES: Record<string, string> = {
   question: 'why',
 };
 
-/** Drawings rendered so far: each gets its own id prefix. */
-let drawings = 0;
+/**
+ * The render in progress: KaTeX's output for each formula, by its placeholder number, and whether any formula
+ * had to wait for KaTeX (then the result isn't kept). The nonce makes placeholders impossible to forge from the text.
+ */
+let render: { nonce: string; slots: string[]; waiting: boolean } = { nonce: '', slots: [], waiting: false };
 
 const blockMath: TokenizerAndRendererExtension = {
   name: 'blockMath',
@@ -111,7 +139,7 @@ const term: TokenizerAndRendererExtension = {
     if (m) return { type: 'term', raw: m[0], text: m[1].trim(), def: m[2].trim(), tokens: this.lexer.inlineTokens(m[1].trim()) };
   },
   renderer(token) {
-    return `<span class="term" tabindex="0" data-def="${escapeAttr(token.def as string)}">${this.parser.parseInline(token.tokens ?? [])}</span>`;
+    return `<span class="term" tabindex="0" data-def="${escapeHtml(token.def as string)}">${this.parser.parseInline(token.tokens ?? [])}</span>`;
   },
 };
 
@@ -126,56 +154,138 @@ const conceptLink: TokenizerAndRendererExtension = {
   },
   renderer(token) {
     const label = (token.label as string) || '';
-    return `<a class="concept-link" data-concept="${escapeAttr(token.ref as string)}" data-label="${escapeAttr(label)}">${escapeAttr(label || (token.ref as string))}</a>`;
+    return `<a class="concept-link" data-concept="${escapeHtml(token.ref as string)}" data-label="${escapeHtml(label)}">${escapeHtml(label || (token.ref as string))}</a>`;
   },
 };
 
-const marked = new Marked({ gfm: true, breaks: false, extensions: [blockMath, inlineMath, highlight, term, conceptLink] });
-
-// <use> and <mpath> may only reference something in the page ("#id"), never an outside file.
-DOMPurify.addHook('uponSanitizeAttribute', (node, data) => {
-  if (!REFERENCING.includes(node.nodeName.toLowerCase())) return;
-  const name = data.attrName.toLowerCase();
-  if (name !== 'href' && name !== 'xlink:href') return;
-  if (data.attrValue.trim().startsWith('#')) data.forceKeepAttr = true;
-  else data.keepAttr = false;
+const marked = new Marked({
+  gfm: true,
+  breaks: false,
+  extensions: [blockMath, inlineMath, highlight, term, conceptLink],
+  renderer: {
+    // A task list's box is drawn, not a form control: lesson content carries no inputs.
+    checkbox: ({ checked }) => `<span class="task${checked ? ' done' : ''}" role="img" aria-label="${checked ? 'done' : 'to do'}"></span> `,
+  },
 });
 
-// An animation may change how a shape looks, never where a link points. Tag names are checked as written and
-// lower-cased, since the parser may have lower-cased "animateTransform".
 DOMPurify.addHook('uponSanitizeAttribute', (node, data) => {
-  if (!ANIMATION_TAGS.includes(node.nodeName.toLowerCase()) && !ANIMATION_TAGS.includes(node.nodeName)) return;
-  if (data.attrName.toLowerCase() !== 'attributename') return;
-  const target = data.attrValue.toLowerCase();
-  if (target.includes('href') || target.startsWith('on')) data.keepAttr = false;
+  // attrName is already lower-cased; most attributes are neither of these, so the tag is only read when needed.
+  const name = data.attrName;
+  if (name === 'href' || name === 'xlink:href') {
+    // <use> and <mpath> may only reference something in the page ("#id"), never an outside file.
+    if (!REFERENCING.has(node.nodeName.toLowerCase())) return;
+    if (data.attrValue.trim().startsWith('#')) data.forceKeepAttr = true;
+    else data.keepAttr = false;
+  } else if (name === 'attributename') {
+    // An animation may change how a shape looks, never where a link points or what runs on an event.
+    if (!ANIMATING.has(node.nodeName.toLowerCase())) return;
+    const target = data.attrValue.toLowerCase();
+    if (target.includes('href') || target.startsWith('on')) data.keepAttr = false;
+  }
 });
 
-/** A whole piece of lesson Markdown, as safe HTML. */
-export function renderMarkdown(source: string): string {
-  const html = marked.parse(source, { async: false });
-  const clean = DOMPurify.sanitize(html, {
-    USE_PROFILES: { html: true, svg: true, svgFilters: true, mathMl: true },
-    ADD_TAGS: [...ANIMATION_TAGS, 'use'],
-    ADD_ATTR: ['target', ...ANIMATION_ATTRS],
-  });
-  return enrich(clean);
+// A link that opens elsewhere never hands that page a way back into this one.
+DOMPurify.addHook('afterSanitizeAttributes', (node) => {
+  if ('hasAttribute' in node && (node as Element).hasAttribute('target')) (node as Element).setAttribute('rel', 'noopener noreferrer');
+});
+
+/**
+ * A whole piece of lesson Markdown, as safe HTML. `keep: false` for text that is still changing (an answer being
+ * written), so its passing states don't push lessons out of the kept results.
+ */
+export function renderMarkdown(source: string, keep = true): string {
+  return cached(
+    keep ? `b:${source}` : null,
+    () => {
+      const scope = hash(source);
+      return withMaths(() => {
+        const fragment = DOMPurify.sanitize(marked.parse(source, { async: false }), BLOCK_CONFIG);
+        enrich(fragment, scope);
+        const box = document.createElement('template');
+        box.content.append(fragment);
+        return box.innerHTML;
+      });
+    },
+    `<p class="render-failed">${escapeHtml(source)}</p>`,
+  );
 }
 
 /** Inline rendering for short strings such as quiz options (no wrapping paragraph). */
 export function renderInline(source: string): string {
-  const html = marked.parseInline(source, { async: false });
-  return DOMPurify.sanitize(html, { USE_PROFILES: { html: true, svg: true, mathMl: true } });
+  return cached(
+    `i:${source}`,
+    () => withMaths(() => DOMPurify.sanitize(marked.parseInline(source, { async: false }), INLINE_CONFIG)),
+    escapeHtml(source),
+  );
 }
 
 /**
- * Gives every id inside each drawing a prefix of its own, and points its references (href="#id", url(#id))
- * at the new names, so two drawings on one page can both use id="path" without clashing.
+ * The kept result for `key`, or a fresh one (kept unless it is waiting for KaTeX). If rendering fails, the text is
+ * shown as it is rather than break the page.
  */
-function scopeIds(root: DocumentFragment) {
+function cached(key: string | null, make: () => { html: string; complete: boolean }, fallback: string): string {
+  const hit = key === null ? undefined : cache.get(key);
+  if (key !== null && hit !== undefined) {
+    cache.delete(key);
+    cache.set(key, hit);
+    return hit;
+  }
+  try {
+    const { html, complete } = make();
+    if (key !== null && complete) {
+      cache.set(key, html);
+      if (cache.size > CACHE_SIZE) cache.delete(cache.keys().next().value!);
+    }
+    return html;
+  } catch (err) {
+    console.error('Could not render this Markdown', err);
+    return fallback;
+  }
+}
+
+/** Runs one render: formulas become numbered placeholders, which are filled with KaTeX's HTML after sanitising. */
+function withMaths(sanitised: () => string): { html: string; complete: boolean } {
+  const mine = { nonce: Math.random().toString(36).slice(2, 10), slots: [] as string[], waiting: false };
+  const outer = render;
+  render = mine;
+  try {
+    const clean = sanitised();
+    const html = mine.slots.length
+      ? clean.replace(/<span data-math-slot="([a-z0-9]+)-(\d+)"><\/span>/g, (m, nonce: string, i: string) =>
+          nonce === mine.nonce ? (mine.slots[Number(i)] ?? '') : m,
+        )
+      : clean;
+    return { html, complete: !mine.waiting };
+  } finally {
+    render = outer;
+  }
+}
+
+/** A formula: a placeholder for KaTeX's HTML, or its source in a quiet box until KaTeX has loaded. */
+function tex(source: string, displayMode: boolean): string {
+  const katex = maths.katex;
+  if (!katex) {
+    // Read in a reactive context, this renders again when KaTeX arrives.
+    void maths.version;
+    void maths.load();
+    render.waiting = true;
+    return `<span class="math-pending${displayMode ? ' display' : ''}">${escapeHtml(source)}</span>`;
+  }
+  const html = katex.renderToString(source, { displayMode, throwOnError: false, output: 'htmlAndMathml', trust: false });
+  return `<span data-math-slot="${render.nonce}-${render.slots.push(html) - 1}"></span>`;
+}
+
+/**
+ * Gives every id inside each drawing a prefix of its own (from the text's hash, so the same text always gets the
+ * same ids, kept or not), and points its references (href="#id", url(#id)) at the new names, so two drawings on one
+ * page can both use id="path" without clashing.
+ */
+function scopeIds(root: DocumentFragment, scope: string) {
+  let n = 0;
   for (const svg of root.querySelectorAll('svg')) {
     const owned = svg.querySelectorAll('[id]');
     if (owned.length === 0) continue;
-    const prefix = `d${++drawings}-`;
+    const prefix = `d${scope}-${n++}-`;
     const names = new Set<string>();
     for (const el of owned) {
       names.add(el.id);
@@ -193,41 +303,100 @@ function scopeIds(root: DocumentFragment) {
   }
 }
 
-/** Scopes drawing ids, turns blockquotes that open with [!kind] into callouts, and titled images into captioned figures. */
-function enrich(html: string): string {
-  if (!html.includes('[!') && !html.includes('<img') && !html.includes(' id=')) return html;
-  const doc = document.createElement('template');
-  doc.innerHTML = html;
-  scopeIds(doc.content);
-  for (const quote of doc.content.querySelectorAll('blockquote')) {
-    const first = quote.firstElementChild;
-    const m = first?.tagName === 'P' ? /^\s*\[!(\w+)\][+-]?\s*([^\n]*)\n?/.exec(first.innerHTML) : null;
-    if (!first || !m) continue;
-    const kind = ALIASES[m[1].toLowerCase()] ?? m[1].toLowerCase();
-    const meta = CALLOUTS[kind] ?? CALLOUTS.note;
-    first.innerHTML = first.innerHTML.slice(m[0].length);
-    const aside = document.createElement('aside');
-    aside.className = `callout ${CALLOUTS[kind] ? kind : 'note'}`;
-    aside.innerHTML =
-      `<p class="callout-title"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${meta.icon}</svg>${m[2].trim() || meta.label}</p>` +
-      `<div class="callout-body"></div>`;
-    const body = aside.querySelector('.callout-body')!;
-    if (!first.innerHTML.trim()) first.remove();
-    body.append(...quote.childNodes);
-    quote.replaceWith(aside);
-  }
-  for (const img of doc.content.querySelectorAll('img[title]')) {
+/**
+ * Scopes drawing ids, turns blockquotes that open with [!kind] into callouts, and titled images into captioned
+ * figures. Works on the sanitised nodes, moving them, never re-reading HTML.
+ */
+function enrich(root: DocumentFragment, scope: string) {
+  const doc = root.ownerDocument;
+  scopeIds(root, scope);
+  for (const quote of root.querySelectorAll('blockquote')) callout(quote, doc);
+  for (const img of root.querySelectorAll('img[title]')) {
     const p = img.parentElement;
-    const figure = document.createElement('figure');
-    const caption = document.createElement('figcaption');
+    const figure = doc.createElement('figure');
+    const caption = doc.createElement('figcaption');
     caption.textContent = img.getAttribute('title');
     img.removeAttribute('title');
     img.setAttribute('loading', 'lazy');
-    figure.append(img.cloneNode(), caption);
     if (p?.tagName === 'P' && p.childNodes.length === 1) p.replaceWith(figure);
     else img.replaceWith(figure);
+    figure.append(img, caption);
   }
-  return doc.innerHTML;
+}
+
+/**
+ * > [!kind] Title, then the body: the marker and the rest of its line (up to the first line break) become the
+ * callout's title, the rest its body.
+ */
+function callout(quote: Element, doc: Document) {
+  const first = quote.firstElementChild;
+  const lead = first?.tagName === 'P' ? first.firstChild : null;
+  if (!first || lead?.nodeType !== Node.TEXT_NODE) return;
+  const m = /^\s*\[!(\w+)\][+-]?[^\S\n]*/.exec(lead.nodeValue ?? '');
+  if (!m) return;
+  const kind = ALIASES[m[1].toLowerCase()] ?? m[1].toLowerCase();
+  const meta = CALLOUTS[kind] ?? CALLOUTS.note;
+  lead.nodeValue = (lead.nodeValue ?? '').slice(m[0].length);
+
+  // The title: what follows the marker on its line.
+  const title: ChildNode[] = [];
+  for (let node = first.firstChild; node; ) {
+    const next = node.nextSibling;
+    if (node.nodeType === Node.TEXT_NODE) {
+      const text = node.nodeValue ?? '';
+      const end = text.indexOf('\n');
+      if (end !== -1) {
+        (node as Text).splitText(end).nodeValue = text.slice(end + 1);
+        title.push(node);
+        break;
+      }
+    } else if (node.nodeName === 'BR') {
+      node.remove();
+      break;
+    } else if ((node.textContent ?? '').includes('\n')) break;
+    title.push(node);
+    node = next;
+  }
+  const head = doc.createElement('p');
+  head.className = 'callout-title';
+  const icon = doc.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  for (const [k, v] of Object.entries({
+    viewBox: '0 0 16 16',
+    fill: 'none',
+    stroke: 'currentColor',
+    'stroke-width': '1.4',
+    'stroke-linecap': 'round',
+    'stroke-linejoin': 'round',
+    'aria-hidden': 'true',
+  }))
+    icon.setAttribute(k, v);
+  icon.innerHTML = meta.icon;
+  head.append(icon);
+  const said = title.some((n) => n.nodeType !== Node.TEXT_NODE || (n.nodeValue ?? '').trim());
+  if (said) {
+    head.append(...title);
+    trimEdges(head);
+  } else {
+    for (const n of title) n.remove();
+    head.append(meta.label);
+  }
+
+  const aside = doc.createElement('aside');
+  aside.className = `callout ${CALLOUTS[kind] ? kind : 'note'}`;
+  const body = doc.createElement('div');
+  body.className = 'callout-body';
+  if (!(first.textContent ?? '').trim() && !first.querySelector('*')) first.remove();
+  body.append(...quote.childNodes);
+  aside.append(head, body);
+  quote.replaceWith(aside);
+}
+
+/** Trims the space left at either end of a title by the marker and the line break. */
+function trimEdges(el: Element) {
+  const firstText = [...el.childNodes].find((n) => n.nodeType === Node.TEXT_NODE);
+  if (firstText && firstText === el.childNodes[1]) firstText.nodeValue = (firstText.nodeValue ?? '').trimStart();
+  const last = el.lastChild;
+  if (last?.nodeType === Node.TEXT_NODE) last.nodeValue = (last.nodeValue ?? '').trimEnd();
 }
 
 /** A Marked extension's start(): where in the source its syntax might begin, or nowhere. */
@@ -235,10 +404,16 @@ function startAt(i: number): number | undefined {
   return i === -1 ? undefined : i;
 }
 
-function tex(source: string, displayMode: boolean): string {
-  return katex.renderToString(source, { displayMode, throwOnError: false, output: 'htmlAndMathml' });
+/** A short, stable name for a piece of text (FNV-1a), for the ids in its drawings. */
+function hash(s: string): string {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return (h >>> 0).toString(36);
 }
 
-function escapeAttr(v: string): string {
+function escapeHtml(v: string): string {
   return v.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }

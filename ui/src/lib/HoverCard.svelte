@@ -202,7 +202,7 @@
       <figcaption><a href={gloss.image.page} target="_blank" rel="noreferrer">{gloss.image.credit}</a></figcaption>
     </figure>
   {/if}
-  <div class="hc-body hc-gloss">{@html renderMarkdown(gloss.gloss)}</div>
+  <div class="hc-body hc-gloss md-box">{@html renderMarkdown(gloss.gloss)}</div>
   <p class="hc-meta hc-foot">
     <span>Glossed by Claude {onDay(gloss.at)}</span>
     <button
@@ -252,7 +252,7 @@
   >
     {#if card.kind === 'term'}
       <p class="hc-title">{card.title}</p>
-      <p class="hc-body">{@html card.html}</p>
+      <p class="hc-body md-box">{@html card.html}</p>
     {:else if card.kind === 'gloss'}
       {@render glossBody(card.gloss)}
     {:else if card.kind === 'concept'}

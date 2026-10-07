@@ -42,19 +42,25 @@
 <ol class="notebook">
   {#each items as item, i (item.id)}
     <li id="item-{item.id}" class="entry entry-{item.type}" class:pending={pendingId === item.id}>
-      {#if item.type === 'block'}
-        <Block {item} number={numbers[i]} />
-      {:else if item.type === 'quiz' || item.type === 'ask'}
-        {@const current = (live.get(item.id) ?? item) as typeof item}
-        {@const locked = readonly && (Boolean(current.answeredAt) || !live.has(item.id))}
-        {#if current.type === 'quiz'}
-          <Quiz item={current} active={pendingId === item.id} readonly={locked} />
+      <!-- One entry that can't be shown (bad content in a stored block) never takes the rest of the page with it. -->
+      <svelte:boundary onerror={(error) => console.error('Could not show this entry', error)}>
+        {#if item.type === 'block'}
+          <Block {item} number={numbers[i]} />
+        {:else if item.type === 'quiz' || item.type === 'ask'}
+          {@const current = (live.get(item.id) ?? item) as typeof item}
+          {@const locked = readonly && (Boolean(current.answeredAt) || !live.has(item.id))}
+          {#if current.type === 'quiz'}
+            <Quiz item={current} active={pendingId === item.id} readonly={locked} />
+          {:else}
+            <Ask item={current} active={pendingId === item.id} readonly={locked} />
+          {/if}
         {:else}
-          <Ask item={current} active={pendingId === item.id} readonly={locked} />
+          <MapUpdate {item} />
         {/if}
-      {:else}
-        <MapUpdate {item} />
-      {/if}
+        {#snippet failed(_, retry)}
+          <p class="entry-failed">This part couldn't be shown. <button class="link" onclick={retry}>Try again</button></p>
+        {/snippet}
+      </svelte:boundary>
     </li>
     {#each figures[item.id] ?? [] as fig (fig.id)}
       <li class="entry entry-figure">

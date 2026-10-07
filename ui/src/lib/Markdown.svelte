@@ -1,3 +1,12 @@
+<script lang="ts" module>
+  /** Diagrams drawn so far, by look (theme and accent) and source, so a step revisited shows them at once. */
+  const diagrams = new Map<string, string>();
+  /** The look Mermaid was last set up for. */
+  let mermaidLook = '';
+  /** Ids for Mermaid's drawings, unique on the page. */
+  let drawn = 0;
+</script>
+
 <script lang="ts">
   // Renders lesson Markdown and brings it to life: mermaid diagrams, sequences, explorables and the visual kit's figures.
   import { getContext, mount, unmount } from 'svelte';
@@ -6,6 +15,8 @@
   import { splitRef } from './library.ts';
   import { renderInline, renderMarkdown } from './markdown.ts';
   import { link } from './router.svelte.ts';
+  import { theme } from './theme.svelte.ts';
+  import { whileVisible } from './visible.ts';
   import type { Gloss } from '../../../shared/types.ts';
 
   // Figures load on first use, so a lesson without them never downloads them.
@@ -20,13 +31,11 @@
   };
 
   /** Where glossed phrases are never marked: code, maths, drawings, links, other terms and live figures. */
-  const SKIP = 'pre, code, .katex, svg, a, button, .term, .figure-live, .figure-loading, .kit, .diagram, script, style';
+  const SKIP = 'pre, code, .katex, .math-pending, svg, a, button, .term, .figure-live, .figure-loading, .kit, .diagram, script, style';
 
   let { source, inline = false }: { source: string; inline?: boolean } = $props();
 
   let el = $state<HTMLElement>();
-  /** Diagrams drawn by this component, for ids Mermaid needs to be unique. */
-  let diagramCount = 0;
 
   const html = $derived(inline ? renderInline(source) : renderMarkdown(source));
   /** The topic a lesson's text belongs to, so a bare [[concept]] can be found. */
@@ -118,112 +127,191 @@
     };
   });
 
-  // Animated drawings (SMIL) get a replay button; with reduced motion they start paused.
+  // Animated drawings (SMIL) get Play/Pause and Replay; with reduced motion they start paused. Out of sight (scrolled
+  // away, or the tab hidden) they pause by themselves and carry on when seen again, unless he paused them.
   $effect(() => {
     void html;
     const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const stops: (() => void)[] = [];
     for (const svg of el?.querySelectorAll<SVGSVGElement>('svg') ?? []) {
-      if (!svg.querySelector('animate, animateTransform, animateMotion, set') || svg.closest('.kit')) continue;
+      if (!svg.querySelector('animate, animateTransform, animateMotion, set') || svg.closest('.kit') || svg.parentElement?.closest('svg'))
+        continue;
       let frame = svg.closest('figure') as HTMLElement | null;
       if (!frame) {
         frame = document.createElement('figure');
         svg.replaceWith(frame);
         frame.append(svg);
       }
-      if (frame.querySelector('.figure-tools')) continue;
+      frame.querySelector('.figure-tools')?.remove();
+      let paused = still;
+      let seen = false;
       const tools = document.createElement('div');
       tools.className = 'figure-tools';
       const play = document.createElement('button');
       const replay = document.createElement('button');
       replay.textContent = 'Replay';
-      const label = () => (play.textContent = svg.animationsPaused() ? 'Play' : 'Pause');
+      const apply = () => {
+        if (paused || !seen) svg.pauseAnimations();
+        else svg.unpauseAnimations();
+        play.textContent = paused ? 'Play' : 'Pause';
+      };
       play.onclick = () => {
-        if (svg.animationsPaused()) svg.unpauseAnimations();
-        else svg.pauseAnimations();
-        label();
+        paused = !paused;
+        apply();
       };
       replay.onclick = () => {
         svg.setCurrentTime(0);
-        svg.unpauseAnimations();
-        label();
+        paused = false;
+        apply();
       };
-      if (still) svg.pauseAnimations();
-      label();
+      apply();
       tools.append(play, replay);
       svg.after(tools);
+      stops.push(
+        whileVisible(svg, (visible) => {
+          seen = visible;
+          apply();
+        }),
+      );
     }
+    return () => {
+      for (const stop of stops) stop();
+    };
   });
 
-  // Draw ```mermaid blocks once the HTML is in the page. Mermaid is large, so it loads on first use.
+  // Draw ```mermaid blocks once the HTML is in the page. Mermaid is large, so it loads on first use. A diagram
+  // drawn before in this look is put in at once; a new one holds its space while it is drawn. When the theme or the
+  // accent changes, the diagrams are drawn again in the new colours.
   $effect(() => {
     void html;
-    const blocks = el?.querySelectorAll<HTMLElement>('pre > code.language-mermaid') ?? [];
-    if (blocks.length === 0) return;
+    const look = `${theme.value}|${theme.accent}`;
+    const todo: { at: HTMLElement; source: string }[] = [];
+    for (const code of el?.querySelectorAll<HTMLElement>('pre > code.language-mermaid') ?? []) {
+      todo.push({ at: code.parentElement!, source: code.textContent ?? '' });
+    }
+    for (const figure of el?.querySelectorAll<HTMLElement>('figure.diagram[data-source]') ?? []) {
+      if (figure.dataset.look !== look) todo.push({ at: figure, source: figure.dataset.source ?? '' });
+    }
+    if (todo.length === 0) return;
+    let gone = false;
+    const pending: { at: HTMLElement; source: string }[] = [];
+    for (const d of todo) {
+      const svg = diagrams.get(`${look}\n${d.source}`);
+      if (svg) d.at.replaceWith(diagram(svg, d.source, look));
+      else if (d.at.tagName === 'PRE') {
+        // The space it will take, roughly, so the page doesn't jump when it is drawn.
+        const hold = document.createElement('div');
+        hold.className = 'figure-loading diagram-loading';
+        d.at.replaceWith(hold);
+        pending.push({ at: hold, source: d.source });
+      } else pending.push(d);
+    }
+    if (pending.length === 0) return;
     void (async () => {
       const { default: mermaid } = await import('mermaid');
-      const dark = document.documentElement.dataset.theme === 'dark';
-      const css = getComputedStyle(document.documentElement);
-      const v = (name: string) => css.getPropertyValue(name).trim();
-      const soft = mix(v('--acc'), v('--b0'), dark ? 0.72 : 0.84);
-      // Timelines colour their sections from cScale0…11: the accent, softened, with plain text on it.
-      const scale = Object.fromEntries(
-        Array.from({ length: 12 }, (_, i) => [
-          [`cScale${i}`, i % 2 ? mix(soft, v('--b0'), 0.35) : soft],
-          [`cScaleLabel${i}`, v('--fg')],
-          [`cScaleInv${i}`, v('--acc')],
-        ]).flat(),
-      );
-      mermaid.initialize({
-        startOnLoad: false,
-        securityLevel: 'strict',
-        theme: 'base',
-        themeVariables: {
-          darkMode: dark,
-          fontFamily: v('--sans'),
-          fontSize: '14px',
-          background: v('--b0'),
-          primaryColor: v('--b1'),
-          primaryBorderColor: v('--rule-strong'),
-          primaryTextColor: v('--fg'),
-          secondaryColor: v('--b2'),
-          tertiaryColor: v('--b1'),
-          lineColor: v('--muted'),
-          textColor: v('--fg'),
-          edgeLabelBackground: v('--b0'),
-          clusterBkg: v('--b1'),
-          clusterBorder: v('--rule-strong'),
-          noteBkgColor: v('--b2'),
-          noteBorderColor: v('--rule-strong'),
-          ...scale,
-          // Charts (xychart): lines and bars in the accent, then the semantic colours.
-          xyChart: {
-            plotColorPalette: [v('--acc'), v('--shaky'), v('--solid'), v('--muted')].join(', '),
-            titleColor: v('--fg'),
-            xAxisLabelColor: v('--muted'),
-            yAxisLabelColor: v('--muted'),
-            xAxisTitleColor: v('--muted'),
-            yAxisTitleColor: v('--muted'),
-            xAxisLineColor: v('--rule-strong'),
-            yAxisLineColor: v('--rule-strong'),
-            xAxisTickColor: v('--rule-strong'),
-            yAxisTickColor: v('--rule-strong'),
-          },
-        },
-      });
-      for (const code of blocks) {
-        const pre = code.parentElement!;
+      if (gone) return;
+      if (mermaidLook !== look) {
+        mermaid.initialize(mermaidConfig());
+        mermaidLook = look;
+      }
+      for (const d of pending) {
         try {
-          const { svg } = await mermaid.render(`mermaid-${crypto.randomUUID()}-${diagramCount++}`, code.textContent ?? '');
-          const figure = document.createElement('figure');
-          figure.className = 'diagram';
-          figure.innerHTML = svg;
-          pre.replaceWith(figure);
+          const { svg } = await mermaid.render(`mermaid-${++drawn}`, d.source);
+          diagrams.set(`${look}\n${d.source}`, svg);
+          if (gone) return;
+          d.at.replaceWith(diagram(svg, d.source, look));
         } catch {
+          if (gone) return;
+          const pre = document.createElement('pre');
+          const code = document.createElement('code');
+          code.textContent = d.source;
+          pre.append(code);
           pre.classList.add('diagram-error');
+          d.at.replaceWith(pre);
         }
       }
     })();
+    return () => {
+      gone = true;
+    };
   });
+
+  /** A drawn diagram, carrying its source and look so it can be drawn again when the look changes. */
+  function diagram(svg: string, source: string, look: string): HTMLElement {
+    const figure = document.createElement('figure');
+    figure.className = 'diagram';
+    figure.dataset.source = source;
+    figure.dataset.look = look;
+    figure.innerHTML = svg;
+    return figure;
+  }
+
+  /** Mermaid in the app's colours, read from the tokens. A diagram can't change them (or add CSS) from its own text. */
+  function mermaidConfig() {
+    const dark = document.documentElement.dataset.theme === 'dark';
+    const css = getComputedStyle(document.documentElement);
+    const v = (name: string) => css.getPropertyValue(name).trim();
+    const soft = mix(v('--acc'), v('--b0'), dark ? 0.72 : 0.84);
+    // Timelines colour their sections from cScale0…11: the accent, softened, with plain text on it.
+    const scale = Object.fromEntries(
+      Array.from({ length: 12 }, (_, i) => [
+        [`cScale${i}`, i % 2 ? mix(soft, v('--b0'), 0.35) : soft],
+        [`cScaleLabel${i}`, v('--fg')],
+        [`cScaleInv${i}`, v('--acc')],
+      ]).flat(),
+    );
+    return {
+      startOnLoad: false,
+      securityLevel: 'strict' as const,
+      secure: [
+        'secure',
+        'securityLevel',
+        'startOnLoad',
+        'maxTextSize',
+        'suppressErrorRendering',
+        'maxEdges',
+        'theme',
+        'themeCSS',
+        'themeVariables',
+        'darkMode',
+        'fontFamily',
+        'altFontFamily',
+      ],
+      theme: 'base' as const,
+      themeVariables: {
+        darkMode: dark,
+        fontFamily: v('--sans'),
+        fontSize: '14px',
+        background: v('--b0'),
+        primaryColor: v('--b1'),
+        primaryBorderColor: v('--rule-strong'),
+        primaryTextColor: v('--fg'),
+        secondaryColor: v('--b2'),
+        tertiaryColor: v('--b1'),
+        lineColor: v('--muted'),
+        textColor: v('--fg'),
+        edgeLabelBackground: v('--b0'),
+        clusterBkg: v('--b1'),
+        clusterBorder: v('--rule-strong'),
+        noteBkgColor: v('--b2'),
+        noteBorderColor: v('--rule-strong'),
+        ...scale,
+        // Charts (xychart): lines and bars in the accent, then the semantic colours.
+        xyChart: {
+          plotColorPalette: [v('--acc'), v('--shaky'), v('--solid'), v('--muted')].join(', '),
+          titleColor: v('--fg'),
+          xAxisLabelColor: v('--muted'),
+          yAxisLabelColor: v('--muted'),
+          xAxisTitleColor: v('--muted'),
+          yAxisTitleColor: v('--muted'),
+          xAxisLineColor: v('--rule-strong'),
+          yAxisLineColor: v('--rule-strong'),
+          xAxisTickColor: v('--rule-strong'),
+          yAxisTickColor: v('--rule-strong'),
+        },
+      },
+    };
+  }
 
   /** Wraps each whole-word occurrence of a glossed phrase in el's plain text, longest phrases first. */
   function markGlosses(root: HTMLElement, glosses: Gloss[]) {

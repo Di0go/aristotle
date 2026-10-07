@@ -18,6 +18,8 @@
   let text = $state('');
   let saved = $state<'saved' | 'saving' | ''>('');
   let timer: ReturnType<typeof setTimeout> | undefined;
+  /** The save waiting for him to stop typing, if any: sent at once when he moves to another step. */
+  let unsaved: (() => Promise<void>) | null = null;
   let box = $state<HTMLTextAreaElement>();
   /** The step this notebook belongs to, so a late save never lands on the next step's page. */
   let shownFor = '';
@@ -49,6 +51,7 @@
     const key = `${topic.slug}/${stepId}`;
     if (key !== shownFor) {
       clearTimeout(timer);
+      void unsaved?.();
       shownFor = key;
       text = note?.text ?? '';
       saved = '';
@@ -75,15 +78,24 @@
     clearTimeout(timer);
     const [slug, step, body] = [topic.slug, stepId, text];
     const title = page ? `${pageLabel(page)}${page.title ? ` · ${page.title}` : ''}` : undefined;
-    timer = setTimeout(async () => {
+    const save = async () => {
+      if (unsaved === save) unsaved = null;
       await fetch('/api/notes', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ topic: slug, step, text: body, title }),
       });
       if (shownFor === `${slug}/${step}`) saved = 'saved';
-    }, 600);
+    };
+    unsaved = save;
+    timer = setTimeout(save, 600);
   }
+
+  // Leaving the class altogether: what he was typing is saved, not dropped.
+  $effect(() => () => {
+    clearTimeout(timer);
+    void unsaved?.();
+  });
 </script>
 
 <div class="bench-inner" class:chatting={bench.tab === 'chat'}>

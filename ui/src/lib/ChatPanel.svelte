@@ -34,6 +34,43 @@
 
   const messages = $derived(feed.chats[thread] ?? null);
   const draft = $derived(feed.chatDrafts[thread] ?? null);
+  /**
+   * The answer being written, as blocks split at blank lines (outside code fences and $$ maths, and not before an
+   * indented line that continues a list). Each block is rendered on its own, so as text streams in only the last one
+   * is rendered again, not the whole answer.
+   */
+  const draftBlocks = $derived.by(() => {
+    if (!draft) return [];
+    const out: string[] = [];
+    let cur = '';
+    let fence = false;
+    let math = false;
+    let gap = false;
+    for (const line of draft.text.split('\n')) {
+      const blank = line.trim() === '';
+      if (!fence && !math && blank) {
+        if (cur.trim()) gap = true;
+        else cur = '';
+        continue;
+      }
+      if (gap) {
+        if (/^\s/.test(line)) cur += '\n';
+        else {
+          out.push(cur);
+          cur = '';
+        }
+        gap = false;
+      }
+      if (/^\s*(```|~~~)/.test(line)) fence = !fence;
+      else if (!fence && (line.match(/\$\$/g)?.length ?? 0) % 2 === 1) math = !math;
+      cur += `${line}\n`;
+    }
+    if (cur.trim()) out.push(cur);
+    return out;
+  });
+  /** He is reading the newest messages (scrolled to the bottom), so new text keeps them in view. */
+  let following = true;
+  let scrollQueued = false;
   const where = $derived(page ? `${title} · ${pageLabel(page)}${page.title ? `: ${page.title}` : ''}` : title);
   /** Everything he can tag: this class's steps and concepts, then every class. */
   const mentionables = $derived.by((): Mention[] => {
@@ -70,13 +107,25 @@
     void feed.loadChat(thread);
   });
 
-  // Keep the newest message in view as the conversation grows and an answer streams in.
+  // Keep the newest message in view as the conversation grows and an answer streams in, unless he has scrolled up
+  // to reread: at most once a frame, however fast the text arrives.
   $effect(() => {
     void messages?.length;
     void draft?.text;
-    void sending;
-    void tick().then(() => list?.scrollTo({ top: list.scrollHeight, behavior: 'smooth' }));
+    if (sending) following = true;
+    if (!following || scrollQueued) return;
+    scrollQueued = true;
+    requestAnimationFrame(() => {
+      scrollQueued = false;
+      if (list) list.scrollTop = list.scrollHeight;
+    });
   });
+
+  /** Following the conversation while near its end; scrolling up to reread stops it. */
+  function onScroll() {
+    if (!list) return;
+    following = list.scrollHeight - list.scrollTop - list.clientHeight < 80;
+  }
 
   // The box grows with what he writes, up to a few lines.
   $effect(() => {
@@ -254,7 +303,7 @@
     {/if}
   </header>
 
-  <div class="msgs" bind:this={list}>
+  <div class="msgs" bind:this={list} onscroll={onScroll}>
     {#if messages === null}
       <p class="hint">Loading…</p>
     {:else if messages.length === 0 && !draft && !sending}
@@ -274,7 +323,7 @@
         <div class="msg theirs">
           <span class="avatar" aria-hidden="true"><Logo size={14} /></span>
           <div class="body">
-            <div class="answer">{@html renderMarkdown(m.text)}</div>
+            <div class="answer md-box">{@html renderMarkdown(m.text)}</div>
             <div class="meta">
               <span>{formatTime(m.at)}</span>
               {#if m.stopped}<span class="stopped">stopped</span>{/if}
@@ -288,7 +337,11 @@
     {#if draft}
       <div class="msg theirs">
         <span class="avatar" aria-hidden="true"><Logo size={14} /></span>
-        <div class="body"><div class="answer streaming">{@html renderMarkdown(draft.text)}</div></div>
+        <div class="body">
+          <div class="answer streaming md-box">
+            {#each draftBlocks as block, i (i)}{@html renderMarkdown(block, false)}{/each}
+          </div>
+        </div>
       </div>
     {:else if sending}
       <div class="msg theirs">
