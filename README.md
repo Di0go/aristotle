@@ -6,6 +6,7 @@
 </p>
 
 <p align="center">
+  <a href="#see-it-teach">See it teach</a> ·
   <a href="#the-method">The method</a> ·
   <a href="#learn-anything">Learn anything</a> ·
   <a href="#around-the-lessons">Around the lessons</a> ·
@@ -30,6 +31,15 @@ It runs on your Claude subscription. No API keys, no accounts, no cloud: everyth
 <p align="center">
   <a href="docs/images/hero-dark.webp"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/hero-dark.webp"><img src="docs/images/hero-light.webp" alt="A lesson in Aristotle: the step &quot;Where the beat starts&quot;, with an engraving of the heart from Gray's Anatomy, the courses in the library beside it, and a chat with Aristotle answering a question about the step." width="100%"></picture></a>
 </p>
+
+## See it teach
+
+One turn of a real lesson, start to finish. You answer an open question in your own words. Claude reads what you wrote, says what was right and what to refine, and marks the concept solid on your map. The next step arrives with its check, a quiz whose wrong options are mistakes you would really make. You pick one of them, the explanation tells you why, and the map records that the idea is shaky again.
+
+<p align="center">
+  <picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/lesson-loop-dark.webp"><img src="docs/images/lesson-loop-light.webp" alt="Recording of a lesson step: the learner types an answer about why the heart still races two minutes after a fright, Claude prepares the next step, its critique appears and the map marks the concept solid; then a new step, Coming back down, with a quiz; the learner picks a wrong option, sees the right one and the explanation, and the map marks the vagal brake shaky." width="100%"></picture>
+</p>
+<p align="center"><sub>Recorded in the demo library, in focus mode. The tutor's turns go through the same MCP tools Claude Code calls (<code>show</code>, <code>update_map</code>, <code>quiz</code>).</sub></p>
 
 ## The method
 
@@ -57,41 +67,41 @@ Bigger subjects are planned as **courses**: an ordered path of classes, agreed w
 
 ## Learn anything
 
-Any subject, at any depth. Here is one lesson from each of four courses, in medicine, chemistry, physics and history. Every image is the app itself; click one to see it full size.
+Any subject, at any depth. Here is one lesson from each of four courses, in medicine, chemistry, physics and history, and the figures move: these are recordings of the app itself. Click one to see it full size.
 
 ### Medicine · How the heart keeps time
 <table>
   <tr>
-    <td width="50%" valign="top"><a href="docs/images/med-plate-dark.webp"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/med-plate-dark.webp"><img src="docs/images/med-plate-light.webp" alt="A plate: Gray's Anatomy engraving of the inside of the heart, with numbered markers for the chambers, valves and walls, inside the lesson."></picture></a><p><b>Plates.</b> Real images with numbered markers and a key, used only when their licence allows it (here Gray's Anatomy, 1918, public domain).</p></td>
-    <td width="50%" valign="top"><a href="docs/images/med-explorable-dark.webp"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/med-explorable-dark.webp"><img src="docs/images/med-explorable-light.webp" alt="An explorable: a beating heart with its trace and its rate over 30 seconds, jumping when the vagal brake is released."></picture></a><p><b>Explorables.</b> Hand-built simulations. Here you drop the vagal brake and feel the heart jump within a beat, then push the accelerator and watch it climb over seconds.</p></td>
+    <td width="50%" valign="top"><a href="docs/images/med-plate-dark.webp"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/med-plate-dark.webp"><img src="docs/images/med-plate-light.webp" alt="Recording of a plate: Gray's Anatomy engraving of the inside of the heart, with numbered markers for the chambers, valves and walls lighting up in turn with their entries in the key."></picture></a><p><b>Plates.</b> Real images with numbered markers and a key: point at a marker and its part lights up in both. Used only when the licence allows it (here Gray's Anatomy, 1918, public domain).</p></td>
+    <td width="50%" valign="top"><a href="docs/images/med-explorable-dark.webp"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/med-explorable-dark.webp"><img src="docs/images/med-explorable-light.webp" alt="Recording of an explorable: a beating heart with its trace and its rate over 30 seconds. Releasing the vagal brake makes the rate jump within a beat; pushing the accelerator instead makes it climb over several seconds."></picture></a><p><b>Explorables.</b> Hand-built simulations you work with your hands. Drop the vagal brake and the heart jumps within a beat; push the accelerator instead and it climbs over seconds. The difference is the lesson.</p></td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top"><a href="docs/images/med-timeline-dark.webp"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/med-timeline-dark.webp"><img src="docs/images/med-timeline-light.webp" alt="Recording of a timeline on a log scale: after a sudden stressor, the brake releases within a second, the sympathetic nerves within seconds, adrenaline over minutes and cortisol over the hour, as a cursor sweeps across."></picture></a><p><b>Timelines.</b> On a log scale, so a second and an hour fit on one line. It plays by itself, and you can drag across it to move through time.</p></td>
+    <td width="50%" valign="top"><a href="docs/images/hover-dark.webp"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/hover-dark.webp"><img src="docs/images/hover-light.webp" alt="Recording of hover cards: pointing at the word weight shows its definition with the formula, and pointing at concepts beside the step shows what each is, where it sits and when it is next due for review."></picture></a><p><b>Hover cards.</b> Every term carries its definition, maths included, and every concept shows how well you hold it and when it is next due. Nothing makes you leave the page.</p></td>
   </tr>
 </table>
 
 ### Chemistry · How cells release energy
-<table>
-  <tr>
-    <td width="50%" valign="top"><a href="docs/images/chem-flow-dark.webp"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/chem-flow-dark.webp"><img src="docs/images/chem-flow-light.webp" alt="A flow from glucose to ATP: glycolysis, the Krebs cycle and the electron transport chain, walked through step by step."></picture></a><p><b>Flows.</b> A pathway you walk through one step at a time, with signals moving along it, alongside the equation it unpacks.</p></td>
-    <td width="50%" valign="top"><a href="docs/images/chem-plate-dark.webp"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/chem-plate-dark.webp"><img src="docs/images/chem-plate-light.webp" alt="A plate of a mitochondrion with markers on the matrix, the cristae, ATP synthase and the outer membrane."></picture></a><p><b>Where it happens.</b> The same reaction, placed in the structure that runs it: the folds of the inner membrane are where most of the ATP is made.</p></td>
-  </tr>
-</table>
+<p><a href="docs/images/chem-flow-dark.webp"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/chem-flow-dark.webp"><img src="docs/images/chem-flow-light.webp" alt="Recording of a flow from glucose to ATP: walked through one stage at a time, glycolysis, the Krebs cycle, the electron transport chain and oxygen, each with a caption."></picture></a></p>
+<p><b>Flows.</b> A pathway you walk through one stage at a time, each lit up with what happens there and where: glycolysis in the cytoplasm, the Krebs cycle in the matrix, the chain on the inner membrane that makes most of the ATP.</p>
 
 ### Physics · Falling with air resistance
 <table>
   <tr>
     <td width="50%" valign="top"><a href="docs/images/phys-chart-dark.webp"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/phys-chart-dark.webp"><img src="docs/images/phys-chart-light.webp" alt="A chart of a skydiver's speed over 20 seconds, rising fast and levelling off near 55 metres per second."></picture></a><p><b>Charts and maths.</b> LaTeX for the equations and charts drawn from them: drag grows with the square of speed, so the curve flattens.</p></td>
-    <td width="50%" valign="top"><a href="docs/images/phys-balance-dark.webp"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/phys-balance-dark.webp"><img src="docs/images/phys-balance-light.webp" alt="A balance: drag against weight, with the dial showing the skydiver still speeding up by 4.8 m/s² five seconds into the jump."></picture></a><p><b>Balances.</b> Two forces on one value, with states to step through: just jumped, five seconds in, terminal velocity, under the canopy.</p></td>
+    <td width="50%" valign="top"><a href="docs/images/phys-balance-dark.webp"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/phys-balance-dark.webp"><img src="docs/images/phys-balance-light.webp" alt="Recording of a balance: drag against weight, stepping from just jumped (9.8 m/s² of acceleration) to five seconds in (4.8) to terminal velocity (zero) and under the canopy."></picture></a><p><b>Balances.</b> Two forces on one value, with states to step through: just jumped, five seconds in, terminal velocity, under the canopy. Watch drag catch up with weight.</p></td>
   </tr>
 </table>
 
 ### History · The printing press
 <table>
   <tr>
-    <td width="50%" valign="top"><a href="docs/images/hist-plate-dark.webp"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/hist-plate-dark.webp"><img src="docs/images/hist-plate-light.webp" alt="A plate: Jost Amman’s 1568 woodcut of a print shop, with markers on the compositor, the pressman, the inking, the press and the stacks of paper."></picture></a><p><b>Sources you can point at.</b> A woodcut from 1568 shows the whole process in one room: setting type, inking, pulling the press, stacking identical sheets.</p></td>
-    <td width="50%" valign="top"><a href="docs/images/hist-timeline-dark.webp"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/hist-timeline-dark.webp"><img src="docs/images/hist-timeline-light.webp" alt="A timeline from Gutenberg in the 1440s to Luther’s pamphlets in the 1520s."></picture></a><p><b>Timelines.</b> Seventy years from Gutenberg’s first Bible to the pamphlets of the Reformation, and why the speed of print changed the argument.</p></td>
+    <td width="50%" valign="top"><a href="docs/images/hist-plate-dark.webp"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/hist-plate-dark.webp"><img src="docs/images/hist-plate-light.webp" alt="Recording of a plate: Jost Amman’s 1568 woodcut of a print shop, with markers lighting up in turn on the compositor, the pressman, the inking, the press and the stacks of paper."></picture></a><p><b>Sources you can point at.</b> A woodcut from 1568 shows the whole process in one room. Each marker lights up its part: setting type, inking, pulling the press, stacking identical sheets.</p></td>
+    <td width="50%" valign="top"><a href="docs/images/hist-timeline-dark.webp"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/hist-timeline-dark.webp"><img src="docs/images/hist-timeline-light.webp" alt="A timeline from Gutenberg in the 1440s to Luther’s pamphlets in the 1520s."></picture></a><p><b>Mermaid diagrams.</b> Here a timeline: seventy years from Gutenberg’s first Bible to the pamphlets of the Reformation, and why the speed of print changed the argument.</p></td>
   </tr>
 </table>
 
-Also: step-through sequences, Mermaid diagrams, timelines on a log scale, hover cards on every term and concept, and quizzes whose wrong answers are the mistakes you would really make.
+Also: step-through sequences, callouts, highlights, and drawings the tutor makes for the step at hand, checked rendered in both themes before you see them.
 
 ## Around the lessons
 
@@ -238,7 +248,7 @@ Start at [docs/README.md](docs/README.md) and [CONTRIBUTING.md](CONTRIBUTING.md)
 - **[amosblomqvist/learn](https://github.com/amosblomqvist/learn)**: the original setup from that video, for the pi agent. Its teaching principles and quiz design inspired this project's. No text or code is copied (the repository has no licence).
 - **[vasanthsreeram/Alvarmethod](https://github.com/vasanthsreeram/Alvarmethod)** (MIT): the port to Claude Code and other agents, and the idea of per-topic maps and resumable session files.
 - **[ts-fsrs](https://github.com/open-spaced-repetition/ts-fsrs)** for spaced repetition. The epigraph is from Aristotle's *Nicomachean Ethics*, Book II, in W. D. Ross's translation.
-- **Images in the demo lessons**, all from Wikimedia Commons: the heart, Henry Vandyke Carter for *Gray's Anatomy* (1918, public domain); the mitochondrion, Kelvinsong (CC0); the print shop, Jost Amman’s woodcut from the *Ständebuch* (1568, public domain).
+- **Images in the demo lessons**, all from Wikimedia Commons: the heart, Henry Vandyke Carter for *Gray's Anatomy* (1918, public domain); the print shop, Jost Amman’s woodcut from the *Ständebuch* (1568, public domain).
 
 ## License
 
