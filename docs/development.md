@@ -80,7 +80,7 @@ The server keeps its compiled code in Node's compile cache (`NODE_COMPILE_CACHE`
 
 ## Docs
 
-`pnpm docs:gen` rewrites the generated parts of these docs from the code (see [docs/README.md](README.md#how-these-docs-stay-true)). You rarely run it by hand: the pre-commit hook and the Claude Code Stop hook do.
+`pnpm docs:gen` rewrites the generated parts of these docs from the code (see [docs/README.md](README.md#how-these-docs-stay-true)). You rarely run it by hand: the pre-commit hook and the Claude Code Stop hook do. The check that prose moves with the code ([`scripts/doc-zones.ts`](../scripts/doc-zones.ts)) goes commit by commit: a commit that says `Docs: none -- <why>` excuses only its own files, and Dependabot's commits, which only move a pinned action's version, are skipped.
 
 ## Commands
 

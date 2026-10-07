@@ -6,7 +6,7 @@
 import { execFileSync } from 'node:child_process';
 import { readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
-import { NO_DOCS, undocumented } from './doc-zones.ts';
+import { NO_DOCS, NO_DOCS_AUTHOR, undocumented } from './doc-zones.ts';
 import { generate } from './docs.ts';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
@@ -28,13 +28,15 @@ const pending = porcelain(git('status', '--porcelain', '-z', '--untracked-files=
     return true; // deleted
   }
 });
-// Files of the commits made since, except those whose message says why no docs changed ("Docs: none -- <why>").
-const committed = git('log', `--since=${new Date(since).toISOString()}`, '--name-only', '--format=%x00%B%x01')
+// Files of the commits made since, except those whose message says why no docs changed ("Docs: none -- <why>") and
+// Dependabot's (a pinned version moved).
+const committed = git('log', `--since=${new Date(since).toISOString()}`, '--name-only', '--format=%x00%ae%n%B%x01')
   .split('\0')
   .filter(Boolean)
   .flatMap((entry) => {
-    const [message, files = ''] = entry.split('\x01');
-    return NO_DOCS.test(message) ? [] : files.split('\n').filter(Boolean);
+    const [message = '', files = ''] = entry.split('\x01');
+    const exempt = NO_DOCS.test(message) || NO_DOCS_AUTHOR.test(message.split('\n')[0] ?? '');
+    return exempt ? [] : files.split('\n').filter(Boolean);
   });
 const changed = [...new Set([...pending, ...committed])];
 // Only Markdown changed (or nothing): no code to keep the docs in step with.

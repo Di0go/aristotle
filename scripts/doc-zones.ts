@@ -21,6 +21,9 @@ export const ZONES: { name: string; code: RegExp; docs: string[] }[] = [
 /** The exception, written in a commit message: "Docs: none -- <why>". */
 export const NO_DOCS = /^Docs: none\b/m;
 
+/** Commits that need no docs whatever they touch: Dependabot's, which only move a pinned version. */
+export const NO_DOCS_AUTHOR = /dependabot\[bot\]/;
+
 /** The zones that changed without any of their docs changing. */
 export function undocumented(changed: string[]): { name: string; files: string[]; docs: string[] }[] {
   const out = [];

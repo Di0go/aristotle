@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
-import { undocumented, NO_DOCS } from '../scripts/doc-zones.ts';
+import { undocumented, NO_DOCS, NO_DOCS_AUTHOR } from '../scripts/doc-zones.ts';
 import { header, mappedFiles } from '../scripts/docs.ts';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
@@ -61,14 +61,15 @@ test('code changed since the last release came with its docs', (t) => {
   // The release tag marks what is live; without it (a fresh clone, CI without tags) there is nothing to compare.
   const base = git('rev-parse', '--verify', '--quiet', 'refs/tags/live');
   if (!base) return t.skip('no live tag');
-  // Each commit's files, except a commit that says why it needs no docs ("Docs: none -- <why>"): that one
-  // exempts its own files, not every other commit's. A doc changed by any commit counts.
-  const log = git('log', '--name-only', '--format=%x00%B%x01', `${base}..HEAD`) ?? '';
+  // Each commit's files, except a commit that says why it needs no docs ("Docs: none -- <why>") or is Dependabot's:
+  // that one exempts its own files, not every other commit's. A doc changed by any commit counts.
+  const log = git('log', '--name-only', '--format=%x00%ae%n%B%x01', `${base}..HEAD`) ?? '';
   const changed = new Set<string>();
   for (const entry of log.split('\0').filter(Boolean)) {
-    const [message, files = ''] = entry.split('\x01');
+    const [message = '', files = ''] = entry.split('\x01');
+    const exempt = NO_DOCS.test(message) || NO_DOCS_AUTHOR.test(message.split('\n')[0] ?? '');
     for (const file of files.split('\n').filter(Boolean)) {
-      if (!NO_DOCS.test(message) || file.endsWith('.md')) changed.add(file);
+      if (!exempt || file.endsWith('.md')) changed.add(file);
     }
   }
   const missing = undocumented([...changed]);
