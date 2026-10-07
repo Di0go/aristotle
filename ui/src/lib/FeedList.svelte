@@ -43,7 +43,7 @@
   {#each items as item, i (item.id)}
     <li id="item-{item.id}" class="entry entry-{item.type}" class:pending={pendingId === item.id}>
       <!-- One entry that can't be shown (bad content in a stored block) never takes the rest of the page with it. -->
-      <svelte:boundary onerror={(error) => console.error('Could not show this entry', error)}>
+      <svelte:boundary onerror={(error: unknown) => console.error('Could not show this entry', error)}>
         {#if item.type === 'block'}
           <Block {item} number={numbers[i]} />
         {:else if item.type === 'quiz' || item.type === 'ask'}
@@ -57,7 +57,7 @@
         {:else}
           <MapUpdate {item} />
         {/if}
-        {#snippet failed(_, retry)}
+        {#snippet failed(_: unknown, retry: () => void)}
           <p class="entry-failed">This part couldn't be shown. <button class="link" onclick={retry}>Try again</button></p>
         {/snippet}
       </svelte:boundary>

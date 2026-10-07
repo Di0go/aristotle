@@ -116,18 +116,12 @@ export type FeedEvent =
   | { type: 'topic'; topic: Topic }
   | { type: 'roadmap'; roadmap: Roadmap }
   | { type: 'mission'; mission: Mission }
-  /** Every gloss, after one is added or removed. Being replaced by gloss / gloss-removed. */
-  | { type: 'glosses'; glosses: Gloss[] }
   /** A gloss added or rewritten. */
   | { type: 'gloss'; gloss: Gloss }
   | { type: 'gloss-removed'; id: string }
-  /** Every question he asked on a passage, after one is added or removed. Being replaced by aside / aside-removed. */
-  | { type: 'asides'; asides: Aside[] }
   /** A question on a passage, added or answered. */
   | { type: 'aside'; aside: Aside }
   | { type: 'aside-removed'; id: string }
-  /** His notes on every step, after one changes. Being replaced by note / note-removed. */
-  | { type: 'notes'; notes: StepNote[] }
   /** A step's notebook, saved. */
   | { type: 'note'; note: StepNote }
   /** A step's notebook, emptied. */
@@ -138,9 +132,9 @@ export type FeedEvent =
   | { type: 'about'; about: string }
   /** A message in a chat, his or Aristotle's, once it is complete. */
   | { type: 'chat'; thread: string; message: ChatMessage }
-  /** Aristotle's answer as it is being written: `delta` is the text added since the last event (`text`, the text
-   * so far, is being retired). The complete message follows as a `chat` event. */
-  | { type: 'chat-delta'; thread: string; id: string; delta?: string; text?: string }
+  /** Aristotle's answer as it is being written: the text added since the last delta. The complete message follows as
+   * a `chat` event. */
+  | { type: 'chat-delta'; thread: string; id: string; delta: string }
   /** A chat was started over. */
   | { type: 'chat-cleared'; thread: string };
 

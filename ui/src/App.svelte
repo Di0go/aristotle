@@ -43,13 +43,24 @@
   /** Each page's code, imported once: the same promise every time, so moving within a page (another step of the
    * class, another concept) updates it instead of building it again. */
   const loaded = new Map<string, ReturnType<Page>>();
+  /** Each page's component once its code has arrived, and the pages whose code failed to load (a rebuilt app). */
+  let components = $state<Record<string, Component<Record<string, unknown>>>>({});
+  let failed = $state<Record<string, boolean>>({});
 
   let railOpen = $state(false);
 
   const route = $derived(router.route);
   /** #/topics has no page of its own: the roadmaps page has every topic in its table. */
   const pageName = $derived(route.page === 'topics' ? 'roadmaps' : route.page);
-  const pageModule = $derived(pageName === 'now' ? null : load(pageName));
+  /**
+   * The component for the current route, read from the same route as its props: while the next page's code is still
+   * on its way nothing is shown, rather than the previous page given the next page's props (which fetched
+   * /api/sessions/undefined on the way from a session to the log).
+   */
+  const Current = $derived(pageName === 'now' ? null : components[pageName]);
+  $effect(() => {
+    if (pageName !== 'now') void load(pageName);
+  });
   /** What the current page is told: its slug or id, and for a topic the selected concept. */
   const pageProps = $derived.by((): Record<string, unknown> => {
     const r = router.route;
@@ -69,8 +80,17 @@
     let page = loaded.get(name);
     if (!page) {
       page = pages[name]();
-      // A chunk that failed to load (the app was rebuilt) is asked for again next time.
-      page.catch(() => loaded.delete(name));
+      page.then(
+        (m) => {
+          components[name] = m.default;
+          failed[name] = false;
+        },
+        () => {
+          // A chunk that failed to load (the app was rebuilt) is asked for again next time.
+          loaded.delete(name);
+          failed[name] = true;
+        },
+      );
       loaded.set(name, page);
     }
     return page;
@@ -113,21 +133,19 @@
     </header>
     <TabBar />
     <main class="page-area">
-      {#if !pageModule}
+      {#if pageName === 'now'}
         <Now />
-      {:else}
-        {#await pageModule then m}
-          {#key pageKey}
-            <m.default {...pageProps} />
-          {/key}
-        {:catch}
-          <div class="page">
-            <div class="empty-state">
-              <h2>Aristotle was updated</h2>
-              <p>This page needs the new version. <button class="link" onclick={() => location.reload()}>Reload</button></p>
-            </div>
+      {:else if Current}
+        {#key pageKey}
+          <Current {...pageProps} />
+        {/key}
+      {:else if failed[pageName]}
+        <div class="page">
+          <div class="empty-state">
+            <h2>Aristotle was updated</h2>
+            <p>This page needs the new version. <button class="link" onclick={() => location.reload()}>Reload</button></p>
           </div>
-        {/await}
+        </div>
       {/if}
     </main>
   </div>

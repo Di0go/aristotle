@@ -273,16 +273,6 @@ class LiveFeed {
       case 'note-removed':
         this.notes = this.notes.filter((n) => !(n.topic === event.topic && n.step === event.step));
         break;
-      // The whole lists, as older servers send them.
-      case 'glosses':
-        this.glosses = event.glosses;
-        break;
-      case 'asides':
-        this.asides = event.asides;
-        break;
-      case 'notes':
-        this.notes = event.notes;
-        break;
       case 'about':
         this.about = event.about;
         break;
@@ -297,12 +287,10 @@ class LiveFeed {
         delete this.chatDrafts[event.thread];
         break;
       case 'chat-delta': {
-        // `delta` is appended to the answer it belongs to (a new id starts a new one); `text`, the whole text so
-        // far, is what older servers send.
+        // Each delta is appended to the answer it belongs to; a new id starts a new one.
         const draft = this.chatDrafts[event.thread];
         const before = draft?.id === event.id ? draft.text : '';
-        const text = event.delta !== undefined ? before + event.delta : (event.text ?? before);
-        this.chatDrafts[event.thread] = { id: event.id, text };
+        this.chatDrafts[event.thread] = { id: event.id, text: before + event.delta };
         break;
       }
     }
