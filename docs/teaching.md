@@ -50,6 +50,7 @@ These are in [`CLAUDE.md`](../CLAUDE.md) because they hold whichever skill is ru
 - **What he wondered about reaches the tutor**: `get_topic` lists the phrases he glossed and the questions he asked on passages of the topic. Both are gaps he noticed himself, worth a check or a step.
 - **Hover cards are the tutor's to write** (a highlighted term carries its definition inside the highlight): `{{term|definition}}` and `[[concept-id]]` only exist where Claude puts them, so `show` answers a teaching step that has neither with a reminder to add them in the next steps.
 - **Claude Code starts when Aristotle opens**, idle in the terminal drawer, so the first request never waits for it to boot; what is sent while it starts is typed in once it is ready.
+- **Pictures for anything physical, spatial or timed** (in `teach`): an explorable first, then the visual kit, a real image as a `plate`, and an illustrator SVG last. A `flow` that moves real things draws them (`art`, `carries`, `makes`: glucose in, electrons along, ATP out), and their numbers are facts like any other.
 - **Accuracy first**: verify any fact, name, date or formula before teaching it (the `researcher` subagent), and mark real uncertainty.
 
 ## Changing the method
