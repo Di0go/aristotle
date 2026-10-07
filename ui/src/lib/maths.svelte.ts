@@ -1,4 +1,4 @@
-// KaTeX, loaded when first needed (or when the browser is idle after the first paint) instead of on the startup
+// KaTeX, loaded just after the first paint (or when first needed, if sooner) instead of on the startup
 // path. Until it arrives, maths renders as a quiet placeholder; reading `version` in a reactive context renders it
 // again once KaTeX is here.
 
@@ -31,10 +31,11 @@ export const maths = {
     );
     return loading;
   },
-  /** Loads KaTeX once the browser has nothing better to do, so a page with maths rarely waits for it. */
+  /**
+   * Loads KaTeX right after the first frame is painted (a task queued from the frame's callback runs after it), so it
+   * stays off the startup path yet is almost always here before a lesson's text, which needs the feed and its sessions.
+   */
   preload() {
-    const go = () => void maths.load();
-    if ('requestIdleCallback' in window) requestIdleCallback(go, { timeout: 1500 });
-    else setTimeout(go, 300);
+    requestAnimationFrame(() => setTimeout(() => void maths.load(), 0));
   },
 };
