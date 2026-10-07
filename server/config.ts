@@ -99,6 +99,8 @@ export const CLAUDE_CMD = process.env.ARISTOTLE_CLAUDE_CMD ?? 'claude';
 
 /** The model for glosses and his questions on a passage (server/oneshot.ts): an alias Claude Code knows, on his own login. */
 export const ONESHOT_MODEL = process.env.ARISTOTLE_ONESHOT_MODEL ?? 'sonnet';
+/** Wikimedia Commons' API, which find_images and glosses search; tests point it at a local stand-in. */
+export const COMMONS_API = process.env.ARISTOTLE_COMMONS_API ?? 'https://commons.wikimedia.org/w/api.php';
 /** Whether a gloss may carry a picture from Wikimedia Commons, when one would help (off in the tests: no network). */
 export const GLOSS_IMAGES = process.env.ARISTOTLE_GLOSS_IMAGES !== 'off';
 /** A command that reads a question on stdin and prints the answer, in place of Claude Code (oneshot.ts); tests swap one in. */

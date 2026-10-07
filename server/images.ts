@@ -4,8 +4,8 @@
 // on a plate can be placed where the structures really are. rsvgConvert, shared with preview_svg, turns SVG into PNG.
 
 import { execFile } from 'node:child_process';
+import { COMMONS_API as API } from './config.ts';
 
-const API = 'https://commons.wikimedia.org/w/api.php';
 // Wikimedia asks every client for a descriptive User-Agent (Policy:User-Agent_policy).
 const UA = 'Aristotle/0.3 (personal learning app; https://github.com/Di0go/aristotle) node-fetch';
 // Wikimedia serves originals from upload. and rendered thumbnails (PNG versions of SVGs, for one) from thumb.

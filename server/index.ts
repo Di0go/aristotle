@@ -228,7 +228,6 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ro
   if (req.method === 'POST' && route === '/api/glosses') {
     const body = (await readJson(req)) as Partial<GlossBody> | null;
     if (typeof body?.text !== 'string') return json(res, 400, { error: 'Missing text' });
-    const str = (v: unknown) => (typeof v === 'string' ? v : undefined);
     const topic = str(body.topic);
     try {
       const gloss = await gym.glosses.explain(
@@ -251,7 +250,6 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ro
   if (req.method === 'POST' && route === '/api/asides') {
     const body = (await readJson(req)) as Partial<AsideBody> | null;
     if (typeof body?.question !== 'string') return json(res, 400, { error: 'Missing question' });
-    const str = (v: unknown) => (typeof v === 'string' ? v : undefined);
     const topic = str(body.topic);
     const item = str(body.item);
     const step = item ? gym.feed.stepTitleOf(item) : undefined;
@@ -311,7 +309,6 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ro
       tags?: unknown;
     } | null;
     if (typeof body?.text !== 'string') return json(res, 400, { error: 'Missing text' });
-    const str = (v: unknown) => (typeof v === 'string' ? v : undefined);
     const thread = tail('/api/chats/');
     try {
       const context = chatContext(thread, str(body.where), str(body.page), str(body.step), str(body.mentions));
@@ -445,6 +442,11 @@ function refuseOtherUsers(socket: Socket) {
   if (UID === undefined) return;
   const owner = socketOwner(socket.remoteAddress, socket.remotePort);
   if (owner !== undefined && owner !== UID) socket.destroy();
+}
+
+/** A body field that should be a string: itself, or undefined when it is anything else. */
+function str(v: unknown): string | undefined {
+  return typeof v === 'string' ? v : undefined;
 }
 
 /** One quiz pick as the interface sends it: an option index (or null for "I don't know") and an optional note. */

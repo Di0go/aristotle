@@ -60,7 +60,8 @@ export class Backup {
     }
     this.running = true;
     try {
-      const { stdout } = await git('status', '--porcelain');
+      // Every untracked file by name (not just its folder), so the commit message can name what changed.
+      const { stdout } = await git('status', '--porcelain', '--untracked-files=all');
       if (stdout.trim()) {
         await git('add', '--all');
         await git('commit', '--quiet', '-m', `Data: ${describe(stdout)}`);
