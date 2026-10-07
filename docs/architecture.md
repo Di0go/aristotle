@@ -217,7 +217,7 @@ Only for the interface (and the tests); Claude Code uses MCP.
 | [`ClassPage.svelte`](../ui/src/lib/ClassPage.svelte) | One page of a class: the intro, or one step with its checks and the feedback on his answers, with Previous and Next. |
 | [`Composer.svelte`](../ui/src/lib/Composer.svelte) | Talk to Claude from Aristotle: types the message into the Claude Code running in the drawer. |
 | [`ConceptNode.svelte`](../ui/src/lib/ConceptNode.svelte) | One concept on a map: status by fill and outline, goal by an inner ring, focus by a halo. |
-| [`ConceptPanel.svelte`](../ui/src/lib/ConceptPanel.svelte) | The side panel for one concept on a map: status, what it rests on and leads to, notes, and its check record. |
+| [`ConceptPanel.svelte`](../ui/src/lib/ConceptPanel.svelte) | The side panel for one concept on a map: status, what it rests on and leads to, notes, and its check record; a fading one can be reviewed from here. |
 | [`ContextMenu.svelte`](../ui/src/lib/ContextMenu.svelte) | The menu on right-clicking selected text: copy it, search for it in Aristotle, gloss it (Claude Code explains it in a hover card, which then shows wherever the phrase appears), or ask a question about it (answered beside the step, kept with it). |
 | [`FeedList.svelte`](../ui/src/lib/FeedList.svelte) | A lesson as one long note: each entry a block in the reading column. |
 | [`Grip.svelte`](../ui/src/lib/Grip.svelte) | A drag handle on a pane's edge. |

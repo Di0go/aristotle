@@ -1,5 +1,7 @@
 <script lang="ts">
-  // The side panel for one concept on a map: status, what it rests on and leads to, notes, and its check record.
+  // The side panel for one concept on a map: status, what it rests on and leads to, notes, and its check record;
+  // a fading one can be reviewed from here.
+  import { actions } from './actions.ts';
   import { feed } from './feed.svelte.ts';
   import { formatDay, formatTime, onDay } from './format.ts';
   import { markOf, splitRef } from './library.ts';
@@ -31,6 +33,8 @@
       .catch(() => {});
   });
   const fading = $derived(isFading(concept));
+  /** How many of the class's concepts are fading, this one included. */
+  const fadingInTopic = $derived(topic.concepts.filter((c) => isFading(c)).length);
   const word = $derived(fading ? 'Fading' : WORD[concept.status]);
   /** Fading is still solid underneath (as on the map), so it keeps the solid colour; not yet has none. */
   const tagClass = $derived(concept.status === 'unknown' ? '' : concept.status);
@@ -78,11 +82,20 @@
   {#if concept.status === 'solid' && concept.review}
     <p class="review-line">
       {#if fading}
-        Due for review since {formatDay(concept.review.due)}.
+        Fading: due for review {onDay(concept.review.due)}. Recalling it now is what makes it last.
       {:else}
         Next review {inDays(concept.review.due)}{concept.review.reps > 1 ? `, after ${concept.review.reps} reviews` : ''}.
       {/if}
     </p>
+  {/if}
+
+  {#if fading}
+    <div class="review-act">
+      <button class="primary small" onclick={() => actions.review(`${topic.slug}/${concept.id}`)}>Review it now</button>
+      {#if fadingInTopic > 1}
+        <button class="link" onclick={() => actions.review(topic.slug)}>or all {fadingInTopic} fading in this class</button>
+      {/if}
+    </div>
   {/if}
 
   {#if concept.deps.length}
@@ -175,6 +188,14 @@
   .review-line {
     font: 0.83rem var(--sans);
     color: var(--muted);
+  }
+
+  .review-act {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    margin: 4px 0 6px;
   }
 
   h3 {

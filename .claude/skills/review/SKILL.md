@@ -9,7 +9,7 @@ Concepts the learner once held solidly fade unless they retrieve them. Recalling
 
 ## Start
 
-1. `start_session` with kind `review` and a goal like "Review what's fading". It also hands over answers they gave after the last session ended: judge and record them first. The result lists the fading concepts (`topic/concept`), least likely to be recalled first. If they named a topic (`/review differential-forms`), review only that topic's: `due_reviews` with `topic`. If nothing is fading, say so in one line, mention what comes due soon, and stop (or offer `/train` or a lesson).
+1. `start_session` with kind `review` and a goal like "Review what's fading". It also hands over answers they gave after the last session ended: judge and record them first. The result lists the fading concepts (`topic/concept`), least likely to be recalled first. If they named a topic (`/review differential-forms`), review only that topic's: `due_reviews` with `topic`. If they named one concept (`/review differential-forms/wedge-product`, from the concept's own page), review that one, and anything fading it rests on. If nothing is fading, say so in one line, mention what comes due soon, and stop (or offer `/train` or a lesson).
 2. Work through the list, worst-remembered first. A session doesn't have to clear it: they stop when they like.
 3. If you need a concept's context (its summary, prerequisites, notes), call `get_topic` for its topic.
 

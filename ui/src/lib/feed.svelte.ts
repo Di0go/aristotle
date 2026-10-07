@@ -20,6 +20,9 @@ import {
 /** How long the feed must be quiet after a change before pages refetch what the server works out from it. */
 const SETTLE_MS = 300;
 
+/** Longer than this with nothing happening, an open session is no longer going on (as long as quiz and ask wait). */
+const IDLE_MS = 15 * 60_000;
+
 class LiveFeed {
   session = $state<Session | null>(null);
   items = $state<PublicItem[]>([]);
@@ -66,6 +69,27 @@ class LiveFeed {
   pending = $derived(this.session?.endedAt ? null : (this.items.find((i) => isInteractive(i) && !i.answeredAt) ?? null));
   /** The topic of the lesson running right now, or null when none is. */
   liveSlug = $derived(this.session && !this.session.endedAt ? this.session.topicSlug : null);
+  /** When anything last happened in the current session: it started, a step was shown, a question answered. */
+  lastActivity = $derived(
+    this.session
+      ? Math.max(
+          Date.parse(this.session.startedAt),
+          ...this.items.flatMap((i) => [Date.parse(i.at), isInteractive(i) && i.answeredAt ? Date.parse(i.answeredAt) : 0]),
+        )
+      : 0,
+  );
+  /**
+   * A sitting is in progress: its session is open and something happened in it lately. A session nobody closed (Claude
+   * Code stopped mid-lesson, a question left unanswered for days) stays open on disk, but it is not going on.
+   */
+  get inProgress(): boolean {
+    return this.inProgressAt(Date.now());
+  }
+
+  /** inProgress at time `t` (a page with its own clock reads it as the clock ticks). */
+  inProgressAt(t: number): boolean {
+    return Boolean(this.session && !this.session.endedAt && t - this.lastActivity < IDLE_MS);
+  }
   currentTopic = $derived(this.session ? (this.topics[this.session.topicSlug] ?? null) : null);
   /** Roadmaps, most recently changed first. */
   roadmapList = $derived(Object.values(this.roadmaps ?? {}).sort((a, b) => b.updated.localeCompare(a.updated)));

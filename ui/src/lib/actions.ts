@@ -92,15 +92,17 @@ export const actions = {
   reviewMission(id: string) {
     go(`/praxis review ${id}`, `Use the praxis skill: review my debrief of the mission ${id}.`, 'Reviewing a mission', true);
   },
-  review(slug?: string) {
-    go(
-      slug ? `/review ${slug}` : '/review',
-      slug ? `Use the review skill to review what's fading in the topic ${slug}.` : "Use the review skill to review what's fading.",
-      'A review of what is fading',
-      false,
-      undefined,
-      'other',
-    );
+  /** A review: of everything fading, of one class's (`topic`), or of one concept (`topic/concept`). */
+  review(ref?: string) {
+    const [slug = '', id] = ref?.split('/') ?? [];
+    const topic = feed.topics[slug];
+    const label = id
+      ? `Reviewing ${topic?.concepts.find((c) => c.id === id)?.label ?? id}`
+      : slug
+        ? `Reviewing ${topic?.title ?? slug}`
+        : 'A review of what is fading';
+    const what = id ? `the concept ${ref}` : slug ? `what's fading in the topic ${slug}` : "what's fading";
+    go(ref ? `/review ${ref}` : '/review', `Use the review skill to review ${what}.`, label, false, undefined, 'other');
   },
 };
 
@@ -127,9 +129,10 @@ function pickUp() {
  */
 function go(command: string, initial: string, label: string, converse = false, topic?: string, kind: 'learn' | 'other' = 'learn') {
   // A new sitting starts from a clean context: the Claude Code in the drawer lives as long as the app, and would
-  // otherwise carry every earlier sitting into each call. Only when no session is open and Claude is idle at its
-  // prompt (not working, not asking something); conversations (a course, a mission) keep theirs.
-  const fresh = !converse && claude.running && !claude.busy && !claude.asking && (!feed.session || Boolean(feed.session.endedAt));
+  // otherwise carry every earlier sitting into each call. Only when no sitting is in progress (none open, or the open
+  // one idle for a while: one nobody closed stays open on disk for days) and Claude is idle at its prompt (not
+  // working, not asking something); conversations (a course, a mission) keep theirs.
+  const fresh = !converse && claude.running && !claude.busy && !claude.asking && !feed.inProgress;
   if (fresh) {
     claude.say('/clear');
     // Typed in after /clear has run, not into the same input box (the terminal types each message, then Enter).

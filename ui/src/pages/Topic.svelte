@@ -25,6 +25,17 @@
     selected = concept ?? null;
   });
 
+  /** The chosen concept's panel, under the map: further down than the screen on most windows. */
+  let panelBox = $state<HTMLElement | null>(null);
+  let shown: string | undefined;
+  // Arriving for one concept (from Home's reviews, search, a link), bring its panel into view, once per arrival;
+  // clicking around the map afterwards leaves the page where it is.
+  $effect(() => {
+    if (!concept || !panelBox || shown === concept) return;
+    shown = concept;
+    panelBox.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  });
+
   $effect(() => {
     missing = false;
     // Once loaded, the feed holds every topic, so one it doesn't have doesn't exist (yet).
@@ -96,7 +107,9 @@
           </div>
         </section>
         {#if chosen}
-          <ConceptPanel {topic} concept={chosen} onselect={(id) => select(id)} onclose={() => select(null)} />
+          <div bind:this={panelBox}>
+            <ConceptPanel {topic} concept={chosen} onselect={(id) => select(id)} onclose={() => select(null)} />
+          </div>
         {/if}
         <p class="muted updated">Last studied {ago(topic.updated)}{topic.training ? `, training level ${topic.training.level}/10` : ''}.</p>
       </div>

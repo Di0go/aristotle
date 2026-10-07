@@ -25,8 +25,13 @@
   const topics = $derived(Object.values(feed.topics));
   const courses = $derived(feed.roadmapList.filter((r) => r.status === 'active'));
   const drafts = $derived(feed.roadmapList.filter((r) => r.status === 'draft'));
-  /** The lesson running now, if any: its class and the step being taught. */
-  const teaching = $derived(feed.session?.kind === 'learn' && feed.liveSlug ? feed.session : null);
+  /** A sitting going on now (feed.svelte.ts inProgress), read again as the clock ticks. */
+  const inProgress = $derived(feed.inProgressAt(now));
+  /**
+   * The lesson running now, if any: its class and the step being taught. A session left open but idle for long is not
+   * running, unless a question in it is still waiting for him.
+   */
+  const teaching = $derived(feed.session?.kind === 'learn' && feed.liveSlug && (inProgress || feed.pending) ? feed.session : null);
   const teachingPage = $derived(teaching ? (classes.pages(teaching.topicSlug)?.at(-1) ?? null) : null);
   /** With nothing being taught: the class he studied last, still unfinished, to continue. */
   const lastClass = $derived(
@@ -176,11 +181,38 @@
           <span class="now-k">{feed.pending ? 'Your turn' : 'Being taught now'}</span>
           <span class="now-title">{where(teaching, teachingPage)}</span>
           <span class="muted"
-            >{feed.pending ? 'A question is waiting for your answer.' : 'Claude is teaching; follow along in the class.'}</span
+            >{feed.pending
+              ? inProgress
+                ? 'A question is waiting for your answer.'
+                : `A question has been waiting since ${ago(feed.pending.at)}; answering it picks the class up again.`
+              : 'Claude is teaching; follow along in the class.'}</span
           >
         </span>
         <span class="primary">{feed.pending ? 'Answer it' : 'Open the class'}</span>
       </a>
+      {#if !inProgress && fading}
+        <!-- A question left waiting since another day shouldn't hide what is fading. -->
+        <p class="now-also">
+          Or review the {fading}
+          {fading === 1 ? 'concept' : 'concepts'} fading first:
+          <button class="primary small" onclick={() => actions.review()}>Review now</button>
+        </p>
+      {/if}
+    {:else if fading}
+      <!-- Spaced review comes first: recalling a concept just as it fades is what makes it last. -->
+      <section class="now sheet">
+        <span class="now-text">
+          <span class="now-k">Time to review</span>
+          <span class="now-title">{fading} {fading === 1 ? 'concept is' : 'concepts are'} fading</span>
+          <span class="muted"
+            >Recall {fading === 1 ? 'it' : 'them'} now, just before {fading === 1 ? 'it slips' : 'they slip'}: a few questions you answer in
+            your own words.{#if lastClass}
+              Or <button class="link inline" onclick={() => actions.continueTopic(lastClass.slug)}>continue {lastClass.title}</button
+              >.{/if}</span
+          >
+        </span>
+        <button class="primary" onclick={() => actions.review()}>Review now</button>
+      </section>
     {:else if lastClass}
       <section class="now sheet">
         <span class="now-text">
@@ -257,7 +289,7 @@
             <p class="empty">Concepts come here once they're solid, to be recalled just before they fade.</p>
           {/each}
           {#if fading}
-            <button class="panel-foot link" onclick={() => actions.review()}>Review what's fading</button>
+            <button class="primary small panel-action" onclick={() => actions.review()}>Review {fading} fading</button>
           {/if}
         </section>
 
@@ -465,8 +497,24 @@
     color: var(--acc);
   }
 
-  button.panel-foot {
-    margin-top: 6px;
+  .panel-action {
+    align-self: flex-start;
+    margin-top: auto;
+  }
+
+  .now-also {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: -16px 0 28px;
+    padding: 0 20px;
+    font-size: 0.88rem;
+    color: var(--muted);
+  }
+
+  .now .link.inline {
+    padding: 0;
+    font: inherit;
   }
 
   .stats {
