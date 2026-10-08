@@ -24,12 +24,13 @@
 
   let { spec }: { spec: Spec } = $props();
 
-  // Layout, in viewBox units: labels on the left up to L, then the bars across RW; a ROW per lane below TOP.
+  // Layout, in viewBox units: the axis runs from L across RW; a ROW per lane below TOP, each with its label
+  // on a line of its own above the bar, so a long label never runs out of the figure.
   const VIEW_W = 560;
-  const L = 178;
-  const RW = 362;
-  const ROW = 40;
-  const TOP = 24;
+  const L = 16;
+  const RW = 528;
+  const ROW = 60;
+  const TOP = 28;
   /** Room under the lanes for the axis and its marks. */
   const FOOT = 46;
   /** The playhead takes this long to sweep the whole axis. */
@@ -146,29 +147,29 @@
       {@const b = pos(secs(lane.end))}
       {@const reached = Math.min(b, Math.max(a, head.current))}
       {@const active = head.current >= a}
-      <text class="lane" class:active x={L - 14} y={y + 15} text-anchor="end">{lane.label}</text>
-      <rect class="bar-bg" x={x(a)} y={y + 6} width={Math.max(4, (b - a) * RW)} height="12" rx="6" />
+      <text class="lane" class:active x={L} y={y + 12}>{lane.label}</text>
+      <rect class="bar-bg" x={x(a)} y={y + 20} width={Math.max(4, (b - a) * RW)} height="12" rx="6" />
       {#if active}<rect
           class="bar"
           class:alt={i % 2 === 1}
           x={x(a)}
-          y={y + 6}
+          y={y + 20}
           width={Math.max(4, (reached - a) * RW)}
           height="12"
           rx="6"
         />{/if}
       {#if lane.peak}
         {@const pk = pos(secs(lane.peak))}
-        <circle class="peak" class:on={head.current >= pk} cx={x(pk)} cy={y + 12} r="5" />
+        <circle class="peak" class:on={head.current >= pk} cx={x(pk)} cy={y + 26} r="5" />
       {/if}
       <!-- A lane in the right half has its note end where the bar ends, so the note stays inside the figure. -->
-      {#if lane.note && active}<text class="lane-note" x={a > 0.5 ? x(b) : x(a)} text-anchor={a > 0.5 ? 'end' : 'start'} y={y + 33}
+      {#if lane.note && active}<text class="lane-note" x={a > 0.5 ? x(b) : x(a)} text-anchor={a > 0.5 ? 'end' : 'start'} y={y + 46}
           >{lane.note}</text
         >{/if}
     {/each}
 
     <line class="head" x1={x(head.current)} y1={TOP - 10} x2={x(head.current)} y2={axisY} />
-    <text class="now" x={Math.min(x(head.current), L + RW - 30)} y={TOP - 12} text-anchor="middle">{human(now)}</text>
+    <text class="now" x={Math.max(L + 14, Math.min(x(head.current), L + RW - 30))} y={TOP - 12} text-anchor="middle">{human(now)}</text>
   </svg>
   <div class="kit-states">
     <button class="kit-play" onclick={() => (playing ? pause() : play())} aria-pressed={playing}
