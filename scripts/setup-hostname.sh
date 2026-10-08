@@ -57,7 +57,7 @@ fi
 # 1. Hosts entry (only if missing).
 if ! grep -qE '^[^#]*\saristotle\.test(\s|$)' /etc/hosts; then
   [[ -f /etc/hosts.bak-aristotle ]] || cp /etc/hosts /etc/hosts.bak-aristotle
-  printf '\n# Aristotle (~/Projects/Learn): reencaminhado para 127.0.0.1:4747\n127.0.0.82 aristotle.test\n' >> /etc/hosts
+  printf '\n# Aristotle (~/Projects/Aristotle): reencaminhado para 127.0.0.1:4747\n127.0.0.82 aristotle.test\n' >> /etc/hosts
   echo "Added aristotle.test to /etc/hosts"
 else
   echo "aristotle.test already in /etc/hosts"

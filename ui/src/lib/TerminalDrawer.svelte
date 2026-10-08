@@ -188,7 +188,7 @@
   <header class="drawer-head">
     <span class="drawer-title"><i class="run-dot" class:on={claude.running}></i>Terminal · Claude Code</span>
     <span class="muted drawer-state">
-      {#if !claude.connected}Connecting…{:else if claude.running}Running in ~/Projects/Learn{:else}Not running{/if}
+      {#if !claude.connected}Connecting…{:else if claude.running}Running in ~/Projects/Aristotle{:else}Not running{/if}
     </span>
     <div class="drawer-actions">
       {#if claude.connected && !claude.running}
