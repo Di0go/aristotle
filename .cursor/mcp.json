@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "aristotle": {
+      "command": "node",
+      "args": ["${workspaceFolder}/server/bridge.ts"]
+    }
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "aristotle": {
+      "type": "local",
+      "command": ["node", "server/bridge.ts"],
+      "enabled": true
+    }
+  },
+  "permission": {
+    "aristotle_*": "allow"
+  }
+}

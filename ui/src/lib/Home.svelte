@@ -3,7 +3,7 @@
   // and what needs him (reviews coming due, recent answers, words he looked up, missions). Lessons happen in their
   // class; the card only points there. Each panel is a short live list with its way onwards at the foot.
   import { actions } from './actions.ts';
-  import { claude } from './claude.svelte.ts';
+  import { tutor } from './tutor.svelte.ts';
   import { classes } from './classes.svelte.ts';
   import { feed, refetching } from './feed.svelte.ts';
   import { ago, dayKey, formatDay, onDay } from './format.ts';
@@ -118,10 +118,11 @@
     (all) => (sessions = all),
   );
 
-  // A lesson asked for while its class wasn't known (a new one): once it is live, go to the step being taught.
+  // A lesson asked for while its class wasn't known (a new one): once it is live, go to the step being taught. Not
+  // before its sitting has started (`starting` clears then): a sitting still going on from before is not it.
   $effect(() => {
     const href = classes.liveHref();
-    if (feed.follow !== '*' || !teaching || !href) return;
+    if (feed.follow !== '*' || feed.starting || !teaching || !href) return;
     feed.follow = null;
     location.hash = href;
   });
@@ -164,16 +165,18 @@
           <p class="now-k">Starting</p>
           <p class="now-title">{feed.starting.label}</p>
           <p class="muted">
-            {#if claude.asking}
-              Claude is asking something in the terminal before it can begin.
+            {#if tutor.asking}
+              {tutor.name} is asking something in the terminal before it can begin.
             {:else if waited > 40}
-              Still setting up ({waited} s). Claude may be reading your notes, or waiting in the terminal.
+              Still setting up ({waited} s). {tutor.name} may be reading your notes{tutor.mode === 'terminal'
+                ? ', or waiting in the terminal'
+                : ''}.
             {:else}
-              Claude is preparing it. You'll be taken to it as soon as it starts.
+              {tutor.name} is preparing it. You'll be taken to it as soon as it starts.
             {/if}
           </p>
         </div>
-        <button class={claude.asking ? 'primary' : 'ghost'} onclick={() => claude.toggle(true)}>Open the terminal</button>
+        <button class={tutor.asking ? 'primary' : 'ghost'} onclick={() => tutor.toggle(true)}>Open the terminal</button>
         <button class="link" onclick={() => (feed.starting = null)}>Dismiss</button>
       </section>
     {:else if teaching}
@@ -187,7 +190,7 @@
               ? inProgress
                 ? 'A question is waiting for your answer.'
                 : `A question has been waiting since ${ago(feed.pending.at)}; answering it picks the class up again.`
-              : 'Claude is teaching; follow along in the class.'}</span
+              : `${tutor.name} is teaching; follow along in the class.`}</span
           >
         </span>
         <span class="primary">{feed.pending ? 'Answer it' : 'Open the class'}</span>
@@ -213,7 +216,7 @@
                 ? 'A question is waiting for your answer.'
                 : `A question has been waiting since ${ago(feed.pending.at)}; answer it whenever you like.`
               : inProgress
-                ? 'Claude is on it.'
+                ? `${tutor.name} is on it.`
                 : `Left ${ago(new Date(feed.lastActivity).toISOString())}; pick it up whenever you like.`}</span
           >
         </span>
@@ -348,7 +351,7 @@
             </a>
           {:else}
             <p class="empty">
-              Every course ends with a mission that puts it to work in your own life. Claude designs it as soon as the last class is done.
+              Every course ends with a mission that puts it to work in your own life. {tutor.name} designs it as soon as the last class is done.
             </p>
           {/each}
           <a class="panel-foot" href={link.praxis()}>All missions</a>

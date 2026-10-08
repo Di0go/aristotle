@@ -1,4 +1,4 @@
-// Hash routing: #/, #/review, #/train/<slug>, #/progress, #/map, #/roadmaps, #/roadmaps/<slug>, #/lesson/<slug>, #/lesson/<slug>/<step>, #/topics, #/topics/<slug>?c=<concept>, #/log, #/log/<session>, #/praxis, #/praxis/<mission>, #/about.
+// Hash routing: #/, #/review, #/train/<slug>, #/progress, #/map, #/roadmaps, #/roadmaps/<slug>, #/lesson/<slug>, #/lesson/<slug>/<step>, #/topics, #/topics/<slug>?c=<concept>, #/log, #/log/<session>, #/praxis, #/praxis/<mission>, #/about, #/settings.
 
 export type Route =
   | { page: 'now' }
@@ -19,7 +19,9 @@ export type Route =
   | { page: 'session'; id: string }
   | { page: 'praxis' }
   | { page: 'mission'; id: string }
-  | { page: 'about' };
+  | { page: 'about' }
+  /** Who teaches: Claude Code, another agent, or a model API. */
+  | { page: 'settings' };
 
 class Router {
   route = $state<Route>(parse(location.hash));
@@ -54,6 +56,7 @@ export const link = {
   praxis: () => '#/praxis',
   mission: (id: string) => `#/praxis/${encodeURIComponent(id)}`,
   about: () => '#/about',
+  settings: () => '#/settings',
 };
 
 function parse(hash: string): Route {
@@ -74,6 +77,7 @@ function parse(hash: string): Route {
   if (parts[0] === 'train' && parts[1]) return { page: 'train', slug: parts[1] };
   if (parts[0] === 'progress') return { page: 'progress' };
   if (parts[0] === 'about') return { page: 'about' };
+  if (parts[0] === 'settings') return { page: 'settings' };
   if (parts[0] === 'map') return { page: 'map' };
   return { page: 'now' };
 }

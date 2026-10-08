@@ -15,7 +15,7 @@ export const ZONES: { name: string; code: RegExp; docs: string[] }[] = [
     code: /^(scripts\/|\.githooks\/|\.github\/|package\.json$|biome\.json$|vite\.config\.ts$|tsconfig\.json$|\.mcp\.json$|tests\/)/,
     docs: ['docs/development.md', 'CONTRIBUTING.md'],
   },
-  { name: 'teaching', code: /^\.claude\/(skills|agents)\//, docs: ['docs/teaching.md', 'CLAUDE.md'] },
+  { name: 'teaching', code: /^\.claude\/(skills|agents)\//, docs: ['docs/teaching.md', 'AGENTS.md', 'CLAUDE.md'] },
 ];
 
 /** The exception, written in a commit message: "Docs: none -- <why>". */

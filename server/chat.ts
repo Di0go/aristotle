@@ -1,8 +1,9 @@
-// The chat beside a lesson: he talks with Aristotle (a second Claude Code on his own login, beside the tutor) while
-// he reads, about anything. Each message carries what he is looking at, so it always knows where he is; it answers
-// at once even while a question waits for him, and never moves the lesson. One conversation per class (and one for
-// everywhere else), kept in data/chats/<thread>.jsonl (appended to, never rewritten) and continued as one Claude Code
-// session; the tutor reads it.
+// The chat beside a lesson: the learner talks with Aristotle (a second Claude Code on their own login, beside the
+// tutor, or the model API when Settings say so) while they read, about anything. Each message carries what they are
+// looking at, so it always knows where they are; it answers at once even while a question waits for them, and never
+// moves the lesson. One conversation per class (and one for everywhere else), kept in data/chats/<thread>.jsonl
+// (appended to, never rewritten) and continued as one Claude Code session, or sent with its recent messages to the
+// API; the tutor reads it.
 
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
@@ -10,7 +11,9 @@ import { EventEmitter } from 'node:events';
 import { readdir } from 'node:fs/promises';
 import path from 'node:path';
 import { CHATS_DIR, ONESHOT_CMD } from './config.ts';
-import { claudeCwd, claudeEnv, headlessArgs, limited } from './oneshot.ts';
+import { complete, type LlmMessage } from './llm.ts';
+import { claudeCwd, claudeEnv, headlessArgs, limited, useApi } from './oneshot.ts';
+import { settings } from './settings.ts';
 import { slugCandidates, slugify } from './slug.ts';
 import { AppendLog, endLastLine, isObject, loadJsonDir, readLog } from './store.ts';
 import type { ChatMessage, ChatThread } from '../shared/types.ts';
@@ -20,6 +23,8 @@ const TIMEOUT_MS = 180_000;
 const STOPPED = '\u0000stopped';
 const MAX_MESSAGE = 8000;
 const MAX_CONTEXT = 12_000;
+/** Messages of the chat so far sent with each new one to the model API (Claude Code keeps its own session). */
+const API_HISTORY = 20;
 
 const SYSTEM =
   'You are Aristotle, talking with a learner beside their lesson in the Aristotle app. A separate tutor runs the lesson; ' +
@@ -166,8 +171,44 @@ export class Chats {
     }
   }
 
+  /** Asks the model API, with the thread's recent messages, streaming each new piece of text to `onDelta`. */
+  private askApi(t: ChatThread, request: string, onDelta: (delta: string) => void): Promise<string> {
+    return limited(async () => {
+      const abort = new AbortController();
+      const run = { kill: () => abort.abort(), stopped: false };
+      this.running.set(t.thread, run);
+      let text = '';
+      try {
+        // The messages before his new one (already in the thread), without the context each was sent with.
+        const history: LlmMessage[] = t.messages
+          .slice(0, -1)
+          .slice(-API_HISTORY)
+          .map((m) => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.text }));
+        const answer = await complete(settings.helperEndpoint(), SYSTEM, request, {
+          signal: AbortSignal.any([abort.signal, AbortSignal.timeout(TIMEOUT_MS)]),
+          history,
+          onText: (piece) => {
+            text += piece;
+            onDelta(piece);
+          },
+        });
+        if (!answer) throw new ChatError('Aristotle gave an empty answer');
+        return answer;
+      } catch (err) {
+        if (run.stopped) return `${text.trim()}${STOPPED}`;
+        if (err instanceof ChatError) throw err;
+        throw new ChatError(
+          `Aristotle could not answer: ${(err as Error).name === 'TimeoutError' ? 'it took too long' : (err as Error).message}`,
+        );
+      } finally {
+        if (this.running.get(t.thread) === run) this.running.delete(t.thread);
+      }
+    });
+  }
+
   /** Runs Claude Code on the thread's session (resumed, or a new one), streaming each new piece of text to `onDelta`. */
   private ask(t: ChatThread, request: string, onDelta: (delta: string) => void): Promise<string> {
+    if (useApi()) return this.askApi(t, request, onDelta);
     const resume = Boolean(t.session);
     const session = t.session ?? randomUUID();
     // Always the same private folder (oneshot.ts claudeCwd), so a session can be resumed.

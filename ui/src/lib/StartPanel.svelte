@@ -1,7 +1,7 @@
 <script lang="ts">
   // Start a lesson on anything, without the terminal.
   import { actions } from './actions.ts';
-  import { claude } from './claude.svelte.ts';
+  import { tutor } from './tutor.svelte.ts';
   import { link } from './router.svelte.ts';
 
   let { onstarted }: { onstarted?: () => void } = $props();
@@ -41,7 +41,8 @@
     aria-label="What you want from it"></textarea>
   <div class="start-row">
     <span class="muted">
-      {claude.running ? 'Claude switches to it.' : 'Starts Claude here.'} For a whole field, <a href={link.roadmaps()}>plan a course</a> instead.
+      {tutor.running ? `${tutor.name} switches to it.` : `Starts ${tutor.name} here.`} For a whole field,
+      <a href={link.roadmaps()}>plan a course</a> instead.
     </span>
     <button class="primary" type="submit">Start the class</button>
   </div>

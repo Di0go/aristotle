@@ -5,7 +5,7 @@
   import { setContext, tick } from 'svelte';
   import { actions } from './actions.ts';
   import { asides } from './aside.svelte.ts';
-  import { claude } from './claude.svelte.ts';
+  import { tutor } from './tutor.svelte.ts';
   import { classes } from './classes.svelte.ts';
   import { placeFigures } from './explorables/index.ts';
   import { bench } from './bench.svelte.ts';
@@ -174,7 +174,7 @@
         {#if next}<a class="next" href={link.step(slug, next.number)}><span class="dir">Next</span>{name(next)}</a>
         {:else if !live}
           <button class="primary next-continue" onclick={() => actions.continueTopic(slug)}
-            >{feed.starting ? 'Claude is picking up the class…' : 'Continue the class'}</button
+            >{feed.starting ? `${tutor.name} is picking up the class…` : 'Continue the class'}</button
           >
         {/if}
       </nav>

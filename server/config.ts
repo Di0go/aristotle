@@ -26,6 +26,7 @@ export const GLOSSES_FILE = path.join(DATA_DIR, 'glosses.json');
 export const ASIDES_FILE = path.join(DATA_DIR, 'asides.json');
 export const NOTES_FILE = path.join(DATA_DIR, 'notes.json');
 export const ABOUT_FILE = path.join(DATA_DIR, 'about.md');
+export const PROFILE_FILE = path.join(DATA_DIR, 'profile.md');
 export const CHATS_DIR = path.join(DATA_DIR, 'chats');
 
 /** Where this install keeps what isn't learning: certificate, settings, pid files, log. Never in git. */
@@ -54,8 +55,11 @@ export const TLS_TRUSTED = TLS_ENABLED && existsSync(path.join(TLS_DIR, 'install
 /** The address to give the learner: the clean name when it is set up, else plain localhost. */
 export const URL_CLEAN = DEV ? `http://localhost:${PORT}` : `${TLS_TRUSTED ? 'https' : 'http'}://${HOSTNAME}`;
 
-/** This install's own choices, kept out of git: settings.json in the state directory (for example {"accent": "red"}). */
-const SETTINGS_FILE = process.env.ARISTOTLE_SETTINGS ?? path.join(STATE_DIR, 'settings.json');
+/**
+ * This install's own choices, kept out of git: settings.json in the state directory (for example {"accent": "red"}), and
+ * which tutor teaches (server/settings.ts).
+ */
+export const SETTINGS_FILE = process.env.ARISTOTLE_SETTINGS ?? path.join(STATE_DIR, 'settings.json');
 const settings = readSettings();
 /** The accent the interface starts with until a browser picks its own (blue when unset). */
 export const ACCENT = ['blue', 'red', 'violet', 'graphite'].includes(settings.accent ?? '') ? settings.accent : undefined;
@@ -99,6 +103,11 @@ export const CLAUDE_CMD = process.env.ARISTOTLE_CLAUDE_CMD ?? 'claude';
 
 /** The model for glosses and his questions on a passage (server/oneshot.ts): an alias Claude Code knows, on his own login. */
 export const ONESHOT_MODEL = process.env.ARISTOTLE_ONESHOT_MODEL ?? 'sonnet';
+/**
+ * A key for the model API (server/settings.ts), for anyone who would rather not keep it in settings.json; a key saved
+ * there comes first.
+ */
+export const API_KEY = process.env.ARISTOTLE_API_KEY || undefined;
 /** Wikimedia Commons' API, which find_images and glosses search; tests point it at a local stand-in. */
 export const COMMONS_API = process.env.ARISTOTLE_COMMONS_API ?? 'https://commons.wikimedia.org/w/api.php';
 /** Whether a gloss may carry a picture from Wikimedia Commons, when one would help (off in the tests: no network). */
@@ -113,6 +122,11 @@ export const ONESHOT_CMD = process.env.ARISTOTLE_ONESHOT_CMD;
 export const WAIT_MS = Number(process.env.ARISTOTLE_WAIT_MS ?? 15 * 60_000);
 /** The longest a quiz or ask waits however long he keeps working on it, so a page left open can't hold a call forever. */
 export const WAIT_CAP_MS = Number(process.env.ARISTOTLE_WAIT_CAP_MS ?? 3 * 60 * 60_000);
+/**
+ * How long one piece of a wait lasts for a client that ends tool calls after a minute whatever they report (Cursor's
+ * CLI, mcp.ts): the wait comes in pieces, each ending in "still waiting"; short in tests.
+ */
+export const WAIT_SLICE_MS = Number(process.env.ARISTOTLE_WAIT_SLICE_MS ?? 45_000);
 /** Interval of progress notifications while a tool waits, so the call doesn't look idle. */
 export const KEEPALIVE_MS = 15_000;
 

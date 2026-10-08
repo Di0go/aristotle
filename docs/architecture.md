@@ -1,24 +1,26 @@
 # Architecture
 
-Claude Code is the tutor; Aristotle is the classroom. The tutor decides what to teach and when; the app shows it, collects the answers, and keeps the record.
+An AI agent is the tutor; Aristotle is the classroom. The tutor decides what to teach and when; the app shows it, collects the answers, and keeps the record. The tutor is Claude Code unless Settings say otherwise: another agent CLI (Codex, Gemini CLI, opencode, or any MCP client from outside), or Aristotle's own tutor on a model behind an OpenAI-compatible API. Every one of them teaches through the same MCP tools and follows the same method.
 
 ```mermaid
 flowchart LR
-    CC["Claude Code<br/><i>skills: teach, review, train, roadmap, praxis</i>"] -- stdio --> B["server/bridge.ts"]
+    CC["Claude Code, Codex, Gemini CLI, opencode…<br/><i>skills: teach, review, train, roadmap, praxis</i>"] -- stdio --> B["server/bridge.ts"]
     B -- "MCP over HTTP (/mcp)" --> S["server/index.ts"]
+    API["Aristotle's own tutor<br/>server/tutor-api.ts"] -- "MCP, in process" --> S
+    API -- "Chat Completions / Responses" --> M[("a model API<br/>hosted or local")]
     S --> G["Gym<br/>feed · topics · roadmaps · missions"]
     G <--> D[("data/<br/>plain files")]
     S -- "SSE (/api/events)" --> UI["Interface<br/>Svelte 5"]
     UI -- "HTTP (/api/answer …)" --> S
-    S -- "pseudo-terminal over WebSocket" --> UI
+    S -- "the drawer over WebSocket:<br/>a terminal, or the API tutor's conversation" --> UI
 ```
 
 ## One lesson step, end to end
 
-1. A skill (say `teach`) calls the MCP tool `show` with Markdown. Claude Code talks stdio to [`bridge.ts`](../server/bridge.ts), which starts the server if needed and relays to `/mcp`.
+1. A skill (say `teach`) calls the MCP tool `show` with Markdown. An agent talks stdio to [`bridge.ts`](../server/bridge.ts), which starts the server if needed and relays to `/mcp`; the API tutor calls the same tools over an in-process MCP connection.
 2. [`mcp.ts`](../server/mcp.ts) validates the input (zod) and calls the [`Gym`](../server/gym.ts), which adds an item to the session's [`Feed`](../server/feed.ts). The feed appends it to the session log in `data/sessions/` and emits an event.
 3. The server streams the event over SSE (`/api/events`); [`feed.svelte.ts`](../ui/src/lib/feed.svelte.ts) puts it in reactive state, and the Now page renders it. The server pings every 20 seconds as a named event the page can see; a stream not heard from for 50 seconds, or one the browser has given up on, is opened again (which reloads the whole state), so a connection that died while the machine slept never leaves the page on a stale sitting.
-4. For `quiz` and `ask`, the tool call **waits** (sending progress notifications so it does not look idle) until the learner answers in the page (`POST /api/answer`). It gives up after `ARISTOTLE_WAIT_MS` with no sign of him: while a question is open and he is working on the page (it is showing and he has touched it in the last 5 minutes), the page says so every minute (`POST /api/presence`) and the wait goes on, up to `ARISTOTLE_WAIT_CAP_MS` in all. The answer is recorded as evidence on the concept's map, and returned to Claude as the tool's result. If he is away, the tool returns "No answer yet" and Claude collects it later with `collect_answers`.
+4. For `quiz` and `ask`, the tool call **waits** (sending progress notifications so it does not look idle) until the learner answers in the page (`POST /api/answer`). It gives up after `ARISTOTLE_WAIT_MS` with no sign of him: while a question is open and he is working on the page (it is showing and he has touched it in the last 5 minutes), the page says so every minute (`POST /api/presence`) and the wait goes on, up to `ARISTOTLE_WAIT_CAP_MS` in all. The answer is recorded as evidence on the concept's map, and returned to Claude as the tool's result. If he is away, the tool returns "No answer yet" and Claude collects it later with `collect_answers`. A client that ends a tool call after a minute whatever it reports (Cursor's CLI) waits in pieces (`ARISTOTLE_WAIT_SLICE_MS`): each ends in "still waiting" and the tutor calls `collect_answers` with `wait: true`, until the pieces add up to the same wait, counted from when the question was asked. Every other agent the drawer runs is given a tool timeout longer than the longest wait.
 5. `update_map` changes the topic's knowledge map ([`topics.ts`](../server/topics.ts)), which the interface draws; `record_practice` moves spaced-review cards ([`reviews.ts`](../server/reviews.ts), FSRS).
 
 Everything the learner sees is a projection of `data/`: restart the server and the same state comes back. The live feed sends one record per change (a `topic`, a `gloss`, an `aside`, a `note`, and their `…-removed`), never a whole list, and `warnings` when something is wrong with the data ([`warnings.ts`](../server/warnings.ts)).
@@ -27,11 +29,15 @@ Everything the learner sees is a projection of `data/`: restart the server and t
 
 A plain Node HTTP server, run directly as TypeScript (Node's type stripping: only erasable syntax, `.ts` in imports). No framework: routing is a list of `if`s in [`index.ts`](../server/index.ts). One process holds the state in memory and writes through to files.
 
-- **MCP** is stateless: a fresh `McpServer` per request on the Streamable HTTP transport, so restarting the server never strands Claude Code.
+- **MCP** is stateless: a fresh `McpServer` per request on the Streamable HTTP transport, so restarting the server never strands an agent. The bridge passes on the client's own name from `initialize` (`X-Aristotle-Agent`): Claude Code, which has the skills itself, is not offered `method` or the prompts; a client that ends tool calls after a minute whatever they report (Cursor's CLI) gets its waits in pieces (below).
 - **The interface** is the built `dist/ui`, served with long caching for hashed assets.
-- **The terminal**: [`terminal.ts`](../server/terminal.ts) runs `claude` in a pseudo-terminal (node-pty) in the app's folder and streams it over a WebSocket to the drawer. The interface starts it when Aristotle opens; messages sent before it has drawn its screen and gone quiet are held and typed in then.
-- **The chat beside a lesson**: [`chat.ts`](../server/chat.ts) keeps one conversation per class in `data/chats/<thread>.json` and continues it as one Claude Code session (`claude -p --resume`, locked down like the one-shot runner, from the same private folder). Each message is sent with fresh context (where he is, his screen, the class's map, his notes, About you); the answer streams as `chat-delta` events over the live feed (each carrying only the text added since the last), then a `chat` event. Clearing a chat while an answer is being written drops that answer. The tutor reads the class's chat in `get_topic`.
-- **Glosses and questions on a passage**: [`oneshot.ts`](../server/oneshot.ts) runs `claude -p` on his own login, headless and locked down: no tools, no MCP servers, no settings or hooks, no saved session, in a private folder outside any project (`ARISTOTLE_CLAUDE_CWD`, under `~/.cache/aristotle/`), so no project's `CLAUDE.md` is read into it and nobody else can leave one there. At most three of these (with chat answers) run at once. The request goes on stdin; what it prints is the answer. Sonnet by default (`ARISTOTLE_ONESHOT_MODEL`); five to fifteen seconds. [`glosses.ts`](../server/glosses.ts) explains a phrase (phrase, topic, passage); it is also handed up to five licence-checked pictures from Wikimedia Commons ([`images.ts`](../server/images.ts)), by title and description, and names one on a last `IMAGE: n` line only when the phrase is visual and a candidate clearly shows it (`ARISTOTLE_GLOSS_IMAGES=off` turns this off). [`asides.ts`](../server/asides.ts) answers his question on a passage, with the paragraph, the step's title and the topic.
+- **The drawer's tutor**: [`tutor.ts`](../server/tutor.ts) holds the drawer's WebSocket (`/api/terminal`, one protocol in [`shared/tutor.ts`](../shared/tutor.ts)) and whichever tutor Settings chose; when the choice changes, the old one stops and every drawer is told.
+  - **An agent CLI** ([`terminal.ts`](../server/terminal.ts)): the agent runs in a pseudo-terminal (node-pty) in the app's folder, its screen streamed to the drawer. [`agents.ts`](../server/agents.ts) knows how to drive each: Claude Code (`claude`, `--continue`, `/clear`, the skills as slash commands), Codex (`codex`, its MCP server, timeout and approval passed as `-c` flags, `resume --last`, `/new`), Gemini CLI (`gemini -i`, `-r latest`; `.gemini/settings.json` gives it the server, trusted, with a long timeout, and has it read AGENTS.md) and opencode (`--prompt`, `-c`; `opencode.json` gives it the server). An agent other than Claude Code is asked in words ("Use the teach skill to …") and reads the skill with `method`. The interface starts the agent when Aristotle opens; messages sent before it has drawn its screen and gone quiet are held and typed in then.
+  - **Aristotle's own tutor on a model API** ([`tutor-api.ts`](../server/tutor-api.ts)): what a CLI agent brings of its own, for a bare model. An in-process MCP client to the same tools; instructions made of the server's instructions, the rules every sitting keeps (AGENTS.md), how things work without Claude Code, and the list of skills, which it reads with `method`; a loop that runs each reply's tool calls in order and calls the model again until it answers without any (60 at most per message); `web_search` and `read_page` ([`web.ts`](../server/web.ts)) in place of the researcher subagent. A `quiz` or `ask` waits inside its tool call as it would for an agent, and no model call is made while the learner thinks. A message sent while it works is read at the next step; Stop ends the model call and any wait (the question stays open for `collect_answers`); a new sitting starts a new conversation. Images a tool returns go to a model that can see in a message of their own after the tool results; a model that can't is not offered `preview_svg` or `view_image`. The conversation is kept within the model's context (older tool results shortened, then the oldest exchanges dropped whole), saved in the state folder (`tutor-api.json`) so a restart picks it up, and shown in the drawer as it happens: what was asked, what it said (without a `<think>` block), and a line per tool call.
+  - **The model API** ([`llm.ts`](../server/llm.ts)): Chat Completions, streamed, with tools, as OpenRouter, Ollama, LM Studio, llama.cpp's server and vLLM speak it (tool calls whole or in pieces, by index or by id; reasoning as `reasoning`, `reasoning_content` or OpenRouter's `reasoning_details`, which go back with the turn), retried after a 429 or 5xx; OpenAI's own API through its Responses API (its newest models call tools only there), stateless, with the model's encrypted reasoning sent back as it came. No forced tool choice and no sampling settings, which several APIs refuse.
+- **Settings** ([`settings.ts`](../server/settings.ts)): which tutor, which model API (provider, address, key, model, a smaller model for the helpers, whether it can see images), and what writes glosses and chat answers, in `settings.json` in the state folder, readable by this user only. The interface reads and changes them (`/api/settings`), and lists a provider's models (`/api/settings/models`, which also tells the tutor each model's context window).
+- **The chat beside a lesson**: [`chat.ts`](../server/chat.ts) keeps one conversation per class in `data/chats/<thread>.json` and continues it as one Claude Code session (`claude -p --resume`, locked down like the one-shot runner, from the same private folder), or, when Settings give the helpers to the model API, sends its last 20 messages with each new one. Each message is sent with fresh context (where he is, his screen, the class's map, his notes, About you); the answer streams as `chat-delta` events over the live feed (each carrying only the text added since the last), then a `chat` event. Clearing a chat while an answer is being written drops that answer. The tutor reads the class's chat in `get_topic`.
+- **Glosses and questions on a passage**: [`oneshot.ts`](../server/oneshot.ts) runs `claude -p` on his own login, headless and locked down: no tools, no MCP servers, no settings or hooks, no saved session, in a private folder outside any project (`ARISTOTLE_CLAUDE_CWD`, under `~/.cache/aristotle/`), so no project's `CLAUDE.md` is read into it and nobody else can leave one there. At most three of these (with chat answers) run at once. The request goes on stdin; what it prints is the answer. Sonnet by default (`ARISTOTLE_ONESHOT_MODEL`); five to fifteen seconds. [`glosses.ts`](../server/glosses.ts) explains a phrase (phrase, topic, passage); it is also handed up to five licence-checked pictures from Wikimedia Commons ([`images.ts`](../server/images.ts)), by title and description, and names one on a last `IMAGE: n` line only when the phrase is visual and a candidate clearly shows it (`ARISTOTLE_GLOSS_IMAGES=off` turns this off). [`asides.ts`](../server/asides.ts) answers his question on a passage, with the paragraph, the step's title and the topic. When Settings give the helpers to the model API, both go there instead (the helper model, else the tutor's), at most three at once all the same.
 - **History**: each session log is read once and kept as what it yields (its summary for the lists, its map changes for Progress, its search documents with their text folded for matching), until Feed appends to it; the server is the only writer, so nothing asks the disk whether a log changed. The index fills in the background after the server starts, a few logs at a time.
 - **Stores**: each kind of record has a store in memory that writes through to its files with [`store.ts`](../server/store.ts) (atomic, one write at a time per file, carrying on after a failure) and sets aside a file it can't read rather than failing to start. On SIGTERM the server stops taking requests and waits (up to three seconds) for the stores to finish writing before it exits.
 - **Backup**: [`backup.ts`](../server/backup.ts) commits `data/` (its own Git repository) after quiet periods and pushes if it has a remote; when that keeps failing, the interface shows it.
@@ -47,19 +53,21 @@ The server is for one person on one machine, but a browser runs other people's p
 - the **terminal WebSocket** runs Claude Code, so it demands an Origin, and an allowed one, always; at most eight drawers connect at once, with a 1 MB frame limit, and a malformed frame closes only that socket;
 - every answer carries a **Content-Security-Policy** (only the app's own scripts, connections to this server only, images from here and Wikimedia only, no forms) and `frame-ancestors 'none'` with `X-Frame-Options: DENY`, so no other page can frame the drawer and click in it;
 - **glossing and questions on a passage** run Claude Code too, but with no tools at all, so what they are sent can only shape the text it prints back;
-- the certificate authority for `aristotle.test` is limited to that name (`nameConstraints`), so trusting it cannot vouch for anything else.
+- the certificate authority for `aristotle.test` is limited to that name (`nameConstraints`), so trusting it cannot vouch for anything else;
+- **settings** are changed only through those same checks; the API key goes in and only ever comes back masked, and `settings.json` is written readable by this user only; the command an agent runs as is one of the known agents, never something the interface sends (a command of one's own is set by hand in the file);
+- **the API tutor's `read_page`** fetches public addresses only: every hop of a redirect is checked, and a name that resolves to this machine or the local network is refused, so a page can't steer the tutor into Aristotle's own API or a router. What it reads, like Commons' titles, is framed to the model as data, never instructions.
 
 ## The interface
 
 Svelte 5 (runes) built by Vite, no router library and no UI kit.
 
-- **State** lives in a few rune modules: [`feed.svelte.ts`](../ui/src/lib/feed.svelte.ts) (the live session, topics, roadmaps, missions, kept current over SSE), [`router.svelte.ts`](../ui/src/lib/router.svelte.ts) (hash routes), [`tabs.svelte.ts`](../ui/src/lib/tabs.svelte.ts), [`theme.svelte.ts`](../ui/src/lib/theme.svelte.ts), [`claude.svelte.ts`](../ui/src/lib/claude.svelte.ts) (the terminal).
+- **State** lives in a few rune modules: [`feed.svelte.ts`](../ui/src/lib/feed.svelte.ts) (the live session, topics, roadmaps, missions, kept current over SSE), [`router.svelte.ts`](../ui/src/lib/router.svelte.ts) (hash routes), [`tabs.svelte.ts`](../ui/src/lib/tabs.svelte.ts), [`theme.svelte.ts`](../ui/src/lib/theme.svelte.ts), [`tutor.svelte.ts`](../ui/src/lib/tutor.svelte.ts) (the tutor's connection: its terminal or its conversation).
 - **Pages** load on first visit ([`App.svelte`](../ui/src/App.svelte)), except Now, which is always ready.
 - **Lessons** are Markdown rendered by [`markdown.ts`](../ui/src/lib/markdown.ts) (marked + KaTeX + DOMPurify) and brought to life by [`Markdown.svelte`](../ui/src/lib/Markdown.svelte): mermaid, sequences, explorables and the visual kit mount into fenced blocks. See [interface.md](interface.md).
 
-## Claude Code's side
+## The method
 
-The method is in `.claude/`: skills Claude follows and subagents it calls. See [teaching.md](teaching.md).
+The method is in `.claude/`: the skills a tutor follows and the subagents Claude Code calls. Claude Code loads them itself; every other tutor reads them through the MCP tool `method` (and, in clients that offer them, the MCP prompts), from [`method.ts`](../server/method.ts). See [teaching.md](teaching.md).
 
 <!-- generated: skills -->
 | Kind | Name | What it is for |
@@ -81,6 +89,7 @@ The method is in `.claude/`: skills Claude follows and subagents it calls. See [
 | `list_topics` | List every topic the learner has studied, with how much of each map is solid and where the last session left off. |
 | `get_topic` | Read a topic's knowledge map (every concept, its status, prerequisites, notes and check record), the last handoff, recent sessions, and the phrases they asked Aristotle to explain and the questions they asked on passages while reading it. |
 | `read_about` | Read what the learner wrote about themselves on Aristotle's About you page: what they do, their projects, their sport or work, what they want. |
+| `profile` | Read your notes on how the learner learns (their profile), or replace them by passing `markdown`. |
 | `list_roadmaps` | List the learner's roadmaps: ordered paths of topics planned with them, with how far along each one is. |
 | `get_roadmap` | Read a roadmap: its goal, and every step in order with its goal, why it comes there, and the state of the step's topic. |
 | `save_roadmap` | Create a roadmap, or replace the steps of an existing one (pass its slug as `roadmap`): reordering, adding and dropping steps all go through here. |
@@ -99,11 +108,12 @@ The method is in `.claude/`: skills Claude follows and subagents it calls. See [
 | `find_images` | Search Wikimedia Commons for real images (anatomical plates, photos, diagrams) and return only files whose licence allows reuse: public domain, CC0, CC BY, CC BY-SA. |
 | `view_image` | Look at an image from find_images, with a grid of 10% lines drawn over it (labelled 10 to 90 along the top and left edges). |
 | `end_session` | Close the session with a handoff for next time: what locked in, what is still shaky, and the next step. |
+| `method` | How to teach in Aristotle. |
 <!-- /generated -->
 
 ## HTTP API
 
-Only for the interface (and the tests); Claude Code uses MCP.
+Only for the interface (and the tests); tutors use MCP.
 
 <!-- generated: routes -->
 | Method | Route |
@@ -133,6 +143,9 @@ Only for the interface (and the tests); Claude Code uses MCP.
 | `GET` | `/api/chats/…` |
 | `DELETE` | `/api/chats/…` |
 | `POST` | `/api/chats/…` |
+| `GET` | `/api/settings` |
+| `PUT` | `/api/settings` |
+| `GET` | `/api/settings/models` |
 | `GET` | `/api/sessions` |
 | `GET` | `/api/sessions/…` |
 | `GET` | `/api/progress` |
@@ -150,10 +163,11 @@ Only for the interface (and the tests); Claude Code uses MCP.
 
 | File | What it is |
 |---|---|
+| [`agents.ts`](../server/agents.ts) | The agent CLIs the terminal drawer can run as the tutor, and how to drive each: its command, how to start it with a first message or carry on its last conversation, how it starts over, and how it reaches Aristotle's tools. |
 | [`asides.ts`](../server/asides.ts) | His questions on a passage ("Ask about this"): asked beside a step, answered by Claude Code on his own login (oneshot.ts) without interrupting the class, and kept with the step. |
 | [`backup.ts`](../server/backup.ts) | Versions data/ in its own Git repository, kept apart from the code so his learning history never lands in the app's repo. |
 | [`bridge.ts`](../server/bridge.ts) | Claude Code starts this over stdio (see .mcp.json). |
-| [`chat.ts`](../server/chat.ts) | The chat beside a lesson: he talks with Aristotle (a second Claude Code on his own login, beside the tutor) while he reads, about anything. |
+| [`chat.ts`](../server/chat.ts) | The chat beside a lesson: the learner talks with Aristotle (a second Claude Code on their own login, beside the tutor, or the model API when Settings say so) while they read, about anything. |
 | [`config.ts`](../server/config.ts) | Every setting the server reads, in one place. |
 | [`control.ts`](../server/control.ts) | Start, stop and check the Aristotle server. |
 | [`feed.ts`](../server/feed.ts) | The live session: what the interface shows under "Now", and the session log on disk. |
@@ -161,24 +175,31 @@ Only for the interface (and the tests); Claude Code uses MCP.
 | [`gym.ts`](../server/gym.ts) | Ties the live feed to the knowledge maps: answers become evidence on concepts, map changes show up in the feed, practice moves review schedules and training levels, and data/ is backed up. |
 | [`images.ts`](../server/images.ts) | Real images for lessons, from Wikimedia Commons, with their licences checked before Claude may use them. |
 | [`index.ts`](../server/index.ts) | The Aristotle server: the interface, its live feed, and the MCP endpoint Claude Code connects to. |
-| [`mcp.ts`](../server/mcp.ts) | The tools Claude Code uses to teach through the interface: one MCP server per request (server/index.ts), over the stores in Gym; the tools themselves are defined once. |
+| [`llm.ts`](../server/llm.ts) | Talking to a model behind an OpenAI-compatible API: Chat Completions, streamed, with tools. |
+| [`mcp.ts`](../server/mcp.ts) | The tools a tutor uses to teach through the interface: one MCP server per request (server/index.ts), over the stores in Gym; the tools themselves are defined once. |
+| [`method.ts`](../server/method.ts) | The method, for every tutor: the skills (.claude/skills/<name>/SKILL.md) and the helpers' instructions (.claude/agents/<name>.md), and the rules every sitting keeps (the "When teaching" part of AGENTS.md). |
 | [`missions.ts`](../server/missions.ts) | Praxis missions: one JSON file per mission in data/missions/. |
-| [`notes.ts`](../server/notes.ts) | His own words: a notebook per step (what he writes in the panel beside a step, kept with that step) in data/notes.json, and his About you page (what he does, his projects, what he wants) in data/about.md. |
-| [`oneshot.ts`](../server/oneshot.ts) | One question to Claude Code, answered in a few seconds and forgotten: `claude -p` on his own login, headless and locked down (no tools, no MCP servers, no settings or hooks, no saved session, run from a private folder outside any project). |
+| [`notes.ts`](../server/notes.ts) | The learner's own words: a notebook per step (what they write in the panel beside a step, kept with that step) in data/notes.json, and their About you page (what they do, their projects, what they want) in data/about.md. |
+| [`oneshot.ts`](../server/oneshot.ts) | One question, answered in a few seconds and forgotten: by Claude Code (`claude -p` on the learner's own login, headless and locked down: no tools, no MCP servers, no settings or hooks, no saved session, run from a private folder outside any project), or by the model API when Settings say so (settings.ts helpers; llm.ts). |
 | [`peer.ts`](../server/peer.ts) | Which local user is at the other end of a loopback connection, read from the kernel's socket tables (/proc/net/tcp and tcp6, Linux). |
 | [`reviews.ts`](../server/reviews.ts) | Spaced review of concepts with FSRS: every solid concept carries a review card; when its due date passes, the concept is "fading" until he practises it again. |
 | [`roadmaps.ts`](../server/roadmaps.ts) | Roadmaps: one JSON file per roadmap in data/roadmaps/. |
 | [`search.ts`](../server/search.ts) | Search across everything he has: roadmaps and their steps, topics and their concepts, Praxis missions, and the text of every session (steps, questions and his answers). |
+| [`settings.ts`](../server/settings.ts) | Who teaches, as this install chose: Claude Code (the default), another agent CLI in the terminal drawer, or Aristotle's own tutor on a model behind an OpenAI-compatible API (OpenAI, OpenRouter, Ollama, LM Studio, llama.cpp…), and what writes glosses and chat answers. |
 | [`slug.ts`](../server/slug.ts) | Turns titles into the stable kebab-case ids used for topics, roadmaps, missions, glosses, chats and file names. |
 | [`store.ts`](../server/store.ts) | How the stores read and write their files in data/. |
-| [`terminal.ts`](../server/terminal.ts) | Claude Code inside Aristotle: one interactive `claude` running in a pseudo-terminal, streamed to the interface over a WebSocket. |
+| [`terminal.ts`](../server/terminal.ts) | An agent CLI inside Aristotle: one interactive Claude Code (or Codex, Gemini CLI, opencode: agents.ts) running in a pseudo-terminal, its screen streamed to the drawer (tutor.ts). |
 | [`topics.ts`](../server/topics.ts) | Knowledge maps: one JSON file per topic in data/topics/. |
+| [`tutor-api.ts`](../server/tutor-api.ts) | Aristotle's own tutor, on a model behind an OpenAI-compatible API (llm.ts), for anyone who would rather teach with another model than Claude, a local one included. |
+| [`tutor.ts`](../server/tutor.ts) | The tutor in Aristotle's drawer, whichever it is (Settings, settings.ts): an agent CLI in a pseudo-terminal (terminal.ts: Claude Code by default, or Codex, Gemini CLI, opencode) or Aristotle's own tutor on a model API (tutor-api.ts). |
 | [`warnings.ts`](../server/warnings.ts) | What the learner should know is wrong with their data: a backup that keeps failing, a file set aside as unreadable. |
+| [`web.ts`](../server/web.ts) | The web, for Aristotle's own tutor on a model API (tutor-api.ts), which has no search of its own: `web_search` (DuckDuckGo's plain HTML results, or Wikipedia's search when that fails) and `read_page` (a page as plain text). |
 
 #### Shared types (`shared/`)
 
 | File | What it is |
 |---|---|
+| [`tutor.ts`](../shared/tutor.ts) | Who teaches, as the server and the interface both see it: the engines a tutor runs on (Claude Code or another agent CLI in the terminal drawer, or a model behind an OpenAI-compatible API), the API providers with their usual addresses, the settings the interface reads and changes (GET/PUT /api/settings), and what the drawer's WebSocket carries (server/tutor.ts). |
 | [`types.ts`](../shared/types.ts) | Types shared by the server and the interface: the records kept in data/ and what the API sends and accepts. |
 
 #### Interface entry (`ui/src/`)
@@ -205,6 +226,7 @@ Only for the interface (and the tests); Claude Code uses MCP.
 | [`Roadmap.svelte`](../ui/src/pages/Roadmap.svelte) | One course (a roadmap, in the data) as a route: its classes in order down a line, each with its goal, why it sits there, and its progress. |
 | [`Roadmaps.svelte`](../ui/src/pages/Roadmaps.svelte) | The library: what you have, at a glance. |
 | [`SessionView.svelte`](../ui/src/pages/SessionView.svelte) | One past session, read back in full: every step, check and answer, and its handoff. |
+| [`Settings.svelte`](../ui/src/pages/Settings.svelte) | Settings (#/settings): who teaches. |
 | [`Step.svelte`](../ui/src/pages/Step.svelte) | One page of a class, as linked from the library tree and from Previous / Next: #/lesson/<slug>/<number>. |
 | [`Topic.svelte`](../ui/src/pages/Topic.svelte) | A class's concepts: what it teaches, as an outline and a graph, with the panel for one concept. |
 
@@ -217,7 +239,7 @@ Only for the interface (and the tests); Claude Code uses MCP.
 | [`Block.svelte`](../ui/src/lib/Block.svelte) | One piece of teaching from `show` (orientation, step, plan, summary, feedback or note), labelled and rendered. |
 | [`ChatPanel.svelte`](../ui/src/lib/ChatPanel.svelte) | The chat beside a lesson: talk with Aristotle about anything while reading. |
 | [`ClassPage.svelte`](../ui/src/lib/ClassPage.svelte) | One page of a class: the intro, or one step with its checks and the feedback on his answers, with Previous and Next. |
-| [`Composer.svelte`](../ui/src/lib/Composer.svelte) | Talk to Claude from Aristotle: types the message into the Claude Code running in the drawer. |
+| [`Composer.svelte`](../ui/src/lib/Composer.svelte) | Talk to the tutor from Aristotle: the message goes to the agent running in the drawer (typed in), or to the API tutor. |
 | [`ConceptNode.svelte`](../ui/src/lib/ConceptNode.svelte) | One concept on a map: status by fill and outline, goal by an inner ring, focus by a halo. |
 | [`ConceptPanel.svelte`](../ui/src/lib/ConceptPanel.svelte) | The side panel for one concept on a map: status, what it rests on and leads to, notes, and its check record; a fading one can be reviewed from here. |
 | [`ContextMenu.svelte`](../ui/src/lib/ContextMenu.svelte) | The menu on right-clicking selected text: copy it, search for it in Aristotle, gloss it (Claude Code explains it in a hover card, which then shows wherever the phrase appears), or ask a question about it (answered beside the step, kept with it). |
@@ -235,7 +257,7 @@ Only for the interface (and the tests); Claude Code uses MCP.
 | [`Markdown.svelte`](../ui/src/lib/Markdown.svelte) | Renders lesson Markdown and brings it to life: mermaid diagrams, sequences, explorables and the visual kit's figures. |
 | [`Quiz.svelte`](../ui/src/lib/Quiz.svelte) | A graded multiple-choice check: options, "I don't know", a note per question, and right or wrong once answered. |
 | [`ReviewPanel.svelte`](../ui/src/lib/ReviewPanel.svelte) | During a review session: what has been practised so far, and what is still fading. |
-| [`Ribbon.svelte`](../ui/src/lib/Ribbon.svelte) | The thin strip on the far left: the main places, Claude, and the look settings. |
+| [`Ribbon.svelte`](../ui/src/lib/Ribbon.svelte) | The thin strip on the far left: the main places, then Settings (who teaches), focus and the look. |
 | [`Search.svelte`](../ui/src/lib/Search.svelte) | The search palette: everything he has (roadmaps, steps, topics, concepts, missions, and what was said in every session), searched on the server as he types. |
 | [`Sequence.svelte`](../ui/src/lib/Sequence.svelte) | A process he steps through, one frame at a time: written as a ```sequence block, frames split by "---". |
 | [`Sidebar.svelte`](../ui/src/lib/Sidebar.svelte) | The library pane: courses as folders, their classes inside, and in each class its pages: the intro and every step taught, with how its checks went. |
@@ -243,13 +265,14 @@ Only for the interface (and the tests); Claude Code uses MCP.
 | [`StatusBar.svelte`](../ui/src/lib/StatusBar.svelte) | A thin bar of solid, shaky and not-yet counts (and fading), with an optional legend. |
 | [`StatusLine.svelte`](../ui/src/lib/StatusLine.svelte) | The small bar along the bottom: what's going on, in a few words. |
 | [`TabBar.svelte`](../ui/src/lib/TabBar.svelte) | The open pages, as tabs above the page. |
-| [`TerminalDrawer.svelte`](../ui/src/lib/TerminalDrawer.svelte) | Claude Code's terminal, docked at the bottom of every page. |
-| [`actions.ts`](../ui/src/lib/actions.ts) | Starting things from the interface: each action asks the Claude Code running in Aristotle to run a skill. |
+| [`TerminalDrawer.svelte`](../ui/src/lib/TerminalDrawer.svelte) | The tutor's drawer, docked at the bottom of every page: an agent's terminal (TerminalView), or the API tutor's conversation (TutorConversation), with what runs there and the controls that go with it. |
+| [`TerminalView.svelte`](../ui/src/lib/TerminalView.svelte) | An agent's terminal inside the drawer (Claude Code, or Codex, Gemini CLI, opencode): xterm.js, loaded on first open. |
+| [`TutorConversation.svelte`](../ui/src/lib/TutorConversation.svelte) | The API tutor's side of the drawer: its conversation (what was asked of it, what it said, a line per tool it called) and a box to talk to it. |
+| [`actions.ts`](../ui/src/lib/actions.ts) | Starting things from the interface: each action asks the tutor running in Aristotle to run a skill. |
 | [`aside.svelte.ts`](../ui/src/lib/aside.svelte.ts) | "Ask about this": a question on a passage he selected, asked in a small panel by the passage and answered by Claude Code beside the step, without interrupting the class. |
 | [`automatic.svelte.ts`](../ui/src/lib/automatic.svelte.ts) | What Aristotle does on its own, from what he does, so he never presses a button for the app's housekeeping. |
 | [`bench.svelte.ts`](../ui/src/lib/bench.svelte.ts) | The panel beside a step: whether it is folded away (so the step gets the whole width), and which of its tabs is open, This step or Chat. |
 | [`classes.svelte.ts`](../ui/src/lib/classes.svelte.ts) | Each topic's class as pages (steps.ts), for the library tree, the class page and its step pages: past sessions loaded on first use and kept, the session running now read from the live feed as it grows. |
-| [`claude.svelte.ts`](../ui/src/lib/claude.svelte.ts) | The connection to Claude Code running inside Aristotle (server/terminal.ts). |
 | [`feed.svelte.ts`](../ui/src/lib/feed.svelte.ts) | Live copy of the server's state, kept current over Server-Sent Events. |
 | [`focus.svelte.ts`](../ui/src/lib/focus.svelte.ts) | Focus mode: everything but the page hides (ribbon, library, tabs, status line, the bench beside a lesson), for reading and answering with nothing else in view. |
 | [`format.ts`](../ui/src/lib/format.ts) | Dates, times, durations and plurals, written the way the interface shows them. |
@@ -258,12 +281,13 @@ Only for the interface (and the tests); Claude Code uses MCP.
 | [`library.ts`](../ui/src/lib/library.ts) | The hierarchy everything hangs on: roadmaps hold steps, a step is a topic, a topic holds concepts. |
 | [`markdown.ts`](../ui/src/lib/markdown.ts) | Markdown with LaTeX maths, sanitised. |
 | [`maths.svelte.ts`](../ui/src/lib/maths.svelte.ts) | KaTeX, loaded just after the first paint (or when first needed, if sooner) instead of on the startup path. |
-| [`router.svelte.ts`](../ui/src/lib/router.svelte.ts) | Hash routing: #/, #/review, #/train/<slug>, #/progress, #/map, #/roadmaps, #/roadmaps/<slug>, #/lesson/<slug>, #/lesson/<slug>/<step>, #/topics, #/topics/<slug>?c=<concept>, #/log, #/log/<session>, #/praxis, #/praxis/<mission>, #/about. |
+| [`router.svelte.ts`](../ui/src/lib/router.svelte.ts) | Hash routing: #/, #/review, #/train/<slug>, #/progress, #/map, #/roadmaps, #/roadmaps/<slug>, #/lesson/<slug>, #/lesson/<slug>/<step>, #/topics, #/topics/<slug>?c=<concept>, #/log, #/log/<session>, #/praxis, #/praxis/<mission>, #/about, #/settings. |
 | [`search.svelte.ts`](../ui/src/lib/search.svelte.ts) | Whether the search palette is open: Ctrl+K or / anywhere, the ribbon's search button, or "Search" on selected text. |
 | [`steps.ts`](../ui/src/lib/steps.ts) | A class as he reads it: one page per step, in order, whatever sitting each was taught in. |
 | [`storage.ts`](../ui/src/lib/storage.ts) | Browser storage helpers: moving a setting saved under the app's old name (Mind Gym) to its new key. |
 | [`tabs.svelte.ts`](../ui/src/lib/tabs.svelte.ts) | Open pages, as tabs. |
 | [`theme.svelte.ts`](../ui/src/lib/theme.svelte.ts) | Look settings: light or dark, and one accent. |
+| [`tutor.svelte.ts`](../ui/src/lib/tutor.svelte.ts) | The connection to the tutor running inside Aristotle (server/tutor.ts): an agent CLI in a terminal (Claude Code by default, or Codex, Gemini CLI, opencode), or Aristotle's own tutor on a model API, whose conversation the drawer shows instead. |
 | [`visible.ts`](../ui/src/lib/visible.ts) | Tells animations when they can be seen: in or near the viewport, with the tab showing. |
 
 #### Visual kit (`ui/src/lib/kit/`)
@@ -326,5 +350,6 @@ Only for the interface (and the tests); Claude Code uses MCP.
 | [`backup.test.ts`](../tests/backup.test.ts) | The backup (server/backup.ts) against a throwaway data repository: it commits what changed with a message naming it, pushes when there is a remote, and when that keeps failing the interface is told (warnings.ts). |
 | [`docs.test.ts`](../tests/docs.test.ts) | The docs stay true: every doc is in the index, every link resolves, every command and setting is documented, and code that changed since the last release came with a change to the docs that describe it. |
 | [`mcp.test.ts`](../tests/mcp.test.ts) | End-to-end: a real server, a real MCP client in Claude Code's place, and HTTP calls in the interface's place. |
+| [`tutor.test.ts`](../tests/tutor.test.ts) | End-to-end: the tutor on a model API, and the method for any agent. |
 | [`unit.test.ts`](../tests/unit.test.ts) | Unit tests for the pure pieces the end-to-end tests only reach indirectly: slugs (old ids must keep working), the write queue that carries on after a failure, the append log that retries, the lean map, and the socket table. |
 <!-- /generated -->

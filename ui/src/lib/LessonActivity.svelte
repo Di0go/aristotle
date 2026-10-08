@@ -3,19 +3,19 @@
   //   working        Claude is preparing the next step (a placeholder where it will appear)
   //   your turn      a question is waiting above (nothing to add here)
   //   waiting        Claude has finished and is waiting on him: what it said, and where to answer
-  import { claude } from './claude.svelte.ts';
+  import { tutor } from './tutor.svelte.ts';
   import { feed } from './feed.svelte.ts';
 
   let now = $state(Date.now());
 
-  const secs = $derived(claude.busy ? Math.max(0, Math.round((now - claude.busySince) / 1000)) : 0);
-  const phase = $derived(feed.pending ? 'turn' : claude.busy ? 'working' : claude.running ? 'waiting' : 'off');
+  const secs = $derived(tutor.busy ? Math.max(0, Math.round((now - tutor.busySince) / 1000)) : 0);
+  const phase = $derived(feed.pending ? 'turn' : tutor.busy ? 'working' : tutor.running ? 'waiting' : 'off');
   /** " (pondering), 12 s": Claude Code's own word for it, and the seconds once there are a few. */
-  const detail = $derived(`${claude.doing ? ` (${claude.doing.replace('…', '').toLowerCase()})` : ''}${secs >= 3 ? `, ${secs} s` : ''}`);
+  const detail = $derived(`${tutor.doing ? ` (${tutor.doing.replace('…', '').toLowerCase()})` : ''}${secs >= 3 ? `, ${secs} s` : ''}`);
 
   // The clock only ticks while there is something to time.
   $effect(() => {
-    if (!claude.busy) return;
+    if (!tutor.busy) return;
     const t = setInterval(() => (now = Date.now()), 1000);
     return () => clearInterval(t);
   });
@@ -30,15 +30,15 @@
     </div>
     <p class="act-line">
       <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>
-      Claude is preparing the next step{detail}.
+      {tutor.name} is preparing the next step{detail}.
       {#if secs > 45}<span class="muted"> Longer steps can take a minute, especially with a figure.</span>{/if}
     </p>
   </div>
 {:else if phase === 'waiting' && feed.items.length}
   <div class="activity waiting" aria-live="polite">
-    <p class="act-line"><span class="idle" aria-hidden="true"></span>Claude is waiting for you.</p>
-    {#if claude.lastSaid}<blockquote class="said">{claude.lastSaid}</blockquote>{/if}
-    <p class="act-hint muted">Answer in the box below{claude.asking ? ', or open the terminal: it is asking something there' : ''}.</p>
+    <p class="act-line"><span class="idle" aria-hidden="true"></span>{tutor.name} is waiting for you.</p>
+    {#if tutor.lastSaid}<blockquote class="said">{tutor.lastSaid}</blockquote>{/if}
+    <p class="act-hint muted">Answer in the box below{tutor.asking ? ', or open the terminal: it is asking something there' : ''}.</p>
   </div>
 {/if}
 

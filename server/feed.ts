@@ -382,6 +382,18 @@ export class Feed {
   }
 
   /**
+   * How long a wait on the question `id` has left before it counts as no answer: `ms` from when it was asked or from
+   * the last sign of the learner, whichever is later, and never past WAIT_CAP_MS from when it was asked. For a client
+   * that waits in pieces (mcp.ts), so the pieces add up to one wait.
+   */
+  waitLeft(id: string, ms: number): number {
+    const item = findInteractive(this.items, id);
+    if (!item) return 0;
+    const asked = Date.parse(item.at) || Date.now();
+    return Math.max(0, Math.min(Math.max(asked, this.presentAt) + ms, asked + WAIT_CAP_MS) - Date.now());
+  }
+
+  /**
    * Resolves with the answered item, or null on abort, or once `ms` have gone by with no sign of him (since the wait
    * began or since he was last `present`), or after WAIT_CAP_MS in all. Thinking hard over a question is not leaving.
    */

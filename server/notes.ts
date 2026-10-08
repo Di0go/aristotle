@@ -1,15 +1,17 @@
-// His own words: a notebook per step (what he writes in the panel beside a step, kept with that step) in
-// data/notes.json, and his About you page (what he does, his projects, what he wants) in data/about.md. Missions
-// and course planning read About you before anything else, so they fit whoever uses Aristotle.
+// The learner's own words: a notebook per step (what they write in the panel beside a step, kept with that step) in
+// data/notes.json, and their About you page (what they do, their projects, what they want) in data/about.md. Missions
+// and course planning read About you before anything else, so they fit whoever uses Aristotle. Beside them, the
+// tutor's own notes on how they learn, data/profile.md (the MCP tool `profile`).
 
 import { EventEmitter } from 'node:events';
 import { readFile } from 'node:fs/promises';
-import { ABOUT_FILE, NOTES_FILE } from './config.ts';
+import { ABOUT_FILE, NOTES_FILE, PROFILE_FILE } from './config.ts';
 import { isObject, loadJson, WriteQueue, writeFileAtomic, writeJson } from './store.ts';
 import type { StepNote } from '../shared/types.ts';
 
 const MAX_NOTE = 20_000;
 const MAX_ABOUT = 20_000;
+const MAX_PROFILE = 20_000;
 
 export class Notes {
   private notes: StepNote[] = [];
@@ -56,6 +58,19 @@ export class Notes {
     const body = this.aboutText.endsWith('\n') || !this.aboutText ? this.aboutText : `${this.aboutText}\n`;
     await this.queue.run(ABOUT_FILE, () => writeFileAtomic(ABOUT_FILE, body));
     this.events.emit('about', this.aboutText);
+  }
+
+  /**
+   * The tutor's notes on how they learn. Read from the file every time: a Claude Code from before the profile tool
+   * edits the file itself.
+   */
+  profile(): Promise<string> {
+    return readOr(PROFILE_FILE, '');
+  }
+
+  async setProfile(text: string) {
+    const body = text.slice(0, MAX_PROFILE).trim();
+    await this.queue.run(PROFILE_FILE, () => writeFileAtomic(PROFILE_FILE, body ? `${body}\n` : ''));
   }
 
   /** Resolves once every write queued so far has finished. */

@@ -2,6 +2,7 @@
   // Praxis: what he learned, put to work. Missions waiting for a review first, then the ones to do, then the
   // closed ones; above them, the finished steps and roadmaps that are ready for a mission.
   import { actions } from '../lib/actions.ts';
+  import { tutor } from '../lib/tutor.svelte.ts';
   import { feed } from '../lib/feed.svelte.ts';
   import { ago } from '../lib/format.ts';
   import { missionSource, missionsDue, SCOPE_LABEL, VERDICT_LABEL, VERDICT_TONE } from '../lib/library.ts';
@@ -9,7 +10,7 @@
   import type { Mission, MissionStatus } from '../../../shared/types.ts';
 
   const SECTIONS = [
-    { status: 'debriefed', title: 'Waiting for review', note: 'You reported back. Ask Claude to look at it.' },
+    { status: 'debriefed', title: 'Waiting for review', note: 'You reported back. Ask your tutor to look at it.' },
     { status: 'open', title: 'To do', note: 'Out there, not in here. Come back with a debrief.' },
     { status: 'reviewed', title: 'Done', note: '' },
   ] as const;
@@ -65,7 +66,7 @@
               class="ghost small"
               onclick={() => (d.index === null ? actions.capstone(d.roadmap) : actions.stepMission(d.roadmap, d.index!))}
             >
-              Design it with Claude
+              Design it with {tutor.name}
             </button>
           </li>
         {/each}
@@ -80,7 +81,7 @@
       <h2>No missions yet</h2>
       <p>
         When every goal concept of a class is solid, it shows up above, ready for a mission. You can also ask for one at any time: open
-        Claude and type <code>/praxis</code> with a topic.
+        {tutor.name} and ask for a mission on a topic{tutor.engine === 'claude-code' ? ' (or type /praxis with one)' : ''}.
       </p>
     </div>
   {:else}

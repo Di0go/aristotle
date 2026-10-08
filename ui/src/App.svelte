@@ -1,7 +1,7 @@
 <script lang="ts">
   // The shell: ribbon, sidebar, tabs, the current page, the status line and the terminal drawer, plus global shortcuts.
   import type { Component } from 'svelte';
-  import { claude } from './lib/claude.svelte.ts';
+  import { tutor } from './lib/tutor.svelte.ts';
   import { classes } from './lib/classes.svelte.ts';
   import { feed } from './lib/feed.svelte.ts';
   import { focus } from './lib/focus.svelte.ts';
@@ -40,6 +40,7 @@
     praxis: () => import('./pages/Praxis.svelte') as never,
     mission: () => import('./pages/Mission.svelte') as never,
     about: () => import('./pages/About.svelte') as never,
+    settings: () => import('./pages/Settings.svelte') as never,
   };
 
   /** Each page's code, imported once: the same promise every time, so moving within a page (another step of the
@@ -78,7 +79,7 @@
   const pageKey = $derived('slug' in route ? route.slug : 'id' in route ? route.id : route.page);
 
   feed.start();
-  claude.connect();
+  tutor.connect();
 
   function load(name: string): ReturnType<Page> {
     let page = loaded.get(name);
@@ -103,7 +104,7 @@
   function onKey(e: KeyboardEvent) {
     if (e.ctrlKey && e.key === '`') {
       e.preventDefault();
-      claude.toggle();
+      tutor.toggle();
     }
     if (e.key === 'Escape' && railOpen) railOpen = false;
   }
@@ -165,6 +166,6 @@
 <Search />
 <Lightbox />
 
-{#if claude.mounted}
+{#if tutor.mounted}
   <TerminalDrawer />
 {/if}

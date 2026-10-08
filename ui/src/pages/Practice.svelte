@@ -6,7 +6,7 @@
   import { setContext, tick } from 'svelte';
   import { actions } from '../lib/actions.ts';
   import { bench } from '../lib/bench.svelte.ts';
-  import { claude } from '../lib/claude.svelte.ts';
+  import { tutor } from '../lib/tutor.svelte.ts';
   import { placeFigures } from '../lib/explorables/index.ts';
   import { feed, refetching } from '../lib/feed.svelte.ts';
   import { ago, onDay } from '../lib/format.ts';
@@ -79,7 +79,7 @@
 
   // When Claude starts working at the end of the sitting, keep its activity card in view if he is near the bottom.
   $effect(() => {
-    if (!mine || !claude.busy) return;
+    if (!mine || !tutor.busy) return;
     const nearBottom = window.innerHeight + window.scrollY >= document.body.scrollHeight - 500;
     if (nearBottom && !feed.pending) void tick().then(() => window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }));
   });
@@ -118,7 +118,7 @@
       {#if feed.items.length === 0}
         <div class="lesson-wait">
           <span class="spinner" aria-hidden="true"></span>
-          <p>Claude is getting it ready: it reads what is due and picks where to start.</p>
+          <p>{tutor.name} is getting it ready: it reads what is due and picks where to start.</p>
         </div>
       {:else}
         <FeedList items={feed.items} pendingId={feed.pending?.id ?? null} figures={placeFigures(mine.topicSlug, feed.items)} />

@@ -29,7 +29,7 @@ Teaching content goes through `show`, never in your terminal reply. Your termina
 ## Starting
 
 1. If they name a topic that exists (`/teach continue <slug>`), or say "continue" about one, go straight to **Continuing** below. Otherwise call `list_topics` once (to reuse what exists and link to it); for a new topic, `start_session` with a clear title, the session's goal, and `topic_goal` for what they ultimately want.
-2. Read `data/profile.md` (how they learn, what they already hold well) and use it.
+2. Read their profile with `profile` (how they learn, what they already hold well) and use it.
 3. Concept ids are stable, short kebab-case (`line-integral`). On an existing topic, reuse the ids already on the map instead of creating near-duplicates.
 4. Topics connect. When a concept rests on one already on another topic's map, put it in `deps` as `other-topic/id` instead of adding a duplicate; Aristotle draws those links. `list_topics` shows what exists.
 5. Some topics are steps on a roadmap (`start_session` and `get_topic` say so). Then the step's goal is the topic's goal: use the step's title as the topic title exactly, and read the roadmap with `get_roadmap`. Earlier steps are what this one builds on, so probe what they kept from them and link to their concepts; later steps are not this lesson's job. If they ask for a path through a whole field rather than one topic, that is the `roadmap` skill.
@@ -140,4 +140,4 @@ Words alone are the weakest way to teach anything physical, spatial or timed. Ev
 
 ## Profile
 
-`data/profile.md` holds what lasts about how they learn. Update it when you learn something that will matter next time: a preference they state, a style that clearly works or fails, an area they hold solidly. Keep it short; session details belong in Aristotle, not there.
+Their profile (the `profile` tool) holds what lasts about how they learn. Rewrite it when you learn something that will matter next time: a preference they state, a style that clearly works or fails, an area they hold solidly. Keep it short; session details belong in Aristotle, not there.

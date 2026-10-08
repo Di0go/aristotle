@@ -88,7 +88,7 @@
     {:else}
       <p class="question">{q.question}</p>
       {#if q.state === 'waiting'}
-        <p class="wait"><span class="dot" aria-hidden="true"></span>Claude is answering…</p>
+        <p class="wait"><span class="dot" aria-hidden="true"></span>Answering…</p>
       {:else if q.state === 'error'}
         <p class="error">{q.error}</p>
         <div class="foot"><button class="link" onclick={() => asides.again()}>Try again</button></div>

@@ -1,0 +1,9 @@
+# Codex reads this in a trusted project: Aristotle's tools, approved, with a timeout long enough for a question to wait
+# for the learner (Codex gives up on a tool call after 300 s by default, and progress doesn't extend it). The drawer
+# passes the same on the command line (server/agents.ts), so it works there whether or not the folder is trusted.
+[mcp_servers.aristotle]
+command = "node"
+args = ["server/bridge.ts"]
+tool_timeout_sec = 11400
+startup_timeout_sec = 30
+default_tools_approval_mode = "approve"

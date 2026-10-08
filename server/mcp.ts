@@ -1,6 +1,8 @@
-// The tools Claude Code uses to teach through the interface: one MCP server per request (server/index.ts), over the
-// stores in Gym; the tools themselves are defined once. The descriptions are all Claude knows of each tool, so they
-// carry the teaching rules too. Claude Code cuts a description at 2048 characters: keep each under (a test checks).
+// The tools a tutor uses to teach through the interface: one MCP server per request (server/index.ts), over the
+// stores in Gym; the tools themselves are defined once. Any MCP client can teach with them: Claude Code, another agent,
+// or Aristotle's own tutor on a model API (tutor-api.ts, in process). The descriptions are all the tutor knows of each
+// tool, so they carry the teaching rules too; `method` and the prompts hand the skills to a tutor that doesn't have
+// them. Claude Code cuts a description at 2048 characters: keep each under (a test checks).
 
 import { randomInt } from 'node:crypto';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -8,9 +10,10 @@ import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/proto
 import type { CallToolResult, ServerNotification, ServerRequest } from '@modelcontextprotocol/sdk/types.js';
 import { AjvJsonSchemaValidator } from '@modelcontextprotocol/sdk/validation/ajv';
 import * as z from 'zod';
-import { KEEPALIVE_MS, URL_CLEAN, WAIT_MS } from './config.ts';
+import { KEEPALIVE_MS, URL_CLEAN, WAIT_MS, WAIT_SLICE_MS } from './config.ts';
 import type { Gym } from './gym.ts';
 import { findImages, rsvgConvert, viewImage } from './images.ts';
+import { essentials, OTHER_AGENTS, skill, skills } from './method.ts';
 import { describeMission, summarizeMission } from './missions.ts';
 import { describeRoadmap } from './roadmaps.ts';
 import { describeTopic } from './topics.ts';
@@ -88,25 +91,97 @@ const leadParam = z
 type ToolDef = { name: string; config: Parameters<McpServer['registerTool']>[1]; handler: Parameters<McpServer['registerTool']>[2] };
 let defined: { gym: Gym; tools: ToolDef[] } | undefined;
 
-const INSTRUCTIONS =
-  `Aristotle is the learner's interface at ${URL_CLEAN}. They read and answer there, not in the terminal: ` +
-  'teaching content goes in `show`, graded questions in `quiz`, open questions in `ask`, and what they know goes on the map with `update_map` ' +
-  "(Aristotle draws the map). Keep terminal replies to a line or two. If these tools are deferred, load a sitting's set in one ToolSearch: " +
-  'select:mcp__aristotle__start_session,mcp__aristotle__get_topic,mcp__aristotle__collect_answers,mcp__aristotle__show,mcp__aristotle__quiz,' +
-  'mcp__aristotle__ask,mcp__aristotle__update_map,mcp__aristotle__record_practice,mcp__aristotle__end_session';
+/**
+ * What every client is told on connecting. `native`: Claude Code, which has the skills itself and defers tools behind
+ * ToolSearch.
+ */
+function instructions(native: boolean): string {
+  return (
+    `Aristotle is the learner's interface at ${URL_CLEAN}. They read and answer there, not where they talk to you: ` +
+    'teaching content goes in `show`, graded questions in `quiz`, open questions in `ask`, and what they know goes on the map with `update_map` ' +
+    '(Aristotle draws the map). Keep your own replies to a line or two. ' +
+    (native
+      ? "If these tools are deferred, load a sitting's set in one ToolSearch: " +
+        'select:mcp__aristotle__start_session,mcp__aristotle__get_topic,mcp__aristotle__collect_answers,mcp__aristotle__show,mcp__aristotle__quiz,' +
+        'mcp__aristotle__ask,mcp__aristotle__update_map,mcp__aristotle__record_practice,mcp__aristotle__end_session'
+      : 'How to teach is in `method`: before a lesson, a review, training, planning a course or a mission, read the skill for it ' +
+        '(teach, review, train, roadmap, praxis), unless you already have it as a skill.')
+  );
+}
+
+/** The skills a client can be handed as prompts (slash commands, in clients that offer them). */
+const PROMPTS = ['teach', 'review', 'train', 'roadmap', 'praxis'];
 
 /**
  * The MCP server with every tool, bound to this server's stores; a fresh one per request (stateless). `drawer`: the
  * request comes from the tutor in Aristotle's terminal drawer (the bridge says so), whose core tools load up front.
+ * `client`: the client's own name, when known ("claude-code" has the skills itself, so it gets no `method` and no
+ * prompts; "aristotle", the tutor on a model API, has the rules every sitting keeps in its instructions already).
  */
-export function createMcpServer(gym: Gym, { drawer = false } = {}): McpServer {
+export function createMcpServer(gym: Gym, { drawer = false, client = '' } = {}): McpServer {
   if (defined?.gym !== gym) defined = { gym, tools: defineTools(gym) };
-  const mcp = new McpServer({ name: 'aristotle', version: '0.3.0' }, { instructions: INSTRUCTIONS, jsonSchemaValidator: VALIDATOR });
+  const native = client === 'claude-code';
+  const mcp = new McpServer(
+    { name: 'aristotle', version: '0.4.0' },
+    { instructions: instructions(native), jsonSchemaValidator: VALIDATOR },
+  );
   for (const { name, config, handler } of defined.tools) {
     const always = drawer && CORE.has(name) ? { _meta: { 'anthropic/alwaysLoad': true } } : {};
     mcp.registerTool(name, { ...(config as object), ...always } as never, handler as never);
   }
+  if (!native) addMethod(mcp, client === 'aristotle');
   return mcp;
+}
+
+/** `method`, and the skills as prompts: the method for a tutor without Claude Code's skills. */
+function addMethod(mcp: McpServer, inProcess: boolean) {
+  /** A skill as a tutor other than Claude Code reads it: what Claude Code's names stand for, the rules, the skill. */
+  const handed = (name: string) => {
+    const s = skill(name);
+    if (!s) return undefined;
+    const rules = s.kind === 'skill' && !inProcess ? essentials() : '';
+    return [OTHER_AGENTS, rules, `# ${s.name}\n\n${s.body}`].filter(Boolean).join('\n\n');
+  };
+  mcp.registerTool(
+    'method',
+    {
+      annotations: READ_ONLY,
+      title: 'Read the method',
+      description:
+        'How to teach in Aristotle. Before a sitting, read the skill it needs, unless your client has already given it to you as a skill: ' +
+        'teach (a lesson, or continuing one), review (what is fading), train (problems at the edge of their level), roadmap (planning a course), ' +
+        'praxis (designing a mission, or reviewing one). researcher and illustrator say how to check a fact and how to draw a figure. Without `name`, lists them.',
+      inputSchema: { name: z.string().optional().describe('teach, review, train, roadmap, praxis, researcher or illustrator') },
+    },
+    async ({ name }) => {
+      const list = skills();
+      if (!name) return text(list.map((s) => `- ${s.name} (${s.kind}): ${s.description}`).join('\n') || 'No skills found.');
+      return text(handed(name) ?? `No skill "${name}". There are: ${list.map((s) => s.name).join(', ')}.`);
+    },
+  );
+  for (const name of PROMPTS) {
+    const s = skill(name);
+    if (!s) continue;
+    mcp.registerPrompt(
+      name,
+      {
+        title: `Aristotle: ${name}`,
+        description: s.description,
+        argsSchema: { request: z.string().optional().describe('What the learner asked for, in their words') },
+      },
+      ({ request }) => ({
+        messages: [
+          {
+            role: 'user',
+            content: {
+              type: 'text',
+              text: `${handed(name)}\n\n---\n\n${request?.trim() ? `The learner's request: ${request.trim()}` : 'Start: the learner has not said more.'}`,
+            },
+          },
+        ],
+      }),
+    );
+  }
 }
 
 /** Every tool, with its schemas built once: `mcp` here only collects the definitions. */
@@ -197,6 +272,24 @@ function defineTools(gym: Gym): ToolDef[] {
       return text(
         about || 'They have not written anything on their About you page yet. Ask them what you need, in a line, when it matters.',
       );
+    },
+  );
+
+  mcp.registerTool(
+    'profile',
+    {
+      title: "The learner's profile",
+      description:
+        'Read your notes on how the learner learns (their profile), or replace them by passing `markdown`. Read it when a sitting starts. ' +
+        'Rewrite it when you learn something that will matter next time: a preference they state, a style that clearly works or fails, ' +
+        'an area they hold solidly. Keep it short (under 60 lines); session details belong in Aristotle, not here.',
+      inputSchema: { markdown: z.string().optional().describe('The whole new profile, replacing the old one; omit to read it') },
+    },
+    async ({ markdown }) => {
+      if (markdown === undefined)
+        return text((await gym.notes.profile()).trim() || 'No profile yet: write one once you know something lasting.');
+      await gym.notes.setProfile(markdown);
+      return text('Profile saved.');
     },
   );
 
@@ -639,6 +732,7 @@ function defineTools(gym: Gym): ToolDef[] {
       await showLead(gym, lead);
       const item = await gym.feed.add({ type: 'quiz', questions: questions.map(shuffle) });
       const answered = await waitForLearner(gym, item.id, extra);
+      if (answered === 'later') return stillWaiting();
       if (answered?.type !== 'quiz') return notAnswered();
       await gym.feed.markDelivered(item.id);
       return text(formatQuiz(answered, gym));
@@ -676,6 +770,7 @@ function defineTools(gym: Gym): ToolDef[] {
         ...(placeholder ? { placeholder } : {}),
       });
       const answered = await waitForLearner(gym, item.id, extra);
+      if (answered === 'later') return stillWaiting();
       if (answered?.type !== 'ask') return notAnswered();
       await gym.feed.markDelivered(item.id);
       return text(formatAsk(answered));
@@ -699,7 +794,9 @@ function defineTools(gym: Gym): ToolDef[] {
       if (late || !wait) return text(late || 'No new answers.');
       const open = gym.feed.items.filter((i) => isInteractive(i) && !i.answeredAt).map((i) => i.id);
       if (!open.length) return text('No new answers, and no question of this session is open.');
-      if (!(await waitForLearner(gym, open, extra))) return notAnswered();
+      const answered = await waitForLearner(gym, open, extra);
+      if (answered === 'later') return stillWaiting();
+      if (!answered) return notAnswered();
       return text((await deliverLate(gym)) || 'No new answers.');
     },
   );
@@ -877,8 +974,24 @@ async function showLead(gym: Gym, lead?: { markdown: string; title?: string; con
   if (lead.concept) await gym.focus(lead.concept);
 }
 
-/** Waits for the learner, sending progress notifications so the call doesn't look idle; for any of `ids`, if several. */
-async function waitForLearner(gym: Gym, ids: string | string[], extra: Extra) {
+/**
+ * Clients that end a tool call after a minute whatever it reports (Cursor's CLI), told apart by the name the bridge
+ * passes on: their waits come in pieces of WAIT_SLICE_MS, each ending in "still waiting" until the learner answers or has
+ * been away for the whole wait.
+ */
+const SHORT_WAIT = /cursor/i;
+
+/**
+ * Waits for the learner, sending progress notifications so the call doesn't look idle; for any of `ids`, if several.
+ * The answered item, null when they are away, or "later" when a client that waits in pieces should ask again.
+ */
+async function waitForLearner(gym: Gym, ids: string | string[], extra: Extra): Promise<InteractiveItem | null | 'later'> {
+  const agent = extra.requestInfo?.headers?.['x-aristotle-agent'];
+  const sliced = typeof agent === 'string' && SHORT_WAIT.test(agent);
+  const list = [ids].flat();
+  // A piece of a wait: whatever is left of it since the question was asked, counted the same way as one long wait.
+  const ms = sliced ? Math.max(...list.map((id) => gym.feed.waitLeft(id, WAIT_MS))) : WAIT_MS;
+  if (ms <= 0) return null;
   const token = extra._meta?.progressToken;
   let ticks = 0;
   const keepalive =
@@ -897,10 +1010,13 @@ async function waitForLearner(gym: Gym, ids: string | string[], extra: Extra) {
   const cancel = () => stop.abort();
   extra.signal.addEventListener('abort', cancel, { once: true });
   if (extra.signal.aborted) stop.abort();
+  let slice: ReturnType<typeof setTimeout> | undefined;
   try {
-    const waits = [ids].flat().map((id) => gym.feed.waitFor(id, WAIT_MS, stop.signal));
+    const waits: Promise<InteractiveItem | null | 'later'>[] = list.map((id) => gym.feed.waitFor(id, ms, stop.signal));
+    if (sliced && ms > WAIT_SLICE_MS) waits.push(new Promise((r) => (slice = setTimeout(() => r('later'), WAIT_SLICE_MS))));
     return await Promise.race(waits);
   } finally {
+    clearTimeout(slice);
     stop.abort();
     extra.signal.removeEventListener('abort', cancel);
     clearInterval(keepalive);
@@ -918,6 +1034,14 @@ function notAnswered(): CallToolResult {
       'Close the sitting now, without asking them anything: in one message, a final `update_map` if this sitting changed what they hold and ' +
       '`end_session` with the handoff. The question stays open in Aristotle; when they answer it, you are asked to continue ' +
       'and `collect_answers` gives you their answer. Then end your turn.',
+  );
+}
+
+/** What a client that waits in pieces gets when a piece runs out with the question still open. */
+function stillWaiting(): CallToolResult {
+  return text(
+    'Still waiting: they have not answered yet, and the question is open in Aristotle. Your client ends a tool call after a minute, ' +
+      'so the wait comes in pieces: call `collect_answers` with `wait: true` now to keep waiting, and do nothing else meanwhile.',
   );
 }
 

@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "aristotle": {
+      "command": "node",
+      "args": ["server/bridge.ts"],
+      "timeout": 11400000,
+      "trust": true
+    }
+  },
+  "context": {
+    "fileName": ["AGENTS.md", "GEMINI.md"]
+  }
+}

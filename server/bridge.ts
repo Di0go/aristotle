@@ -16,7 +16,7 @@ interface Message {
   jsonrpc: '2.0';
   id?: Id;
   method?: string;
-  params?: { requestId?: Id; [key: string]: unknown };
+  params?: { requestId?: Id; clientInfo?: unknown; _meta?: Record<string, unknown>; [key: string]: unknown };
   result?: { protocolVersion?: string; [key: string]: unknown };
   error?: unknown;
 }
@@ -30,6 +30,11 @@ const cancelled = new Set<Id>();
 let protocolVersion: string | undefined;
 /** Whether this bridge serves the tutor in Aristotle's terminal drawer (server/terminal.ts sets it). */
 const client = process.env.ARISTOTLE_DRAWER ? 'drawer' : 'terminal';
+/**
+ * The client's own name from `initialize` ("claude-code", "codex-mcp-client", "gemini-cli-mcp-client"…), passed on so
+ * the server leaves out what a client already has (Claude Code has the skills, so no `method`).
+ */
+let clientName = '';
 
 const ready = (async () => {
   if (await health()) return;
@@ -65,6 +70,10 @@ lines.on('close', () => {
 /** POSTs one message and writes back everything the server answers with. */
 function relay(message: Message) {
   const id = message.method !== undefined ? message.id : undefined;
+  const info = (message.params?.clientInfo ?? message.params?._meta?.['io.modelcontextprotocol/clientInfo']) as
+    | { name?: unknown }
+    | undefined;
+  if (typeof info?.name === 'string') clientName = info.name.replace(/[^\w.@/-]/g, '').slice(0, 80);
   let answered = false;
   const reply = (m: Message) => {
     if (id !== undefined && m.id === id && (m.result !== undefined || m.error !== undefined)) answered = true;
@@ -103,6 +112,7 @@ function relay(message: Message) {
         Accept: 'application/json, text/event-stream',
         'Content-Length': Buffer.byteLength(body),
         'X-Aristotle-Client': client,
+        ...(clientName ? { 'X-Aristotle-Agent': clientName } : {}),
         ...(protocolVersion ? { 'Mcp-Protocol-Version': protocolVersion } : {}),
       },
     },

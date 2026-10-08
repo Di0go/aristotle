@@ -2,6 +2,7 @@
   // One course (a roadmap, in the data) as a route: its classes in order down a line, each with its goal, why it sits
   // there, and its progress.
   import { actions } from '../lib/actions.ts';
+  import { tutor } from '../lib/tutor.svelte.ts';
   import { feed } from '../lib/feed.svelte.ts';
   import { ago } from '../lib/format.ts';
   import { markOf, outline, STATUS_LABEL, STATUS_TONE, stepsOf } from '../lib/library.ts';
@@ -46,7 +47,7 @@
       {#if roadmap.use}<p class="use"><span class="muted">Where you'll use it:</span> {roadmap.use}</p>{/if}
       <div class="head-actions">
         {#if roadmap.status === 'draft'}
-          <button class="primary" onclick={() => actions.editRoadmap(slug)}>Keep planning with Claude</button>
+          <button class="primary" onclick={() => actions.editRoadmap(slug)}>Keep planning with {tutor.name}</button>
         {:else if next}
           <a class="primary" href={link.lesson(next.slug)}>Go to class {next.index + 1}: {next.title}</a>
           <button class="ghost" onclick={() => actions.editRoadmap(slug)}>Change the course</button>
@@ -61,7 +62,7 @@
       <section class="draft-note">
         <p class="kicker">Draft</p>
         <p>
-          Still being planned. Tell Claude what to change (the order, classes to add or drop, a goal that's off) and approve it when it's
+          Still being planned. Tell {tutor.name} what to change (the order, classes to add or drop, a goal that's off) and approve it when it's
           right. Nothing is taught until then.
         </p>
       </section>
@@ -117,10 +118,10 @@
             {:else}
               <p class="step-goal">
                 {#if done === steps.length}
-                  Every class is done: Claude is designing it now, from where you said you'll use this course.
+                  Every class is done: {tutor.name} is designing it now, from where you said you'll use this course.
                 {:else}
-                  A real task that puts the whole course to work in your own life. Claude designs it on its own as soon as the last class is
-                  done ({steps.length - done} to go).
+                  A real task that puts the whole course to work in your own life. {tutor.name} designs it on its own as soon as the last class
+                  is done ({steps.length - done} to go).
                 {/if}
               </p>
             {/if}

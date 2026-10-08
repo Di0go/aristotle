@@ -1,6 +1,6 @@
 <script lang="ts">
   // The small bar along the bottom: what's going on, in a few words.
-  import { claude } from './claude.svelte.ts';
+  import { tutor } from './tutor.svelte.ts';
   import { classes } from './classes.svelte.ts';
   import { feed } from './feed.svelte.ts';
   import { countsOf, placeOf } from './library.ts';
@@ -35,14 +35,20 @@
       >
     {/if}
   </span>
-  {#if feed.pending}<a class="turn" href={classes.sittingHref() ?? link.now()}>Your turn</a>{:else if live && claude.busy}<span class="work"
-      >Claude is working…</span
+  {#if feed.pending}<a class="turn" href={classes.sittingHref() ?? link.now()}>Your turn</a>{:else if live && tutor.busy}<span class="work"
+      >{tutor.name} is working…</span
     >{/if}
   {#if topic && counts.total}<span>{counts.solid} of {counts.total} solid</span>{/if}
   {#if place}<span>class {place.index + 1} of {place.roadmap.steps.length}</span>{/if}
-  <button class="claude" onclick={() => claude.toggle()} title="The terminal Claude Code runs in (Ctrl+`)">
-    <i class:on={claude.running} class:ask={claude.asking}></i>
-    {claude.asking ? 'Terminal: Claude is asking something' : 'Terminal'}
+  <button
+    class="tutor"
+    onclick={() => tutor.toggle()}
+    title={tutor.mode === 'api'
+      ? `The tutor's conversation, on ${tutor.command || 'a model API'} (Ctrl+\`)`
+      : `The terminal ${tutor.name} runs in (Ctrl+\`)`}
+  >
+    <i class:on={tutor.running} class:ask={tutor.asking} class:off={Boolean(tutor.problem)}></i>
+    {tutor.asking ? `Terminal: ${tutor.name} is asking something` : tutor.mode === 'api' ? 'Tutor' : 'Terminal'}
   </button>
 </footer>
 
@@ -112,7 +118,7 @@
     color: var(--fg-2);
   }
 
-  .claude {
+  .tutor {
     display: inline-flex;
     align-items: center;
     gap: 6px;
@@ -124,22 +130,26 @@
     cursor: pointer;
   }
 
-  .claude:hover {
+  .tutor:hover {
     color: var(--fg);
   }
 
-  .claude i {
+  .tutor i {
     width: 6px;
     height: 6px;
     border-radius: 50%;
     background: var(--faint);
   }
 
-  .claude i.on {
+  .tutor i.on {
     background: var(--solid);
   }
 
-  .claude i.ask {
+  .tutor i.ask {
     background: var(--acc);
+  }
+
+  .tutor i.off {
+    background: var(--shaky);
   }
 </style>

@@ -101,8 +101,8 @@ async function liveRoot(): Promise<string | undefined> {
 async function deploy(sha: string): Promise<boolean> {
   if (!existsSync(RELEASE_DIR)) run('git', ['worktree', 'add', '--detach', RELEASE_DIR, sha], ROOT);
   else run('git', ['checkout', '--quiet', '--detach', sha], RELEASE_DIR);
-  // The skills read data/profile.md and the like relative to where Claude Code runs, which for the terminal
-  // drawer is the release copy: give it the real data/ under the same name.
+  // An agent in the terminal drawer runs in the release copy and may read data/ there (a mission's files, an old
+  // skill's data/profile.md): give it the real data/ under the same name.
   const dataLink = path.join(RELEASE_DIR, 'data');
   if (!existsSync(dataLink) && !isLink(dataLink)) symlinkSync(process.env.ARISTOTLE_DATA_DIR ?? path.join(ROOT, 'data'), dataLink);
   run('pnpm', ['install', '--frozen-lockfile', '--prefer-offline', '--silent'], RELEASE_DIR);

@@ -18,6 +18,6 @@ Before you start, read [docs/README.md](docs/README.md): it says which doc cover
 - **Match the code around you**: plain TypeScript run directly by Node (erasable syntax only, `.ts` in imports), Svelte 5 runes, design tokens instead of raw colours, comments that say why.
 - **Commit messages**: a short summary of what changed for the user, then why if it is not obvious.
 
-## With Claude Code
+## With Claude Code, or another agent
 
-Open Claude Code in the repository: [CLAUDE.md](CLAUDE.md) tells it the rules above, and its Stop hook sends it back to the docs when it changes code without them. To have it teach in the dev instance, enable the `aristotle-dev` MCP server with `/mcp`.
+Open Claude Code in the repository: [CLAUDE.md](CLAUDE.md) tells it the rules above (from [AGENTS.md](AGENTS.md), which Codex, opencode, Cursor and most other agents read themselves), and its Stop hook sends it back to the docs when it changes code without them. To have it teach in the dev instance, enable the `aristotle-dev` MCP server with `/mcp`.

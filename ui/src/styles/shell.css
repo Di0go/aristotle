@@ -242,7 +242,7 @@ body.resizing {
   }
 }
 
-/* Claude Code's terminal, docked above the status line. */
+/* The tutor's drawer, docked above the status line: an agent's terminal, or the API tutor's conversation. */
 .drawer {
   position: fixed;
   z-index: 30;
@@ -300,14 +300,28 @@ body.resizing {
   background: var(--solid);
 }
 
+.drawer-title .run-dot.off {
+  background: var(--shaky);
+}
+
 .drawer-state {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: var(--muted);
 }
 
 .drawer-actions {
   display: flex;
+  flex: none;
   gap: 6px;
   margin-left: auto;
+}
+
+.drawer-actions a.ghost {
+  color: var(--fg);
+  text-decoration: none;
 }
 
 .xterm-host {
@@ -365,7 +379,7 @@ body.resizing {
   color: var(--faint);
 }
 
-/* Claude waiting on a question in the terminal: a bar above the message box that opens it. */
+/* An agent waiting on a question in the terminal: a bar above the message box that opens it. */
 .asking {
   display: block;
   width: 100%;

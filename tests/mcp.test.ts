@@ -44,6 +44,7 @@ let server: ChildProcess;
 /** A stand-in for Wikimedia Commons' API, so find_images is tested without the network. */
 let commons: http.Server;
 let dataDir: string;
+let stateDir: string;
 let tlsDir: string;
 let client: Client;
 
@@ -55,6 +56,8 @@ before(async () => {
   );
   await new Promise<void>((r) => commons.listen(0, '127.0.0.1', r));
   dataDir = await mkdtemp(path.join(tmpdir(), 'aristotle-test-'));
+  // Its own state folder too: settings written by a test must never reach the real .aristotle/.
+  stateDir = await mkdtemp(path.join(tmpdir(), 'aristotle-state-'));
   // A certificate from the real script, marked as trusted the way setup-hostname.sh does.
   tlsDir = await mkdtemp(path.join(tmpdir(), 'aristotle-tls-'));
   assert.equal(spawnSync('bash', ['scripts/tls.sh'], { env: { ...process.env, ARISTOTLE_TLS_DIR: tlsDir }, stdio: 'ignore' }).status, 0);
@@ -69,6 +72,7 @@ after(async () => {
   server.kill();
   commons.close();
   await rm(dataDir, { recursive: true, force: true });
+  await rm(stateDir, { recursive: true, force: true });
   await rm(path.join(dataDir, '..', `${path.basename(dataDir)}-claude`), { recursive: true, force: true });
   await rm(tlsDir, { recursive: true, force: true });
 });
@@ -81,6 +85,7 @@ async function startServer() {
       ...process.env,
       ARISTOTLE_PORT: String(PORT),
       ARISTOTLE_DATA_DIR: dataDir,
+      ARISTOTLE_STATE_DIR: stateDir,
       ARISTOTLE_TLS_DIR: tlsDir,
       ARISTOTLE_TLS_PORT: String(TLS_PORT),
       ARISTOTLE_WAIT_MS: '800',
@@ -213,7 +218,9 @@ test('lists the tools', async () => {
     'list_missions',
     'list_roadmaps',
     'list_topics',
+    'method',
     'preview_svg',
+    'profile',
     'quiz',
     'read_about',
     'record_practice',

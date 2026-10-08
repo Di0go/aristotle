@@ -1,13 +1,13 @@
-// Starting things from the interface: each action asks the Claude Code running in Aristotle to run a skill.
-// A running Claude gets the slash command; a fresh one starts with the same request in words, because an
-// opening message that begins with "/" is left in the input box instead of being sent.
+// Starting things from the interface: each action asks the tutor running in Aristotle to run a skill. A running
+// Claude Code gets the slash command; a fresh one, another agent and the API tutor get the same request in words
+// (an opening message that begins with "/" is left in Claude Code's input box instead of being sent).
 
-import { claude } from './claude.svelte.ts';
+import { tutor } from './tutor.svelte.ts';
 import { feed } from './feed.svelte.ts';
 import { link, router } from './router.svelte.ts';
 import type { Roadmap } from '../../../shared/types.ts';
 
-/** How long /clear is given before the sitting's command is typed in after it. */
+/** How long an agent's /clear is given before the sitting's command is typed in after it. */
 const CLEAR_MS = 1500;
 /** Set while a left sitting is being picked up again (pickUp): it starts clean, though his answer just touched it. */
 let pickingUp = false;
@@ -118,8 +118,8 @@ export const actions = {
 function pickUp(going: boolean) {
   const session = feed.session;
   if (!session) return;
-  if (going && claude.running) {
-    claude.say("I've answered. Please collect my answers with collect_answers and carry on.");
+  if (going && tutor.running) {
+    tutor.say("I've answered. Please collect my answers with collect_answers and carry on.");
     return;
   }
   const said = 'I answered the questions left open last time.';
@@ -146,18 +146,18 @@ function go(
   topic?: string,
   kind: 'learn' | 'review' | 'train' = 'learn',
 ) {
-  // A new sitting starts from a clean context: the Claude Code in the drawer lives as long as the app, and would
-  // otherwise carry every earlier sitting into each call. Only when no sitting is in progress (none open, or the open
-  // one idle for a while: one nobody closed stays open on disk for days) and Claude is idle at its prompt (not
-  // working, not asking something); conversations (a course, a mission) keep theirs.
-  const fresh = !converse && claude.running && !claude.busy && !claude.asking && (pickingUp || !feed.inProgress);
+  // A new sitting starts from a clean context: the tutor in the drawer lives as long as the app, and would otherwise
+  // carry every earlier sitting into each call. Only when no sitting is in progress (none open, or the open one idle
+  // for a while: one nobody closed stays open on disk for days) and the tutor is idle (not working, not asking
+  // something); conversations (a course, a mission) keep theirs.
+  const fresh = !converse && tutor.running && !tutor.busy && !tutor.asking && (pickingUp || !feed.inProgress);
   if (fresh) {
-    claude.say('/clear');
-    // Typed in after /clear has run, not into the same input box (the terminal types each message, then Enter).
-    setTimeout(() => claude.run(command, initial), CLEAR_MS);
-  } else claude.run(command, initial);
+    tutor.clear();
+    // An agent gets the request after its /clear has run, not typed into the same input box.
+    setTimeout(() => tutor.run(command, initial), tutor.mode === 'terminal' ? CLEAR_MS : 0);
+  } else tutor.run(command, initial);
   if (converse) {
-    claude.toggle(true);
+    tutor.toggle(true);
     return;
   }
   feed.begin(label);

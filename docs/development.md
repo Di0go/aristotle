@@ -4,7 +4,7 @@ Aristotle is meant to be changed by the person using it: you notice something wh
 
 ## Setup
 
-You need Node.js 24 or newer (`.nvmrc`), [pnpm](https://pnpm.io) and [Claude Code](https://claude.com/claude-code). The tests also need `rsvg-convert` (librsvg), which `preview_svg` and `view_image` use to render images (`rsvgConvert` in [`server/images.ts`](../server/images.ts)).
+You need Node.js 24 or newer (`.nvmrc`), [pnpm](https://pnpm.io) and [Claude Code](https://claude.com/claude-code) (or, for teaching, another agent or a model API: Settings). The tests also need `rsvg-convert` (librsvg), which `preview_svg` and `view_image` use to render images (`rsvgConvert` in [`server/images.ts`](../server/images.ts)).
 
 ```sh
 pnpm install     # also points Git at .githooks/ (the gates run on commit and push)
@@ -72,7 +72,7 @@ Claude Code in the drawer runs in the release copy, so lessons use the released 
 
 The single commands: `pnpm lint` (read only: Biome lints and checks the formatting of TypeScript, CSS and JSON, Prettier the formatting of `.svelte` files), `pnpm format` (apply both), `pnpm check` (types, through `svelte-check`, which also type-checks and lints the `.svelte` files, then the server once more with `noUncheckedIndexedAccess`, [`tsconfig.server.json`](../tsconfig.server.json)), `pnpm test`, `pnpm build`.
 
-`pnpm test` runs [`tests/unit.test.ts`](../tests/unit.test.ts) (slugs, the write queue and append log, the lean map), [`tests/backup.test.ts`](../tests/backup.test.ts) (commit, push and a failing remote, on a throwaway data repository) and, end to end, [`tests/mcp.test.ts`](../tests/mcp.test.ts): a real server on a throwaway data folder and free ports (so two runs never share a server), a real MCP client in Claude Code's place (and the real bridge, driven over stdio, for cancelling), HTTP calls in the interface's place, a shell in the terminal's place, and a local stand-in for Wikimedia Commons (`ARISTOTLE_COMMONS_API`). Besides the teaching tools it covers the security lines (origins, hosts, fetch metadata, content types, headers, a malformed WebSocket frame) and the data's safety (a write refused by the disk, a line torn by a crash, an unreadable file, titles in other scripts, a sitting left open closed by the next). [`tests/docs.test.ts`](../tests/docs.test.ts) checks the docs.
+`pnpm test` runs [`tests/unit.test.ts`](../tests/unit.test.ts) (slugs, the write queue and append log, the lean map), [`tests/backup.test.ts`](../tests/backup.test.ts) (commit, push and a failing remote, on a throwaway data repository) and, end to end, [`tests/mcp.test.ts`](../tests/mcp.test.ts): a real server on a throwaway data and state folder and free ports (so two runs never share a server, and a test's settings never reach `.aristotle/`), a real MCP client in Claude Code's place (and the real bridge, driven over stdio, for cancelling), HTTP calls in the interface's place, a shell in the terminal's place, and a local stand-in for Wikimedia Commons (`ARISTOTLE_COMMONS_API`). Besides the teaching tools it covers the security lines (origins, hosts, fetch metadata, content types, headers, a malformed WebSocket frame) and the data's safety (a write refused by the disk, a line torn by a crash, an unreadable file, titles in other scripts, a sitting left open closed by the next). [`tests/tutor.test.ts`](../tests/tutor.test.ts) does the same for the other tutors: a scripted stand-in for an OpenAI-compatible API (streamed the way APIs stream, in pieces) in a model's place, so the API tutor teaches through the real tools, waits on a quiz without calling the model, stops, starts over and shows its errors; glosses and the chat on the API; OpenAI's Responses API; Settings (the key never coming back, the file readable by this user only); `method`, the prompts and `profile` for another agent; and waits in pieces for a client like Cursor. [`tests/docs.test.ts`](../tests/docs.test.ts) checks the docs.
 
 `pnpm serve` runs the server in the foreground, for debugging it on its own.
 
@@ -118,23 +118,37 @@ Every setting is an environment variable with a default. `.env` is not read: set
 | `ARISTOTLE_HOSTNAME` | The clean name (the address it shows and tls.sh's certificate). | [`config.ts`](../server/config.ts) |
 | `ARISTOTLE_TLS_DIR` | HTTPS for the clean name: a certificate from scripts/tls.sh, served on its own port that 443 is forwarded to. | [`config.ts`](../server/config.ts) |
 | `ARISTOTLE_TLS_PORT` | The HTTPS port, which the clean name's port 443 is forwarded to. | [`config.ts`](../server/config.ts) |
-| `ARISTOTLE_SETTINGS` | This install's own choices, kept out of git: settings.json in the state directory (for example {"accent": "red"}). | [`config.ts`](../server/config.ts) |
+| `ARISTOTLE_SETTINGS` | This install's own choices, kept out of git: settings.json in the state directory (for example {"accent": "red"}), and which tutor teaches (server/settings.ts). | [`config.ts`](../server/config.ts) |
 | `ARISTOTLE_VITE_PORT` | The Vite dev server's port (vite.config.ts), which proxies to this server in dev. | [`config.ts`](../server/config.ts) |
 | `ARISTOTLE_BACKUP` | Commit data/ after quiet periods (server/backup.ts). | [`config.ts`](../server/config.ts) |
 | `ARISTOTLE_TERMINAL_QUIET_MS` | How long a just-started Claude Code must be quiet before messages are typed into it (terminal.ts); short in tests. | [`config.ts`](../server/config.ts) |
 | `ARISTOTLE_CLAUDE_CMD` | The command the terminal drawer runs (server/terminal.ts); tests swap in a shell. | [`config.ts`](../server/config.ts) |
 | `ARISTOTLE_ONESHOT_MODEL` | The model for glosses and his questions on a passage (server/oneshot.ts): an alias Claude Code knows, on his own login. | [`config.ts`](../server/config.ts) |
+| `ARISTOTLE_API_KEY` | A key for the model API (server/settings.ts), for anyone who would rather not keep it in settings.json; a key saved there comes first. | [`config.ts`](../server/config.ts) |
 | `ARISTOTLE_COMMONS_API` | Wikimedia Commons' API, which find_images and glosses search; tests point it at a local stand-in. | [`config.ts`](../server/config.ts) |
 | `ARISTOTLE_GLOSS_IMAGES` | Whether a gloss may carry a picture from Wikimedia Commons, when one would help (off in the tests: no network). | [`config.ts`](../server/config.ts) |
 | `ARISTOTLE_ONESHOT_CMD` | A command that reads a question on stdin and prints the answer, in place of Claude Code (oneshot.ts); tests swap one in. | [`config.ts`](../server/config.ts) |
 | `ARISTOTLE_WAIT_MS` | How long quiz and ask wait without a sign of him before handing control back to Claude: from the question, or from the last time the interface said he was there (POST /api/presence), whichever is later. | [`config.ts`](../server/config.ts) |
 | `ARISTOTLE_WAIT_CAP_MS` | The longest a quiz or ask waits however long he keeps working on it, so a page left open can't hold a call forever. | [`config.ts`](../server/config.ts) |
+| `ARISTOTLE_WAIT_SLICE_MS` | How long one piece of a wait lasts for a client that ends tool calls after a minute whatever they report (Cursor's CLI, mcp.ts): the wait comes in pieces, each ending in "still waiting"; short in tests. | [`config.ts`](../server/config.ts) |
 | `ARISTOTLE_CLAUDE_CWD` |  | [`config.ts`](../server/config.ts) |
 | `ARISTOTLE_DRAWER` | The tutor in Aristotle's terminal drawer (server/terminal.ts sets this): a lesson, where commits released meanwhile must never send it off to write docs. | [`claude-stop-hook.ts`](../scripts/claude-stop-hook.ts) |
 | `ARISTOTLE_RELEASE_DIR` | Where the release copy lives: a Git worktree of this repository that the live service runs. | [`release.ts`](../scripts/release.ts) |
 <!-- /generated -->
 
-This install's own choices (not in Git) go in `.aristotle/settings.json`, e.g. `{"accent": "red"}` (blue, red, violet or graphite).
+This install's own choices (not in Git) go in `.aristotle/settings.json`, e.g. `{"accent": "red"}` (blue, red, violet or graphite). Who teaches is kept there too, set from Settings in the app ([`server/settings.ts`](../server/settings.ts)):
+
+```json
+{
+  "tutor": "api",
+  "helpers": "api",
+  "api": { "provider": "ollama", "baseUrl": "http://localhost:11434/v1", "model": "qwen3:30b", "helperModel": "qwen3:4b", "vision": false }
+}
+```
+
+`tutor` is `claude-code` (the default), `codex`, `gemini`, `opencode` or `api`; `helpers` (what writes glosses, questions on a passage and the chat) is `claude-code` or `api`, and follows the tutor when unset. The API key is saved there as `apiKey` by Settings (the file is readable by you only), or comes from `ARISTOTLE_API_KEY`. `agentCommand`, set only by hand, replaces the agent's command in the drawer (a wrapper, a path).
+
+To try another agent or the API tutor on the dev instance: the API tutor runs in the dev server itself, so Settings in the dev app is enough. An agent in the drawer would teach through the live app's server, so run it from a folder of its own whose MCP config starts the bridge with `ARISTOTLE_INSTANCE=dev`.
 
 ## Troubleshooting
 

@@ -13,7 +13,7 @@ data/
 ├── notes.json                his notebook on each step, in his words
 ├── about.md                  About you: what he does and wants, in his words
 ├── chats/<thread>.json       the chat beside each class ("home" for the rest), and its Claude Code session
-└── profile.md                what the tutor has learned about how he learns (written by the skills)
+└── profile.md                what the tutor has learned about how they learn (the MCP tool `profile`)
 ```
 
 The types are in [`shared/types.ts`](../shared/types.ts); that file is the schema. Ids and slugs come from titles through [`slugify`](../server/slug.ts), which keeps letters of any script (`Ἀρετή` is `αρετη`, `日本語の文法` stays as it is) and drops Latin accents. Before that, letters outside a-z were dropped (so every Greek or Japanese title became `untitled`); records made then keep their ids, and lookups by title try both forms (`slugCandidates`).
@@ -67,9 +67,13 @@ Quiz items keep the right answers and explanations; the interface only receives 
 
 `notes.json` is an array of `StepNote`: the topic, the id of the step's block, the step's title when he wrote it, his text and when; an emptied notebook is removed. `about.md` is his About you page as plain text. Both are written only from the interface ([`notes.ts`](../server/notes.ts)); `get_topic` lists a topic's notes, `read_about` returns About you.
 
+`profile.md` is the tutor's own short notes on how they learn, Markdown, rewritten whole through the MCP tool `profile` (which reads it from the file every time, so a Claude Code still editing it directly is read right).
+
+Not data: who teaches (Settings) is this install's choice, kept with the accent in the state folder's `settings.json`, and so is the API tutor's conversation (`tutor-api.json`), like Claude Code's own sessions.
+
 ## Chats
 
-`chats/<thread>.jsonl` is a chat's log, appended to and never rewritten ([`chat.ts`](../server/chat.ts)): one JSON object per line, `{"op":"message","message":…}` (his or Aristotle's, with when; his keep what he tagged with `@`, an answer he stopped is marked), `{"op":"session","session":…}` (the Claude Code session it continues, or none) and `{"op":"clear"}` (started over). The thread is a class's slug, or `home`. A chat from before logs were used is a whole `chats/<thread>.json` (a `ChatThread`); it is still read, never rewritten, and its log, if any, applies on top of it. The interface loads a chat's newest 300 messages.
+`chats/<thread>.jsonl` is a chat's log, appended to and never rewritten ([`chat.ts`](../server/chat.ts)): one JSON object per line, `{"op":"message","message":…}` (his or Aristotle's, with when; his keep what he tagged with `@`, an answer he stopped is marked), `{"op":"session","session":…}` (the Claude Code session it continues, or none; a chat answered by the model API has none, and sends its recent messages instead) and `{"op":"clear"}` (started over). The thread is a class's slug, or `home`. A chat from before logs were used is a whole `chats/<thread>.json` (a `ChatThread`); it is still read, never rewritten, and its log, if any, applies on top of it. The interface loads a chat's newest 300 messages.
 
 ## Backup
 

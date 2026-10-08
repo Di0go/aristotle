@@ -44,7 +44,7 @@ class Asides {
         q.answer = data as Aside;
         q.state = 'answered';
       } else {
-        q.error = data.error ?? 'Claude could not answer';
+        q.error = data.error ?? 'No answer came back';
         q.state = 'error';
       }
     } catch {

@@ -1,6 +1,6 @@
 <script lang="ts">
-  // The thin strip on the far left: the main places, Claude, and the look settings.
-  import { claude } from './claude.svelte.ts';
+  // The thin strip on the far left: the main places, then Settings (who teaches), focus and the look.
+  import { tutor } from './tutor.svelte.ts';
   import { feed } from './feed.svelte.ts';
   import { focus } from './focus.svelte.ts';
   import { link, router } from './router.svelte.ts';
@@ -14,6 +14,7 @@
   const COURSES = 'M4 4h3.5v12H4zM8.5 4H12v12H8.5zM13.2 4.6l3.2-.9 3 11.6-3.2.9z';
   const MAP = 'M5 6.5a1.8 1.8 0 1 0 0-.01M15 5.5a1.8 1.8 0 1 0 0-.01M10 15a1.8 1.8 0 1 0 0-.01M6.8 6.3l6.4-.8M6 8.2l3 5.2M14 7.2l-3 5.9';
   const REVIEW = 'M15.5 8A5.8 5.8 0 0 0 4.7 7.2M4.5 4.5v2.9h2.9M4.5 12a5.8 5.8 0 0 0 10.8.8M15.5 15.5v-2.9h-2.9';
+  const SETTINGS = 'M4 6.5h6M14 6.5h2M4 13.5h2M10 13.5h6M12 4.5v4M8 11.5v4';
 
   /** The appearance popover is open. */
   let settings = $state(false);
@@ -76,6 +77,17 @@
   </a>
 
   <span class="space"></span>
+
+  <a
+    class="rib"
+    class:on={route.page === 'settings'}
+    href={link.settings()}
+    title="Who teaches: Claude Code, another agent, or a model API"
+  >
+    <svg viewBox="0 0 20 20" aria-hidden="true"><path d={SETTINGS} /></svg>
+    <span class="lbl">Settings</span>
+    {#if tutor.problem}<i class="pip turn" title={tutor.problem}></i>{/if}
+  </a>
 
   <button class="rib" onclick={() => focus.toggle(true)} title="Focus: hide everything but the page (F)">
     <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 7.5V4h3.5M12.5 4H16v3.5M16 12.5V16h-3.5M7.5 16H4v-3.5" /></svg>

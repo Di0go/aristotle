@@ -2,6 +2,7 @@
   // One Praxis mission: why it matters, what to do, when it's done, the concepts it uses; then his debrief
   // and Claude's review. He writes the debrief here; the review comes back here.
   import { setContext } from 'svelte';
+  import { tutor } from '../lib/tutor.svelte.ts';
   import { actions } from '../lib/actions.ts';
   import { feed } from '../lib/feed.svelte.ts';
   import { formatDay } from '../lib/format.ts';
@@ -135,13 +136,13 @@
       {:else if mission.status === 'debriefed'}
         <div class="foot">
           <button class="ghost" onclick={rewrite}>Edit</button>
-          <button class="primary" onclick={() => actions.reviewMission(mission.id)}>Ask Claude to review it</button>
+          <button class="primary" onclick={() => actions.reviewMission(mission.id)}>Ask {tutor.name} to review it</button>
         </div>
       {/if}
 
       {#if mission.review && !writing}
         <div class="review verdict-{mission.review.verdict}">
-          <p class="kicker">Claude's review, {formatDay(mission.review.at)} · <strong>{VERDICT_LABEL[mission.review.verdict]}</strong></p>
+          <p class="kicker">Review, {formatDay(mission.review.at)} · <strong>{VERDICT_LABEL[mission.review.verdict]}</strong></p>
           <Markdown source={mission.review.markdown} />
           {#if mission.status === 'reviewed'}
             <div class="foot"><button class="ghost small" onclick={rewrite}>Try again and write a new debrief</button></div>

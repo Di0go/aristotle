@@ -1,125 +1,43 @@
 <script lang="ts">
-  // Claude Code's terminal, docked at the bottom of every page. xterm.js loads on first open.
-  import { onMount } from 'svelte';
-  import { claude } from './claude.svelte.ts';
+  // The tutor's drawer, docked at the bottom of every page: an agent's terminal (TerminalView), or the API tutor's
+  // conversation (TutorConversation), with what runs there and the controls that go with it.
+  import { link } from './router.svelte.ts';
   import { migrateKey } from './storage.ts';
-  import { theme as look } from './theme.svelte.ts';
-  import type { FitAddon } from '@xterm/addon-fit';
-  import type { Terminal as XTerm } from '@xterm/xterm';
+  import TerminalView from './TerminalView.svelte';
+  import { tutor } from './tutor.svelte.ts';
+  import TutorConversation from './TutorConversation.svelte';
+  import { AGENTS } from '../../../shared/tutor.ts';
 
   const HEIGHT_KEY = 'aristotle.drawer-height';
   /** The name it had before the app was renamed, moved over on first read. */
   const OLD_HEIGHT_KEY = 'mind-gym.drawer-height';
 
-  /** ANSI colours readable on Aristotle's own surfaces, one set per mode. */
-  const ANSI_DARK = {
-    black: '#3a3936',
-    red: '#f08a76',
-    green: '#6cc58f',
-    yellow: '#e2b34f',
-    blue: '#6ea8f0',
-    magenta: '#d68bd0',
-    cyan: '#5cc4c9',
-    white: '#d8d5cf',
-    brightBlack: '#6b6862',
-    brightRed: '#f5a593',
-    brightGreen: '#8fd8ab',
-    brightYellow: '#f0c870',
-    brightBlue: '#94c0f5',
-    brightMagenta: '#e3a8de',
-    brightCyan: '#86d6da',
-    brightWhite: '#ffffff',
-  };
-  const ANSI_LIGHT = {
-    black: '#1f1e1c',
-    red: '#b4402f',
-    green: '#2f7d4f',
-    yellow: '#8a6200',
-    blue: '#2a63b8',
-    magenta: '#9b3c8f',
-    cyan: '#1d7480',
-    white: '#8a877f',
-    brightBlack: '#6b6862',
-    brightRed: '#c9503c',
-    brightGreen: '#3a9460',
-    brightYellow: '#a87900',
-    brightBlue: '#3a78d2',
-    brightMagenta: '#b24fa5',
-    brightCyan: '#258896',
-    brightWhite: '#4a4843',
-  };
-
-  let host = $state<HTMLDivElement>();
   let height = $state(readHeight());
-  let term: XTerm | null = null;
-  let fitAddon: FitAddon | null = null;
 
-  onMount(() => {
-    let unsubscribe = () => {};
-    let disposed = false;
-    const observer = new ResizeObserver(() => fit());
+  /** "Claude Code", "Codex CLI"…, or the API tutor. */
+  const title = $derived(
+    tutor.mode === 'api' ? 'Tutor · Aristotle' : `Terminal · ${AGENTS.find((a) => a.id === tutor.engine)?.name ?? tutor.name}`,
+  );
+  const where = $derived(
+    !tutor.connected
+      ? 'Connecting…'
+      : tutor.problem
+        ? tutor.problem
+        : tutor.mode === 'api'
+          ? `on ${shortModel(tutor.command)}`
+          : tutor.running
+            ? 'Running in the Aristotle folder'
+            : 'Not running',
+  );
 
-    void (async () => {
-      const [{ Terminal }, { FitAddon }] = await Promise.all([
-        import('@xterm/xterm'),
-        import('@xterm/addon-fit'),
-        import('@xterm/xterm/css/xterm.css'),
-      ]);
-      // The drawer may have gone while xterm was loading.
-      if (disposed || !host) return;
-      term = new Terminal({
-        fontFamily: "'JetBrains Mono Variable', ui-monospace, monospace",
-        fontSize: 13.5,
-        lineHeight: 1.15,
-        cursorBlink: true,
-        cursorStyle: 'bar',
-        cursorWidth: 2,
-        allowProposedApi: false,
-        scrollback: 5000,
-        theme: xtermTheme(),
-      });
-      fitAddon = new FitAddon();
-      term.loadAddon(fitAddon);
-      term.open(host);
-      term.onData((data) => claude.input(data));
-      term.onKey(() => claude.keyed());
-      // A replay is the whole screen so far: start from a clean terminal, or it would print twice.
-      unsubscribe = claude.subscribe((data, replay) => {
-        if (replay) term?.reset();
-        term?.write(data);
-      });
-      observer.observe(host);
-      fit();
-      term.focus();
-    })();
-
-    return () => {
-      disposed = true;
-      unsubscribe();
-      observer.disconnect();
-      term?.dispose();
-    };
-  });
-
-  // Follow Aristotle's theme switch.
-  $effect(() => {
-    void look.value;
-    requestAnimationFrame(() => term && (term.options.theme = xtermTheme()));
-  });
+  /** A model as people name it: a local server's file path ("/opt/models/qwen3-32b.gguf") without its folder and suffix. */
+  function shortModel(model: string): string {
+    return model.replace(/^.*\//, '').replace(/\.gguf$/i, '') || 'a model API';
+  }
 
   // Tell the page how much of the bottom the drawer covers, so nothing hides behind it.
   $effect(() => {
-    document.documentElement.style.setProperty('--drawer-space', claude.open ? `${height}px` : '0px');
-  });
-
-  // Refit and focus whenever the drawer opens (a frame later, once it is laid out).
-  $effect(() => {
-    if (claude.open) {
-      requestAnimationFrame(() => {
-        fit();
-        term?.focus();
-      });
-    }
+    document.documentElement.style.setProperty('--drawer-space', tutor.open ? `${height}px` : '0px');
   });
 
   function readHeight(): number {
@@ -141,28 +59,7 @@
     }
   }
 
-  /** xterm's colours: the page's surface and ink, the accent for the cursor, and the ANSI set for the mode. */
-  function xtermTheme() {
-    const css = getComputedStyle(document.documentElement);
-    const v = (name: string) => css.getPropertyValue(name).trim();
-    return {
-      background: v('--b0'),
-      foreground: v('--fg'),
-      cursor: v('--acc'),
-      cursorAccent: v('--b0'),
-      selectionBackground: v('--accent-soft'),
-      ...(look.dark ? ANSI_DARK : ANSI_LIGHT),
-    };
-  }
-
-  /** Fits the terminal to the drawer and tells Claude Code its new size. Only while open: a hidden drawer has none. */
-  function fit() {
-    if (!term || !fitAddon || !claude.open) return;
-    fitAddon.fit();
-    claude.resize(term.cols, term.rows);
-  }
-
-  /** Drag the top edge: between 160px and all but 120px of the window. Saved and refitted on release. */
+  /** Drag the top edge: between 160px and all but 120px of the window. Saved on release. */
   function startResize(e: PointerEvent) {
     const startY = e.clientY;
     const startH = height;
@@ -175,30 +72,43 @@
       target.removeEventListener('pointermove', move);
       target.removeEventListener('pointerup', up);
       saveHeight();
-      fit();
     };
     target.addEventListener('pointermove', move);
     target.addEventListener('pointerup', up);
   }
 </script>
 
-<section class="drawer" class:open={claude.open} style:height="{height}px" aria-label="Claude Code" aria-hidden={!claude.open}>
+<section class="drawer" class:open={tutor.open} style:height="{height}px" aria-label="The tutor" aria-hidden={!tutor.open}>
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div class="drawer-grip" onpointerdown={startResize} title="Drag to resize"></div>
   <header class="drawer-head">
-    <span class="drawer-title"><i class="run-dot" class:on={claude.running}></i>Terminal · Claude Code</span>
-    <span class="muted drawer-state">
-      {#if !claude.connected}Connecting…{:else if claude.running}Running in ~/Projects/Aristotle{:else}Not running{/if}
-    </span>
+    <span class="drawer-title"><i class="run-dot" class:on={tutor.running} class:off={Boolean(tutor.problem)}></i>{title}</span>
+    <span class="muted drawer-state" title={tutor.command}>{where}</span>
     <div class="drawer-actions">
-      {#if claude.connected && !claude.running}
-        <button class="primary small" onclick={() => claude.start()}>Start Claude</button>
-        <button class="ghost small" onclick={() => claude.start(true)} title="claude --continue">Resume last</button>
-      {:else if claude.running}
-        <button class="ghost small" onclick={() => claude.stop()} title="End this Claude Code session">Stop</button>
+      {#if tutor.mode === 'api'}
+        {#if tutor.entries.length && !tutor.busy}
+          <button class="ghost small" onclick={() => tutor.clear()} title="Start a new conversation (the lesson's record stays)"
+            >New conversation</button
+          >
+        {/if}
+      {:else if tutor.connected && !tutor.running && !tutor.problem}
+        <button class="primary small" onclick={() => tutor.start()}>Start {tutor.name}</button>
+        <button class="ghost small" onclick={() => tutor.start(true)} title="Carry on its last conversation">Resume last</button>
+      {:else if tutor.running}
+        <button class="ghost small" onclick={() => tutor.stop()} title="End this {tutor.name} session">Stop</button>
       {/if}
-      <button class="ghost small" onclick={() => claude.toggle(false)} aria-label="Hide the terminal" title="Hide (Ctrl+`)">Hide</button>
+      <a
+        class="button ghost small"
+        href={link.settings()}
+        onclick={() => tutor.toggle(false)}
+        title="Who teaches: Claude Code, another agent, or a model API">Settings</a
+      >
+      <button class="ghost small" onclick={() => tutor.toggle(false)} aria-label="Hide the drawer" title="Hide (Ctrl+`)">Hide</button>
     </div>
   </header>
-  <div class="xterm-host" bind:this={host}></div>
+  {#if tutor.mode === 'api'}
+    <TutorConversation />
+  {:else}
+    <TerminalView />
+  {/if}
 </section>

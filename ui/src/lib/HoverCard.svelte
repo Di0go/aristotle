@@ -204,7 +204,7 @@
   {/if}
   <div class="hc-body hc-gloss md-box">{@html renderMarkdown(gloss.gloss)}</div>
   <p class="hc-meta hc-foot">
-    <span>Glossed by Claude {onDay(gloss.at)}</span>
+    <span>Glossed {onDay(gloss.at)}</span>
     <button
       class="link"
       onclick={() => {
@@ -232,7 +232,7 @@
     {:else}
       <p class="hc-title">{pin.text}</p>
       {#if pin.state === 'loading'}
-        <p class="hc-body hc-wait"><span class="dot" aria-hidden="true"></span>Claude is writing a gloss…</p>
+        <p class="hc-body hc-wait"><span class="dot" aria-hidden="true"></span>Writing a gloss…</p>
       {:else}
         <p class="hc-body hc-error">{pin.error}</p>
       {/if}

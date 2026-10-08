@@ -4,7 +4,7 @@
   // (Step.svelte). Nothing starts by coming here: Claude starts only when he presses Continue or writes in the box,
   // and when the lesson starts he is taken to the step being taught.
   import { actions } from '../lib/actions.ts';
-  import { claude } from '../lib/claude.svelte.ts';
+  import { tutor } from '../lib/tutor.svelte.ts';
   import { classes } from '../lib/classes.svelte.ts';
   import { feed } from '../lib/feed.svelte.ts';
   import { ago } from '../lib/format.ts';
@@ -138,14 +138,18 @@
               bind:value={text}
               onkeydown={onKey}
               rows="1"
-              placeholder={started ? 'Anything to tell Claude first? Or just continue…' : 'Say what you want from it, or just start…'}
-              aria-label="Your first words to Claude"></textarea>
+              placeholder={started
+                ? `Anything to tell ${tutor.name} first? Or just continue…`
+                : 'Say what you want from it, or just start…'}
+              aria-label="Your first words to the tutor"></textarea>
             <button class={where?.page ? 'ghost' : 'primary'} onclick={() => begin(text)}>{started ? 'Continue' : 'Start'}</button>
           </div>
           {#if feed.starting}
-            <p class="composer-off picking-up"><span class="spinner" aria-hidden="true"></span>Claude is picking up the class…</p>
+            <p class="composer-off picking-up"><span class="spinner" aria-hidden="true"></span>{tutor.name} is picking up the class…</p>
           {:else}
-            <p class="composer-off">{claude.running ? 'Claude picks it up from here.' : 'This starts Claude here in Aristotle.'}</p>
+            <p class="composer-off">
+              {tutor.running ? `${tutor.name} picks it up from here.` : tutor.problem || `This starts ${tutor.name} here in Aristotle.`}
+            </p>
           {/if}
         </div>
       {/if}

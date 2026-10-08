@@ -17,16 +17,16 @@
 <p align="center">
   <img alt="Runs on Claude Code" src="https://img.shields.io/badge/runs%20on-Claude%20Code-d97757?style=flat-square">
   <img alt="Local first" src="https://img.shields.io/badge/data-local%20%26%20plain%20files-2e8b57?style=flat-square">
-  <img alt="No API keys" src="https://img.shields.io/badge/API%20keys-none-555?style=flat-square">
+  <img alt="Or any agent, any model" src="https://img.shields.io/badge/or-any%20agent%20%C2%B7%20any%20model%2C%20local%20too-555?style=flat-square">
   <img alt="Svelte 5" src="https://img.shields.io/badge/Svelte-5-ff3e00?style=flat-square&logo=svelte&logoColor=white">
   <img alt="TypeScript on Node 24+" src="https://img.shields.io/badge/TypeScript-Node%2024%2B-3178c6?style=flat-square&logo=typescript&logoColor=white">
 </p>
 
 ---
 
-**Aristotle is a personal tutor that lives on your machine.** [Claude Code](https://claude.com/claude-code) does the teaching; Aristotle is the room you learn in. Lessons come one reasoning step at a time, each followed by a question you answer yourself, and they are drawn, animated and explorable rather than walls of text. A living map shows what you understand, spaced review catches what is fading, training sets get harder as you do, and missions take what you learned out into your own life.
+**Aristotle is a personal tutor that lives on your machine.** An AI agent does the teaching, [Claude Code](https://claude.com/claude-code) unless you pick another; Aristotle is the room you learn in. Lessons come one reasoning step at a time, each followed by a question you answer yourself, and they are drawn, animated and explorable rather than walls of text. A living map shows what you understand, spaced review catches what is fading, training sets get harder as you do, and missions take what you learned out into your own life.
 
-It runs on your Claude subscription. No API keys, no accounts, no cloud: everything you learn is a plain file you own.
+It runs on your Claude subscription, with no API keys. Or let Codex, Gemini CLI or opencode teach, or any model behind an OpenAI-compatible API: OpenAI, OpenRouter, or one on your own machine with Ollama, LM Studio or llama.cpp. No accounts, no cloud: everything you learn is a plain file you own.
 
 <p align="center">
   <a href="docs/images/hero-dark.webp"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/hero-dark.webp"><img src="docs/images/hero-light.webp" alt="A lesson in Aristotle: the step &quot;Where the beat starts&quot;, with an engraving of the heart from Gray's Anatomy, the courses in the library beside it, and a chat with Aristotle answering a question about the step." width="100%"></picture></a>
@@ -118,11 +118,11 @@ Also: step-through sequences, callouts, highlights, and drawings the tutor makes
   </tr>
 </table>
 
-Plus your own notes on every step, an About you page that missions and courses are built from, a Progress page, a replayable history, focus mode (<kbd>F</kbd>), light and dark themes, and Claude Code's own terminal one keystroke away (<kbd>Ctrl</kbd> <kbd>`</kbd>), opening by itself when it needs you.
+Plus your own notes on every step, an About you page that missions and courses are built from, a Progress page, a replayable history, focus mode (<kbd>F</kbd>), light and dark themes, and the tutor's own terminal one keystroke away (<kbd>Ctrl</kbd> <kbd>`</kbd>), opening by itself when it needs you.
 
 ## Quick start
 
-**You need** Linux or macOS, [Node.js](https://nodejs.org) 24.2 or newer, [pnpm](https://pnpm.io), and [Claude Code](https://claude.com/claude-code) signed in with a Claude subscription. `rsvg-convert` (librsvg) is optional, for checking drawings before they are shown.
+**You need** Linux or macOS, [Node.js](https://nodejs.org) 24.2 or newer, [pnpm](https://pnpm.io), and a tutor: [Claude Code](https://claude.com/claude-code) signed in with a Claude subscription, or [another one](#another-tutor). `rsvg-convert` (librsvg) is optional, for checking drawings before they are shown.
 
 ```sh
 git clone https://github.com/Di0go/aristotle.git
@@ -134,6 +134,18 @@ pnpm start          # builds the interface and starts the server
 Open **http://localhost:4747** and type what you want to learn, or plan a course. Aristotle starts Claude Code by itself when you open it (in a terminal inside the app, on your own login), and the lesson begins. The first time, Claude Code asks you to trust the folder and to enable the `aristotle` MCP server: accept both.
 
 You can also talk to the tutor from your own terminal: run `claude` in the project folder and say `/teach <anything>`.
+
+### Another tutor
+
+Open **Settings** (in the left strip) and choose who teaches. Whichever you choose works through the same tools and follows the same method, and your library stays as it is.
+
+| Tutor | What you need |
+|---|---|
+| **Claude Code** (default) | Claude Code, on your Claude subscription |
+| **Codex CLI**, **Gemini CLI**, **opencode** | The CLI installed and signed in. It runs in the same drawer, reaches Aristotle's tools over MCP, and reads the method through them (this folder has their config: `opencode.json`, `.gemini/settings.json`, and Codex gets its own on the command line). |
+| **A model API** | An address and a model: [OpenRouter](https://openrouter.ai) or OpenAI with a key, or a local server with none (Ollama, LM Studio, llama.cpp, vLLM). Aristotle runs the tutor itself: the conversation, the tools, a web search to check facts. Pick a model that can call tools; a local one needs a context of 32k tokens or more (for Ollama: `OLLAMA_CONTEXT_LENGTH=64000`). |
+
+Glosses, questions on a passage and the chat beside a lesson can run on the model API too, with a smaller model if you like. Any other MCP client can teach from its own window too: point it at `node server/bridge.ts` (or `http://127.0.0.1:4747/mcp`) and ask it to use the `method` tool.
 
 <details>
 <summary><b>Optional (Linux): run it at login, and give it a clean https name</b></summary>
@@ -161,7 +173,9 @@ Then Aristotle lives at **https://aristotle.test**. The certificate authority is
 | `pnpm release` | Ship what you committed to the app you learn in, with a rollback |
 | `pnpm gates` | Every check: docs, lint, types, end-to-end tests, build |
 
-### In Claude Code
+### Ask the tutor
+
+In Claude Code these are slash commands; any other tutor gets the same skill when you ask for it in words ("teach me …", "review what's fading"), or as a prompt where the client offers them.
 
 | Skill | For |
 |---|---|
@@ -177,10 +191,10 @@ Then Aristotle lives at **https://aristotle.test**. The certificate authority is
   <picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/architecture-dark.svg"><img src="docs/images/architecture-light.svg" alt="Diagram of how it works: Claude Code, the tutor, talks over stdio to server/bridge.ts, which talks MCP over HTTP to the Node server on 127.0.0.1:4747. The server and the browser (Svelte 5) exchange live events over SSE, and the server streams a pseudo-terminal to the browser over a WebSocket. The server reads and writes data/, plain files." width="874"></picture>
 </p>
 
-- **Claude Code is the tutor; the server is the classroom.** The server exposes its tools over [MCP](https://modelcontextprotocol.io) (`show`, `quiz`, `ask`, `update_map`, `record_practice`, `save_roadmap`, `save_mission`, `review_mission` and more), and the bridge starts it on demand. A question waits for your answer in the browser and hands it back to Claude, so the tutor reacts to what you actually wrote.
-- **The method lives in skills** (`.claude/skills/`): `teach`, `review`, `train`, `roadmap` and `praxis`. A `researcher` subagent fact-checks claims before they are taught, and an `illustrator` subagent draws diagrams and checks them rendered in both themes.
-- **A second Claude beside the tutor.** The chat, glosses and questions on a passage run `claude -p` on your own login, headless and with no tools, given what you are looking at; the chat continues one session per class. The tutor reads what you asked there.
-- **Claude Code in the page.** The server runs `claude` in a pseudo-terminal and streams it to a terminal in the interface, started when you open the app. It is the ordinary interactive Claude Code on your own subscription. Its WebSocket only accepts the app's own pages (exact Host and Origin checks), no other site can frame the app, and the server only listens on loopback and only answers your own user's connections.
+- **An agent is the tutor; the server is the classroom.** The server exposes its tools over [MCP](https://modelcontextprotocol.io) (`show`, `quiz`, `ask`, `update_map`, `record_practice`, `save_roadmap`, `save_mission`, `review_mission` and more), and the bridge starts it on demand. A question waits for your answer in the browser and hands it back to the tutor, so it reacts to what you actually wrote. Any MCP client can be the tutor; with a model API, Aristotle runs the tutor itself, calling the same tools in process.
+- **The method lives in skills** (`.claude/skills/`): `teach`, `review`, `train`, `roadmap` and `praxis`. A `researcher` subagent fact-checks claims before they are taught, and an `illustrator` subagent draws diagrams and checks them rendered in both themes. Claude Code loads them itself; every other tutor reads them through the `method` tool, and the rules every sitting keeps are in `AGENTS.md`.
+- **A second assistant beside the tutor.** The chat, glosses and questions on a passage run `claude -p` on your own login, headless and with no tools (or the model API, if you choose), given what you are looking at; the chat continues one conversation per class. The tutor reads what you asked there.
+- **The tutor in the page.** The server runs the agent (`claude`, or the one you chose) in a pseudo-terminal and streams it to a terminal in the interface, started when you open the app. It is the ordinary interactive agent on your own login. The API tutor shows its conversation there instead. Its WebSocket only accepts the app's own pages (exact Host and Origin checks), no other site can frame the app, and the server only listens on loopback and only answers your own user's connections.
 - **Your data is plain files**, written atomically and readable without the app:
 
   ```
@@ -192,7 +206,7 @@ Then Aristotle lives at **https://aristotle.test**. The certificate authority is
   ├── chats/       the chat beside each class
   ├── glosses.json, asides.json, notes.json   words you looked up, questions on passages, your notes on steps
   ├── about.md     About you, in your words
-  └── profile.md   what the tutor has learned about how you learn
+  └── profile.md   what the tutor has learned about how you learn (the `profile` tool)
   ```
 
   `data/` is never part of this repository (it is in `.gitignore`), so your learning history stays yours.
@@ -223,7 +237,7 @@ Aristotle is meant to change as you use it. `pnpm dev` runs a second instance be
 server/      Node HTTP server, run directly as TypeScript: MCP tools, feed, maps, reviews, missions, search
 ui/          Svelte 5 + Vite interface: pages, the visual kit, explorables, charts
 shared/      types shared by both
-.claude/     the skills and subagents that make up the method
+.claude/     the skills and subagents that make up the method (AGENTS.md: the rules every tutor keeps)
 scripts/     dev instance, seed data, gates, release, docs, the login service and hostname setup
 tests/       end-to-end tests, and the tests that keep the docs true
 docs/        how it is built and how to change it

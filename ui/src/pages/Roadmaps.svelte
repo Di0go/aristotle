@@ -2,7 +2,7 @@
   // The library: what you have, at a glance. Roadmaps as compact cards (progress per step, the next step),
   // then every topic in one table you can filter and sort. New roadmaps and topics start from the header.
   import { actions } from '../lib/actions.ts';
-  import { claude } from '../lib/claude.svelte.ts';
+  import { tutor } from '../lib/tutor.svelte.ts';
   import { feed } from '../lib/feed.svelte.ts';
   import { ago, plural } from '../lib/format.ts';
   import { countsOf, placeOf, stepsOf } from '../lib/library.ts';
@@ -21,7 +21,7 @@
   const MAKER = {
     roadmap: {
       title: 'Plan a course',
-      help: 'Name a field or a big goal. Claude asks what you want from it, checks the field, and drafts its classes on the course page for you to change. Nothing is taught until you approve it.',
+      help: 'Name a field or a big goal. Your tutor asks what you want from it, checks the field, and drafts its classes on the course page for you to change. Nothing is taught until you approve it.',
       what: 'e.g. sports psychology',
       whatLabel: 'Field or goal',
       goal: 'Where you want to end up (optional)',
@@ -127,7 +127,7 @@
         <button class="primary" type="submit">{m.submit}</button>
       </div>
       <p class="maker-foot muted">
-        {claude.running ? 'Claude switches to it.' : 'Starts Claude here.'}
+        {tutor.running ? `${tutor.name} switches to it.` : `Starts ${tutor.name} here.`}
         <button type="button" class="link" onclick={() => (making = null)}>Cancel</button>
       </p>
     </form>
@@ -182,8 +182,8 @@
       <p class="muted">No course matches “{filter}”.</p>
     {:else}
       <p class="muted empty-line">
-        No courses yet. <button class="link" onclick={() => open('roadmap')}>Plan your first</button>: tell Claude what you want to get good
-        at and plan the path together.
+        No courses yet. <button class="link" onclick={() => open('roadmap')}>Plan your first</button>: tell {tutor.name} what you want to get
+        good at and plan the path together.
       </p>
     {/if}
   </section>

@@ -1,6 +1,6 @@
 # Extending Aristotle
 
-Recipes for the changes that come up most. Each lists every place to touch, because most features cross the line between Claude Code, the server and the interface. Work in the dev instance (`pnpm dev`, see [development.md](development.md)) and end with `pnpm gates`.
+Recipes for the changes that come up most. Each lists every place to touch, because most features cross the line between the tutor, the server and the interface. Work in the dev instance (`pnpm dev`, see [development.md](development.md)) and end with `pnpm gates`.
 
 ## The shape of a feature
 
@@ -8,10 +8,10 @@ Most features are some of these layers, in this order:
 
 1. **Data**: a type in [`shared/types.ts`](../shared/types.ts) and where it is stored ([data.md](data.md)). New fields optional, so old files still load.
 2. **Server logic**: a method on the store that owns it ([`topics.ts`](../server/topics.ts), [`feed.ts`](../server/feed.ts), [`roadmaps.ts`](../server/roadmaps.ts), [`missions.ts`](../server/missions.ts)), or on [`Gym`](../server/gym.ts) when it ties several together.
-3. **For Claude**: an MCP tool, or a change to one ([below](#add-an-mcp-tool)).
+3. **For the tutor**: an MCP tool, or a change to one ([below](#add-an-mcp-tool)). Every tutor uses the same tools: Claude Code, other agents, and the API tutor in process.
 4. **For the interface**: an API route and/or an SSE event, and the page or component that shows it.
 5. **For the method**: the skill that should use it ([teaching.md](teaching.md)).
-6. **Proof**: a test in [`tests/mcp.test.ts`](../tests/mcp.test.ts) that drives it the way Claude and the browser would.
+6. **Proof**: a test in [`tests/mcp.test.ts`](../tests/mcp.test.ts) that drives it the way Claude and the browser would ([`tests/tutor.test.ts`](../tests/tutor.test.ts) for the API tutor and other agents).
 
 ## Add an MCP tool
 
@@ -19,7 +19,8 @@ Most features are some of these layers, in this order:
 2. Keep the handler thin: validate, call a `Gym` (or store) method, format a short text answer with `text()`, or `error()` for a mistake Claude can fix.
 3. If it waits for the learner, follow `quiz`: add the item, then `waitForLearner`, and handle "No answer yet".
 4. Add it to the tool list asserted in the first test of [`tests/mcp.test.ts`](../tests/mcp.test.ts), and test what it does.
-5. Mention it in the skill that should use it, and allow it in `.claude/settings.json` if it needs no confirmation (`mcp__aristotle` already allows all).
+5. Mention it in the skill that should use it, by its bare name (each client prefixes tool names its own way), and allow it in `.claude/settings.json` if it needs no confirmation (`mcp__aristotle` already allows all; `opencode.json`, `.gemini/settings.json` and Codex's `-c` flags allow the whole server).
+6. If it returns an image, the API tutor shows it only to a model that can see; add it to `SEEING` in [`tutor-api.ts`](../server/tutor-api.ts) if it is useless without.
 
 The tool appears in [architecture.md](architecture.md#mcp-tools) by itself (`pnpm docs:gen`).
 
@@ -56,10 +57,25 @@ An explorable is a hand-built interactive figure for one topic, placed in a less
 2. Add an entry to `EXPLORABLES` in [`explorables/index.ts`](../ui/src/lib/explorables/index.ts): id, title, a one-line blurb, the topics and concepts it belongs to, and its loader.
 3. Describe its id and options to Claude in `MATH_AND_DIAGRAMS` in [`server/mcp.ts`](../server/mcp.ts).
 
+## Add an agent
+
+An agent CLI that speaks MCP can be the tutor in the drawer.
+
+1. Add it to `AGENTS` in [`shared/tutor.ts`](../shared/tutor.ts) (id, name, the short name the interface calls it, its site) and give it a line in `ABOUT` in [`Settings.svelte`](../ui/src/pages/Settings.svelte).
+2. Add its preset to `PRESETS` in [`server/agents.ts`](../server/agents.ts): its command; the arguments to start it with a first message and to carry on its last conversation; its command for a new conversation; whether it runs the skills as slash commands (only Claude Code does: the others are asked in words and read the skill with `method`).
+3. Give it the MCP server, with a tool timeout longer than `ARISTOTLE_WAIT_CAP_MS` unless it keeps a call alive while progress arrives: in its project config in this folder, or on its command line in the preset (as Codex's). Approve the server's tools there, so the tutor never stops to ask.
+4. If it says it is working in its own words, add them to `WORKING` in [`tutor.svelte.ts`](../ui/src/lib/tutor.svelte.ts), and its permission prompt to `ASKING`, so the drawer opens when it needs the learner.
+5. If it ends tool calls after a short fixed time, add its MCP client name to `SHORT_WAIT` in [`server/mcp.ts`](../server/mcp.ts): its waits then come in pieces.
+6. Try it on the dev instance from a folder of its own whose MCP config runs the bridge with `ARISTOTLE_INSTANCE=dev` (the drawer's agent teaches through the live app's server).
+
+## Add a model API provider
+
+Any OpenAI-compatible API already works as "Another OpenAI-compatible API". To give one its own entry, add it to `PROVIDERS` in [`shared/tutor.ts`](../shared/tutor.ts) (its usual address, whether it needs a key, whether it runs locally) and a line in `HINT` in [`Settings.svelte`](../ui/src/pages/Settings.svelte) saying what to know before using it. If it speaks something other than Chat Completions, give it a `protocol` in `endpoint()` in [`server/settings.ts`](../server/settings.ts) and a reader in [`server/llm.ts`](../server/llm.ts), as OpenAI's Responses API has, keeping the conversation in the Chat Completions shape.
+
 ## Add a setting
 
 1. Read it in [`server/config.ts`](../server/config.ts) from an `ARISTOTLE_*` variable with a default, and put a `/** comment */` above it: that comment is its documentation ([development.md](development.md#settings) is generated from it).
-2. A per-install choice that the learner makes once (like the accent) belongs in `.aristotle/settings.json` instead, read in `readSettings`.
+2. A per-install choice that the learner makes once (like the accent) belongs in `.aristotle/settings.json` instead, read in `readSettings`; one the interface changes (like who teaches) goes through [`server/settings.ts`](../server/settings.ts), which checks every field `PUT /api/settings` sends and keeps the file readable by this user only.
 
 ## Change the look
 

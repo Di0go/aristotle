@@ -20,7 +20,7 @@ They can come at it from the interface (it asks you with `/praxis step N of <roa
 
 1. **Read what it should use.** `get_roadmap` and `get_topic` (the step's topic; for a capstone, every step's). Note the goal concepts, the solid ones, what was shaky, and any missions already set (don't repeat one).
 2. **Look for where it lands in their life.** First what they told Aristotle themselves: `read_about` (their About you page) and, for a roadmap, its "Where they will use it" (`get_roadmap`). Those come first and are often enough. You run on the learner's own machine, so you can also look before you guess:
-   - `data/profile.md`, and your memory notes on them.
+   - their profile (`profile`), and your memory notes on them if you keep any.
    - Their projects (where they keep them; your memory notes may say): the READMEs, notes and recent `git log` of the ones that look related. Some may hold private notes, such as health or money; use only what the mission needs.
    - Their computer and tools, when the topic is technical.
    Look for a real decision, problem, habit or project where this knowledge **gives them an edge**: something they do anyway, done better, or something they want and can now reach.

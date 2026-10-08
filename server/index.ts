@@ -36,15 +36,19 @@ import { Gym } from './gym.ts';
 import { MissionError } from './missions.ts';
 import { socketOwner } from './peer.ts';
 import { Search } from './search.ts';
-import { Terminal } from './terminal.ts';
+import { agentLaunch } from './agents.ts';
+import { listModels } from './llm.ts';
+import { onPath, SettingsError, settings } from './settings.ts';
+import { Tutor } from './tutor.ts';
 import { leanTopic } from './topics.ts';
 import type { AskAnswerBody, AsideBody, FeedEvent, GlossBody, QuizAnswerBody } from '../shared/types.ts';
+import type { SettingsBody } from '../shared/tutor.ts';
 
 const gym = await Gym.load();
 const feed = gym.feed;
 const search = new Search(gym);
-const terminal = new Terminal();
-// A drawer's messages are keystrokes and resizes: a megabyte is plenty. A handful of tabs at once, no more.
+const tutor = new Tutor(gym);
+// A drawer's messages are keystrokes, resizes and messages to the tutor: a megabyte is plenty. A handful of tabs at once, no more.
 const sockets = new WebSocketServer({ noServer: true, maxPayload: 1024 * 1024 });
 const MAX_TERMINAL_CLIENTS = 8;
 /** How many of a chat's messages the interface loads. */
@@ -103,7 +107,7 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
   }
 }
 
-// The terminal runs Claude Code, so it is only ever reachable from Aristotle's own pages: a browser always
+// The drawer runs the tutor (Claude Code, another agent, or the API tutor), so it is only ever reachable from Aristotle's own pages: a browser always
 // sends an Origin on a WebSocket, and other sites (or a rebound DNS name) fail the Host and Origin checks.
 function upgrade(req: http.IncomingMessage, socket: Duplex, head: Buffer) {
   const url = new URL(req.url ?? '/', 'http://localhost');
@@ -123,7 +127,7 @@ function upgrade(req: http.IncomingMessage, socket: Duplex, head: Buffer) {
     socket.destroy();
     return;
   }
-  sockets.handleUpgrade(req, socket, head, (ws) => terminal.attach(ws));
+  sockets.handleUpgrade(req, socket, head, (ws) => tutor.attach(ws));
 }
 
 /** Claude Code's MCP endpoint (POST only). */
@@ -133,9 +137,13 @@ async function handleMcp(req: http.IncomingMessage, res: http.ServerResponse) {
     return;
   }
   // Stateless: a fresh server per request, so a restart never strands Claude Code's connection. The bridge says when
-  // it serves the tutor in the drawer, whose core tools then load up front (mcp.ts).
+  // it serves the tutor in the drawer, whose core tools then load up front, and which client it serves (mcp.ts).
   const { createMcpServer, StreamableHTTPServerTransport } = await mcpModules();
-  const mcp = createMcpServer(gym, { drawer: req.headers['x-aristotle-client'] === 'drawer' });
+  const agent = req.headers['x-aristotle-agent'];
+  const mcp = createMcpServer(gym, {
+    drawer: req.headers['x-aristotle-client'] === 'drawer',
+    client: typeof agent === 'string' && agent !== 'aristotle' ? agent : '',
+  });
   const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
   res.on('close', () => {
     void transport.close();
@@ -328,6 +336,32 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ro
     }
   }
 
+  // Who teaches (settings.ts): the interface reads and changes it; the API key only ever goes in, never out.
+  if (req.method === 'GET' && route === '/api/settings') return json(res, 200, settingsView());
+  if (req.method === 'PUT' && route === '/api/settings') {
+    const body = (await readJson(req)) as SettingsBody | null;
+    if (!body || typeof body !== 'object' || Array.isArray(body)) return json(res, 400, { error: 'Send the settings as an object' });
+    try {
+      await settings.update(body);
+      return json(res, 200, settingsView());
+    } catch (err) {
+      if (err instanceof SettingsError) return json(res, 400, { error: err.message });
+      throw err;
+    }
+  }
+  // The models the API offers, asked of it with the saved address and key.
+  if (req.method === 'GET' && route === '/api/settings/models') {
+    const { baseUrl, apiKey } = settings.api;
+    if (!baseUrl) return json(res, 400, { error: 'Set the address of the API first' });
+    try {
+      const models = await listModels({ baseUrl, apiKey }, AbortSignal.timeout(20_000));
+      settings.rememberModels(models);
+      return json(res, 200, models);
+    } catch (err) {
+      return json(res, 502, { error: (err as Error).message });
+    }
+  }
+
   // History, progress and search
   if (req.method === 'GET' && route === '/api/sessions') return json(res, 200, await gym.listSessions(params.get('topic') ?? undefined));
   if (req.method === 'GET' && route.startsWith('/api/sessions/')) {
@@ -341,6 +375,11 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ro
   if (req.method === 'GET' && route === '/api/backup') return json(res, 200, gym.backup.state());
 
   return json(res, 404, { error: 'Not found' });
+}
+
+/** The settings as the interface sees them, with whether each agent's command is on this machine. */
+function settingsView() {
+  return settings.view((id) => onPath(agentLaunch(id).file));
 }
 
 /**
@@ -543,7 +582,7 @@ async function shutdown() {
   }
   await Promise.race([gym.idle(), new Promise((r) => setTimeout(r, 3000))]);
   rmSync(PID_FILE, { force: true });
-  terminal.stop();
+  tutor.stop();
   process.exit(0);
 }
 process.on('SIGTERM', () => void shutdown());

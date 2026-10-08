@@ -30,8 +30,8 @@
   <header class="page-head">
     <h1 class="page-title">About you</h1>
     <p class="page-lede">
-      What you do, what you're working on, what you want. Claude reads this before it plans a course with you or designs a mission, so what
-      you learn lands in your own life.
+      What you do, what you're working on, what you want. Your tutor reads this before it plans a course with you or designs a mission, so
+      what you learn lands in your own life.
     </p>
   </header>
 

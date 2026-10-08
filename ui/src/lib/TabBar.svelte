@@ -31,6 +31,7 @@
     praxis: TARGET,
     mission: TARGET,
     about: 'M10 4a3 3 0 1 0 0 6a3 3 0 1 0 0-6M4.5 16.5c.8-3 3-4.5 5.5-4.5s4.7 1.5 5.5 4.5',
+    settings: 'M4 6.5h6M14 6.5h2M4 13.5h2M10 13.5h6M12 4.5v4M8 11.5v4',
   };
 
   // Read through the router so it updates on every navigation; location itself is not reactive.
@@ -69,6 +70,8 @@
         return 'Missions';
       case 'about':
         return 'About you';
+      case 'settings':
+        return 'Settings';
       case 'mission':
         return feed.missions?.[r.id]?.title ?? 'Mission';
       case 'session': {
