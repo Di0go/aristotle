@@ -48,6 +48,11 @@
   // Estimated text widths (px per character) for the sub line and the edge labels, so boxes fit their text.
   const SUB_CHAR_W = 6.2;
   const EDGE_CHAR_W = 6.4;
+  /** A box's name wraps onto up to this many lines rather than being cut short. */
+  const MAX_LINES = 4;
+  /** An edge label's pill is this tall; lifted above something riding its arrow, it takes LIFT more room. */
+  const LABEL_H = 20;
+  const LIFT = 28;
   /** How far apart arrows that join the same pair are fanned, in px. */
   const FAN = 46;
   // A pulse takes this long to travel its arrow; starts are staggered within PULSE_STAGGER_S so they don't march in step.
@@ -83,22 +88,34 @@
     // Room above the boxes for what rises out of them.
     const rising = spec.nodes.some((n) => n.makes?.length);
     const carrying = spec.edges.some((e) => e.carries);
+    // A labelled arrow has its label laid out as a step of its own between the ranks, with half of ranksep on
+    // either side, so the gap can be tighter: the label already holds the ranks apart.
+    const labelled = spec.edges.some((e) => e.label);
     g.setGraph({
       rankdir: dir,
       nodesep: dir === 'LR' ? 34 : 46,
-      ranksep: dir === 'LR' ? (carrying ? 190 : 150) : carrying ? 110 : 80,
+      ranksep: dir === 'LR' ? (carrying ? 190 : labelled ? 96 : 150) : carrying ? 110 : labelled ? 64 : 80,
       marginx: 14,
       marginy: rising ? 66 : 22,
     });
     g.setDefaultEdgeLabel(() => ({}));
     const boxes = new Map<string, { w: number; h: number; lines: string[] }>();
     for (const n of spec.nodes) {
-      const b = labelBox(n.label);
+      const b = labelBox(n.label, MAX_LINES);
       const h = b.h + (n.sub ? 16 : 0) + 6 + (n.art ? ART_H : 0);
       boxes.set(n.id, { ...b, w: Math.max(b.w + 16, n.sub ? n.sub.length * SUB_CHAR_W + 28 : 0, n.art ? ART_FIT.w + 24 : 0), h });
       g.setNode(n.id, { width: boxes.get(n.id)!.w, height: h });
     }
-    spec.edges.forEach((e, i) => g.setEdge(e.from, e.to, { i }, `e${i}`));
+    // Labels are sized for dagre, which makes room for each one between the ranks and keeps it off the boxes and
+    // the other labels; a pill is drawn where it puts them, with a margin around it.
+    spec.edges.forEach((e, i) =>
+      g.setEdge(
+        e.from,
+        e.to,
+        e.label ? { i, width: labelW(e.label) + 12, height: LABEL_H + 8 + (e.carries ? LIFT : 0), labelpos: 'c' } : { i },
+        `e${i}`,
+      ),
+    );
     dagre.layout(g);
     const nodes = spec.nodes.map((n) => {
       const p = g.node(n.id);
@@ -111,9 +128,12 @@
     const pairs = new Map<string, number[]>();
     spec.edges.forEach((e, i) => pairs.set(`${e.from}>${e.to}`, [...(pairs.get(`${e.from}>${e.to}`) ?? []), i]));
     const edges = spec.edges.map((e, i) => {
-      let pts = (g.edge({ v: e.from, w: e.to, name: `e${i}` })?.points ?? []).map((p: { x: number; y: number }) => ({ ...p }));
+      const de = g.edge({ v: e.from, w: e.to, name: `e${i}` });
+      let pts = (de?.points ?? []).map((p: { x: number; y: number }) => ({ ...p }));
+      let mid: { x: number; y: number } | undefined = e.label && de?.x !== undefined ? { x: de.x, y: de.y } : undefined;
       const group = pairs.get(`${e.from}>${e.to}`)!;
-      if (group.length > 1 && pts.length >= 2) {
+      // Arrows with labels each get their own route from dagre; only unlabelled ones would lie on top of each other.
+      if (group.length > 1 && group.some((j) => !spec.edges[j].label) && pts.length >= 2) {
         const k = group.indexOf(i) - (group.length - 1) / 2;
         const a = pts[0];
         const b = pts[pts.length - 1];
@@ -121,15 +141,20 @@
         const nx = -(b.y - a.y) / len;
         const ny = (b.x - a.x) / len;
         const off = k * FAN;
-        const mid = { x: (a.x + b.x) / 2 + nx * off, y: (a.y + b.y) / 2 + ny * off };
-        pts = [{ x: a.x + nx * off * 0.25, y: a.y + ny * off * 0.25 }, mid, { x: b.x + nx * off * 0.25, y: b.y + ny * off * 0.25 }];
+        const fanned = { x: (a.x + b.x) / 2 + nx * off, y: (a.y + b.y) / 2 + ny * off };
+        pts = [{ x: a.x + nx * off * 0.25, y: a.y + ny * off * 0.25 }, fanned, { x: b.x + nx * off * 0.25, y: b.y + ny * off * 0.25 }];
+        mid = fanned;
       }
-      const mid = pts[Math.floor(pts.length / 2)] ?? { x: 0, y: 0 };
-      return { ...e, i, d: smooth(pts), mid };
+      return { ...e, i, d: smooth(pts), mid: mid ?? pts[Math.floor(pts.length / 2)] ?? { x: 0, y: 0 } };
     });
     const gr = g.graph();
     return { nodes, edges, w: Math.ceil(gr.width ?? 400), h: Math.ceil(gr.height ?? 200) };
   });
+
+  /** An edge label's pill width, from an estimate of its text's. */
+  function labelW(label: string): number {
+    return label.length * EDGE_CHAR_W + 12;
+  }
 
   /** An arrow stays lit while a step lights both its ends (or no step is on). */
   function edgeLit(e: FEdge): boolean {
@@ -173,9 +198,9 @@
       {/each}
       {#each layout.edges as e (e.i)}
         {#if e.label}
-          {@const w = e.label.length * EDGE_CHAR_W + 12}
+          {@const w = labelW(e.label)}
           <!-- With something riding the arrow, its label moves above it out of the way. -->
-          {@const ly = e.mid.y - (e.carries ? 28 : 0)}
+          {@const ly = e.mid.y - (e.carries ? LIFT / 2 + 4 : 0)}
           <g class="elabel" class:dim={!edgeLit(e)} class:lifted={e.carries}>
             <rect x={e.mid.x - w / 2} y={ly - 10} width={w} height="20" rx="10" />
             <text x={e.mid.x} y={ly + 4} text-anchor="middle">{e.label}</text>
@@ -317,9 +342,9 @@
     stroke: var(--rule);
   }
 
+  /* Lifted above what rides the arrow: no outline, but still solid, so the arrow doesn't run through the words. */
   .elabel.lifted rect {
     stroke: none;
-    fill: transparent;
   }
 
   .elabel text {

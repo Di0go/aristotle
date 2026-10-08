@@ -73,8 +73,8 @@ export interface PlacedBand {
   route: string;
 }
 
-/** Wraps a label onto at most two lines, and sizes the box to fit. */
-export function labelBox(label: string): { w: number; h: number; lines: string[] } {
+/** Wraps a label onto at most `maxLines` lines (two on the maps, where boxes stay compact), and sizes the box to fit. */
+export function labelBox(label: string, maxLines = 2): { w: number; h: number; lines: string[] } {
   const words = label.split(/\s+/);
   const lines: string[] = [''];
   for (const word of words) {
@@ -83,8 +83,8 @@ export function labelBox(label: string): { w: number; h: number; lines: string[]
     else if (`${line} ${word}`.length <= MAX_CHARS) lines[lines.length - 1] = `${line} ${word}`;
     else lines.push(word);
   }
-  let out = lines.slice(0, 2);
-  if (lines.length > 2) out[1] = `${out[1].slice(0, MAX_CHARS - 1)}…`;
+  let out = lines.slice(0, maxLines);
+  if (lines.length > maxLines) out[maxLines - 1] = `${out[maxLines - 1].slice(0, MAX_CHARS - 1)}…`;
   out = out.map((l) => (l.length > MAX_CHARS + 4 ? `${l.slice(0, MAX_CHARS + 3)}…` : l));
   const longest = Math.max(...out.map((l) => l.length));
   return { w: Math.max(72, Math.round(longest * CHAR_W + 30)), h: out.length * LINE_H + 18, lines: out };
