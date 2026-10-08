@@ -28,7 +28,8 @@
 
   /**
    * The latest session's items, live. A question of it still waiting for him can be answered even where the rest is
-   * read back (a class, a past session), and shows his answer as soon as it is sent.
+   * read back (a class, a past session), and shows his answer as soon as it is sent. So can one of an earlier session,
+   * unless another sitting is going on: answering it picks that sitting up again (server feed.ts reopenFor).
    */
   const live = $derived(new Map(feed.items.map((x) => [x.id, x])));
 
@@ -48,7 +49,7 @@
           <Block {item} number={numbers[i]} />
         {:else if item.type === 'quiz' || item.type === 'ask'}
           {@const current = (live.get(item.id) ?? item) as typeof item}
-          {@const locked = readonly && (Boolean(current.answeredAt) || !live.has(item.id))}
+          {@const locked = readonly && (Boolean(current.answeredAt) || (!live.has(item.id) && feed.inProgress))}
           {#if current.type === 'quiz'}
             <Quiz item={current} active={pendingId === item.id} readonly={locked} />
           {:else}

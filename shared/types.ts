@@ -111,7 +111,8 @@ export interface FeedState {
 
 /** What the live feed (/api/events) sends: a change to the session, or to any stored record. */
 export type FeedEvent =
-  | { type: 'session'; session: Session }
+  /** A session started or ended; one picked up again comes with its items, as they were. */
+  | { type: 'session'; session: Session; items?: PublicItem[] }
   | { type: 'item'; item: PublicItem }
   | { type: 'topic'; topic: Topic }
   | { type: 'roadmap'; roadmap: Roadmap }

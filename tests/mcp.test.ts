@@ -1210,3 +1210,54 @@ test('a sitting left open closes, without a handoff, when the next one starts', 
   assert.ok(left?.endedAt, 'the one left open is closed');
   assert.equal(left?.handoff, undefined, 'nobody wrote a handoff for it');
 });
+
+test('continuing a class whose last sitting left a question open picks that sitting up again', async () => {
+  await call('start_session', { topic: 'Come back', goal: 'Leave mid-step' });
+  await call('show', { markdown: 'The slow arm {{x|y}}', title: 'The slow arm', kind: 'step' });
+  assert.match(textOf(await call('ask', { prompt: 'When does cortisol peak?', kind: 'recall' })), /No answer yet/);
+  const left = (await get<FeedState>('/api/state')).session!.id;
+  await call('end_session', { locked: 'A', shaky: 'B', next: 'C' });
+
+  const resumed = textOf(await call('start_session', { topic: 'come-back', goal: 'Continue' }));
+  assert.match(resumed, /Picked up the sitting on come-back[\s\S]*When does cortisol peak\?[\s\S]*collect_answers/);
+  const state = await get<FeedState>('/api/state');
+  assert.equal(state.session?.id, left, 'no new session, so no new step');
+  assert.ok(!state.session?.endedAt, 'it is going on again');
+  assert.equal((await get<Topic>('/api/topics/come-back')).sessions.length, 1);
+
+  // The tutor waits for the open question instead of asking it again.
+  const waiting = call('collect_answers', { wait: true });
+  const open = await waitForPending('ask');
+  await sleep(200);
+  assert.equal((await answer({ id: open.id, text: '20 to 30 minutes in' })).headers.get('X-Aristotle-Heard'), 'yes');
+  assert.match(textOf(await waiting), /20 to 30 minutes in/);
+});
+
+test('a question of an earlier sitting can still be answered, and its sitting is picked up again', async () => {
+  await call('start_session', { topic: 'Answer later', goal: 'Step away' });
+  assert.match(
+    textOf(await call('quiz', { questions: [{ question: 'Two?', options: ['1', '2'], correct: 1, explanation: 'Two.' }] })),
+    /No answer yet/,
+  );
+  const open = await waitForPending('quiz');
+  const earlier = (await get<FeedState>('/api/state')).session!.id;
+  await call('start_session', { kind: 'review', goal: 'Something else' });
+
+  // Not while the other sitting is going on.
+  assert.equal((await answer({ id: open.id, picks: [{ choice: 1 }] })).status, 400);
+  await call('end_session', { locked: 'A', shaky: 'B', next: 'C' });
+
+  const res = await answer({ id: open.id, picks: [{ choice: 1 }] });
+  assert.equal(res.status, 200);
+  assert.equal(res.headers.get('X-Aristotle-Session'), earlier);
+  assert.equal((await get<FeedState>('/api/state')).session?.id, earlier);
+
+  // Continuing hands the answer over, in the same sitting.
+  const resumed = textOf(await call('start_session', { topic: 'answer-later', goal: 'Continue' }));
+  assert.match(resumed, /All its questions are answered[\s\S]*Answers they gave/);
+  assert.equal((await get<FeedState>('/api/state')).session?.id, earlier);
+
+  // A restart lands on it too, though it is not the newest log.
+  await restart();
+  assert.equal((await get<FeedState>('/api/state')).session?.id, earlier);
+});

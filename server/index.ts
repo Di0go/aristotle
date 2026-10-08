@@ -184,6 +184,8 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ro
         ? await gym.answerQuiz(body.id, body.picks)
         : await gym.answerAsk(body.id, String(body.text ?? ''));
       res.setHeader('X-Aristotle-Heard', heard ? 'yes' : 'no');
+      // The session the answer went to: an earlier one, when answering it picked that sitting up again.
+      res.setHeader('X-Aristotle-Session', feed.session?.id ?? '');
       return json(res, 200, publicItem(item));
     } catch (err) {
       if (err instanceof AnswerError) return json(res, 400, { error: err.message });

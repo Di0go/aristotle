@@ -15,8 +15,10 @@ import { describeMission, summarizeMission } from './missions.ts';
 import { describeRoadmap } from './roadmaps.ts';
 import { describeTopic } from './topics.ts';
 import {
+  isInteractive,
   stepState,
   type AskItem,
+  type InteractiveItem,
   type FadingConcept,
   type MapChange,
   type QuizItem,
@@ -421,6 +423,7 @@ function defineTools(gym: Gym): ToolDef[] {
         'kind "learn" (a lesson) and "train" (problems) are on one topic: pass an existing topic slug to continue it, ' +
         'or a new title to create one. kind "review" practises fading concepts across all topics and takes no topic. ' +
         'Call it when a sitting starts and whenever the topic or kind changes; continuing a topic, send it with `get_topic` in one message. ' +
+        "If the topic's last sitting still has questions open, it picks that sitting up again instead of starting a new one, and says what to do. " +
         'It also hands over any answers given after a question stopped waiting, so no `collect_answers` is needed first.',
       inputSchema: {
         kind: z.enum(['learn', 'review', 'train']).default('learn'),
@@ -434,11 +437,12 @@ function defineTools(gym: Gym): ToolDef[] {
     },
     async ({ kind, topic, goal, topic_goal }) => {
       if (kind !== 'review' && !topic) return error(`A ${kind} session needs a topic.`);
-      // Answers given since the last call stopped waiting belong to the session about to close: hand them over now,
-      // or they would be out of collect_answers' reach once the new session starts.
-      const late = await deliverLate(gym);
-      const { session, topic: t, created } = await gym.startSession(topic ?? '', goal, topic_goal, kind);
+      // Answers given since the last call stopped waiting: those of the session it closed (feed.ts hands them back),
+      // then those of the one it picked up again.
+      const { session, topic: t, created, resumed, handed } = await gym.startSession(topic ?? '', goal, topic_goal, kind);
+      const late = [...handed.map((i) => formatItem(i, gym)), await deliverLate(gym)].filter(Boolean).join('\n\n---\n\n');
       const answers = late ? `\n\nAnswers they gave since your last question stopped waiting:\n\n${late}` : '';
+      if (resumed && t) return text(resumedText(gym, session.startedAt, t.slug) + answers);
       if (!t) {
         const fading = gym.topics.fading();
         return text(
@@ -684,9 +688,20 @@ function defineTools(gym: Gym): ToolDef[] {
       title: 'Collect late answers',
       description:
         'Get answers the learner gave in Aristotle after a `quiz` or `ask` call stopped waiting, ' +
-        'for example because they stepped away and came back. Call it when they say they are back or have answered.',
+        'for example because they stepped away and came back. Call it when they say they are back or have answered. ' +
+        'With `wait`, when there are none yet, it waits for an answer to a question of this session still open, as `quiz` and `ask` do.',
+      inputSchema: {
+        wait: z.boolean().default(false).describe("Wait for an answer to this session's open questions"),
+      },
     },
-    async () => text((await deliverLate(gym)) || 'No new answers.'),
+    async ({ wait }, extra) => {
+      const late = await deliverLate(gym);
+      if (late || !wait) return text(late || 'No new answers.');
+      const open = gym.feed.items.filter((i) => isInteractive(i) && !i.answeredAt).map((i) => i.id);
+      if (!open.length) return text('No new answers, and no question of this session is open.');
+      if (!(await waitForLearner(gym, open, extra))) return notAnswered();
+      return text((await deliverLate(gym)) || 'No new answers.');
+    },
   );
 
   // Pictures: checking a drawing, finding and reading real images
@@ -818,10 +833,35 @@ const RECENT = 10;
 async function deliverLate(gym: Gym): Promise<string> {
   const parts: string[] = [];
   for (const item of gym.feed.undelivered()) {
-    parts.push(item.type === 'quiz' ? formatQuiz(item, gym) : formatAsk(item));
+    parts.push(formatItem(item, gym));
     await gym.feed.markDelivered(item.id);
   }
   return parts.join('\n\n---\n\n');
+}
+
+const formatItem = (item: InteractiveItem, gym: Gym) => (item.type === 'quiz' ? formatQuiz(item, gym) : formatAsk(item));
+
+/**
+ * What the tutor reads when start_session picked the last sitting up again: where it is, the questions still waiting
+ * for him, and to wait for them rather than teach that step again.
+ */
+function resumedText(gym: Gym, startedAt: string, slug: string): string {
+  const open = gym.feed.items.filter((i): i is InteractiveItem => isInteractive(i) && !i.answeredAt);
+  const steps = gym.feed.items.filter((i) => i.type === 'block' && i.kind === 'step').length;
+  const head =
+    `Picked up the sitting on ${slug} from ${startedAt.slice(0, 10)} again instead of starting a new one ` +
+    `(${steps} steps shown in it); everything in it is on their screen as it was.`;
+  if (!open.length) return `${head} All its questions are answered: judge the answers below, then carry on from there.`;
+  const lines = open.map((i) => {
+    const what = i.type === 'quiz' ? i.questions.map((q) => q.question).join(' / ') : i.prompt;
+    const step = gym.feed.stepTitleOf(i.id);
+    return `- ${i.type}${step ? ` on "${step}"` : ''}: ${what.replace(/\s+/g, ' ').slice(0, 160)}`;
+  });
+  return (
+    `${head} These questions are still open there:\n${lines.join('\n')}\n\n` +
+    'Do not teach that step again, ask these again, or start the next step: in one message, a one-line `show` (kind "note") ' +
+    'saying the open questions above are waiting for them, and `collect_answers` with `wait: true`. Then judge the answers and carry on.'
+  );
 }
 
 /** The step that leads into a question, when it comes in the same call. */
@@ -837,8 +877,8 @@ async function showLead(gym: Gym, lead?: { markdown: string; title?: string; con
   if (lead.concept) await gym.focus(lead.concept);
 }
 
-/** Waits for the learner, sending progress notifications so the call doesn't look idle. */
-async function waitForLearner(gym: Gym, id: string, extra: Extra) {
+/** Waits for the learner, sending progress notifications so the call doesn't look idle; for any of `ids`, if several. */
+async function waitForLearner(gym: Gym, ids: string | string[], extra: Extra) {
   const token = extra._meta?.progressToken;
   let ticks = 0;
   const keepalive =
@@ -852,9 +892,17 @@ async function waitForLearner(gym: Gym, id: string, extra: Extra) {
             })
             .catch(() => {});
         }, KEEPALIVE_MS);
+  // The first answer ends the wait on the others.
+  const stop = new AbortController();
+  const cancel = () => stop.abort();
+  extra.signal.addEventListener('abort', cancel, { once: true });
+  if (extra.signal.aborted) stop.abort();
   try {
-    return await gym.feed.waitFor(id, WAIT_MS, extra.signal);
+    const waits = [ids].flat().map((id) => gym.feed.waitFor(id, WAIT_MS, stop.signal));
+    return await Promise.race(waits);
   } finally {
+    stop.abort();
+    extra.signal.removeEventListener('abort', cancel);
     clearInterval(keepalive);
   }
 }

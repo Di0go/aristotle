@@ -32,7 +32,9 @@ export type Op =
   | { op: 'answer'; id: string; at: string; responses?: QuizResponse[]; response?: string }
   | { op: 'delivered'; id: string }
   /** The session closed: with its handoff, or without one when it was left open and the next session closed it. */
-  | { op: 'end'; at: string; handoff?: Handoff };
+  | { op: 'end'; at: string; handoff?: Handoff }
+  /** A closed session was picked up again: he answered one of its questions, or the tutor came back to it. */
+  | { op: 'resume'; at: string };
 
 type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
 type NewItem = DistributiveOmit<Item, 'id' | 'at'>;
@@ -50,6 +52,9 @@ export class AnswerError extends Error {}
 
 /** A gap between events longer than this means he was away. */
 const IDLE_MS = 15 * 60_000;
+
+/** How many of the newest logs are looked at on start for the session that last had anything happen. */
+const RECENT_LOGS = 50;
 
 /** Rebuilds a session from its log file; a line torn by a crash is skipped (store.ts readLog). */
 export async function readSession(file: string): Promise<SessionRecord> {
@@ -95,6 +100,11 @@ export function summarizeSession(record: SessionRecord): SessionSummary | null {
     asks: record.items.filter((i) => i.type === 'ask' && i.answeredAt).length,
     ...(record.handoff ? { handoff: record.handoff } : {}),
   };
+}
+
+/** Its questions still waiting for him, and those he answered that the tutor hasn't received yet. */
+export function openItems(items: Item[]): InteractiveItem[] {
+  return items.filter((i): i is InteractiveItem => isInteractive(i) && (!i.answeredAt || !i.delivered));
 }
 
 /** An item as the interface may see it: an unanswered quiz loses its answer key. */
@@ -171,21 +181,49 @@ export class Feed {
     return this.record.items;
   }
 
-  /** Picks up the most recent session, so a restart lands where he was. */
+  /**
+   * Picks up the session that last had anything happen, so a restart lands where he was. That is the newest log,
+   * unless an older one was picked up again since (see `resume`).
+   */
   static async load(): Promise<Feed> {
     const feed = new Feed();
-    const last = (await sessionFiles()).at(-1);
+    const names = await sessionFiles();
+    const last = names.at(-1);
     if (last) {
-      feed.file = path.join(SESSIONS_DIR, last);
-      feed.record = await readSession(feed.file);
       // A crash mid-append leaves a last line without its newline: end it, or the next entry would be glued to it.
-      await endLastLine(feed.file);
+      await endLastLine(path.join(SESSIONS_DIR, last));
+      // An open session before closed ones (closing one and opening another happen in the same instant), then the
+      // latest activity; on a tie, the newest log.
+      const rank = (r: SessionRecord) => `${r.session && !r.session.endedAt ? 1 : 0}${r.lastAt ?? ''}`;
+      let best: { file: string; record: SessionRecord } | null = null;
+      for (const name of names.slice(-RECENT_LOGS).reverse()) {
+        const file = path.join(SESSIONS_DIR, name);
+        const record = await readSession(file);
+        if (!best || rank(record) > rank(best.record)) best = { file, record };
+      }
+      feed.file = best!.file;
+      feed.record = best!.record;
     }
     return feed;
   }
 
-  /** Opens a new session log; the interface clears "Now" for it. */
-  async startSession(topic: string, topicSlug: string, goal: string, kind: SessionKind = 'learn'): Promise<Session> {
+  /**
+   * Opens a session log: a new one, or, for a lesson or a training set, the topic's last sitting of that kind when it
+   * still has questions open or answers the tutor hasn't had. Then he comes back to the step he left, not a new one.
+   * `handed` are the answers of the session it closed that the tutor hadn't had, now marked delivered: they go to the
+   * tutor with this call, or they would be out of `collect_answers`' reach.
+   */
+  async startSession(
+    topic: string,
+    topicSlug: string,
+    goal: string,
+    kind: SessionKind = 'learn',
+  ): Promise<{ session: Session; resumed: boolean; handed: InteractiveItem[] }> {
+    const left = kind === 'review' ? null : await this.lastSitting(topicSlug, kind);
+    if (left && openItems(left.record.items).length) {
+      const handed = await this.resume(left.file, left.record);
+      return { session: this.session!, resumed: true, handed };
+    }
     const now = new Date();
     const session: Session = {
       id: `${stamp(now)}-${topicSlug || kind}`,
@@ -195,14 +233,84 @@ export class Feed {
       goal,
       startedAt: now.toISOString(),
     };
-    // A sitting left open (Claude Code stopped mid-lesson, a question never answered) closes as the next one starts, so
-    // only one is ever going on; it has no handoff, since nobody wrote one. Its questions stay answerable.
-    if (this.session && !this.session.endedAt) await this.commit({ op: 'end', at: now.toISOString() });
+    const handed = await this.close(now.toISOString());
     await mkdir(SESSIONS_DIR, { recursive: true });
     this.file = path.join(SESSIONS_DIR, `${session.id}.jsonl`);
     await this.commit({ op: 'session', session });
     this.emit({ type: 'session', session });
-    return session;
+    return { session, resumed: false, handed };
+  }
+
+  /**
+   * Before another session becomes the current one. A sitting left open (Claude Code stopped mid-lesson, a question
+   * never answered) closes, so only one is ever going on; it has no handoff, since nobody wrote one. Its questions stay
+   * answerable (reopenFor). Returns its answers the tutor hadn't had, marked delivered, when `hand`.
+   */
+  private async close(at: string, hand = true): Promise<InteractiveItem[]> {
+    const handed = hand ? this.undelivered() : [];
+    for (const item of handed) await this.commit({ op: 'delivered', id: item.id });
+    if (this.session && !this.session.endedAt) await this.commit({ op: 'end', at });
+    return handed;
+  }
+
+  /**
+   * The topic's sitting of this kind that last had anything happen (the current one, if it is that), or null: the
+   * newest, unless an older one was picked up again since.
+   */
+  private async lastSitting(topicSlug: string, kind: SessionKind): Promise<{ file: string; record: SessionRecord } | null> {
+    if (!topicSlug) return null;
+    const same = (s: Session | null) => s?.topicSlug === topicSlug && (s.kind ?? 'learn') === kind;
+    if (this.file && same(this.session)) return { file: this.file, record: this.record };
+    let best: { file: string; record: SessionRecord } | null = null;
+    // Log names end with the topic's slug.
+    for (const name of (await sessionFiles()).reverse()) {
+      if (!name.endsWith(`-${topicSlug}.jsonl`)) continue;
+      const file = path.join(SESSIONS_DIR, name);
+      const record = file === this.file ? this.record : await readSession(file);
+      if (same(record.session) && (!best || (record.lastAt ?? '') > (best.record.lastAt ?? ''))) best = { file, record };
+    }
+    return best;
+  }
+
+  /**
+   * Makes a session the current one again, its items as they were: the current one, if another and still open, is
+   * closed without a handoff, as when a new one starts. A closed session is opened again.
+   */
+  private async resume(file: string, record: SessionRecord, hand = true): Promise<InteractiveItem[]> {
+    const at = new Date().toISOString();
+    let handed: InteractiveItem[] = [];
+    if (file !== this.file) {
+      handed = await this.close(at, hand);
+      this.file = file;
+      this.record = record;
+    }
+    if (this.session?.endedAt) await this.commit({ op: 'resume', at });
+    this.emit({ type: 'session', session: this.session!, items: this.items.map(publicItem) });
+    return handed;
+  }
+
+  /**
+   * Finds a question of an earlier session and makes that session the current one, so he can answer it whenever he
+   * comes back, and the tutor carries on from there. Not while another sitting is going on: its tool call is waiting
+   * on a question of its own, and switching would strand it.
+   */
+  private async reopenFor(id: string): Promise<InteractiveItem | undefined> {
+    const busy = [...this.waiters.values()].some((s) => s.size > 0);
+    const recent = this.session && !this.session.endedAt && Date.now() - Date.parse(this.record.lastAt ?? '') < IDLE_MS;
+    for (const name of (await sessionFiles()).reverse()) {
+      const file = path.join(SESSIONS_DIR, name);
+      if (file === this.file) continue;
+      const record = await readSession(file);
+      const item = findInteractive(record.items, id);
+      if (!item) continue;
+      if (item.answeredAt) throw new AnswerError('Already answered');
+      if (busy || recent) throw new AnswerError('Another sitting is going on: answer this once it is over.');
+      // No tool call is here to take the closed session's undelivered answers: they stay in it, and continuing its
+      // topic picks it up again for them.
+      await this.resume(file, record, false);
+      return findInteractive(this.items, id);
+    }
+    return undefined;
   }
 
   /** Closes the session with its handoff; a no-op when there is none. */
@@ -238,7 +346,7 @@ export class Feed {
 
   /** Records his picks, one per question, and wakes the waiting tool call. */
   async answerQuiz(id: string, picks: { choice: number | null; note?: string }[]): Promise<QuizItem> {
-    const item = findInteractive(this.items, id);
+    const item = findInteractive(this.items, id) ?? (await this.reopenFor(id));
     if (item?.type !== 'quiz') throw new AnswerError('No such quiz');
     if (item.answeredAt) throw new AnswerError('Already answered');
     if (picks.length !== item.questions.length) throw new AnswerError('One pick per question');
@@ -257,7 +365,7 @@ export class Feed {
 
   /** Records his written answer and wakes the waiting tool call. */
   async answerAsk(id: string, text: string): Promise<AskItem> {
-    const item = findInteractive(this.items, id);
+    const item = findInteractive(this.items, id) ?? (await this.reopenFor(id));
     if (item?.type !== 'ask') throw new AnswerError('No such question');
     if (item.answeredAt) throw new AnswerError('Already answered');
     if (!text.trim()) throw new AnswerError('Empty answer');
@@ -362,6 +470,10 @@ function applyOp(state: SessionRecord, op: Op) {
     case 'end':
       state.handoff = op.handoff;
       if (state.session) state.session.endedAt = op.at;
+      state.lastAt = op.at;
+      break;
+    case 'resume':
+      if (state.session) delete state.session.endedAt;
       state.lastAt = op.at;
       break;
   }

@@ -183,6 +183,15 @@ class LiveFeed {
     });
     const data = await res.json();
     if (!res.ok) return { error: (data as { error?: string }).error ?? 'Could not send the answer' };
+    // A question of an earlier sitting picks that sitting up again: have it here before anything reads the session,
+    // whether or not its event has arrived yet.
+    const session = res.headers.get('X-Aristotle-Session');
+    if (session && session !== this.session?.id) {
+      const state = await getJson<FeedState>('/api/state');
+      this.session = state.session;
+      this.items = state.items;
+      this.changed();
+    }
     this.upsert(data as PublicItem);
     return { heard: res.headers.get('X-Aristotle-Heard') === 'yes' };
   }
@@ -282,8 +291,10 @@ class LiveFeed {
       case 'session': {
         const changed = event.session.id !== this.session?.id;
         this.session = event.session;
+        // A session picked up again comes with its items; a new one starts empty.
+        if (event.items) this.items = event.items;
         if (changed) {
-          this.items = [];
+          if (!event.items) this.items = [];
           this.starting = null;
           if (event.session.topicSlug && !this.topics[event.session.topicSlug]) void this.loadTopic(event.session.topicSlug);
         }

@@ -153,16 +153,19 @@ export class Gym {
     return topic && concept ? { topic, concept } : null;
   }
 
-  /** Starts a session: on a topic (found or created), or a review across all of them. */
+  /**
+   * Starts a session: on a topic (found or created), or a review across all of them. `resumed` when the topic's last
+   * sitting still had questions open and was picked up again instead (feed.ts).
+   */
   async startSession(topicName: string, goal: string, topicGoal?: string, kind: SessionKind = 'learn') {
     if (kind === 'review') {
-      const session = await this.feed.startSession('Review', '', goal, kind);
-      return { session, topic: undefined, created: false };
+      const { session, handed } = await this.feed.startSession('Review', '', goal, kind);
+      return { session, topic: undefined, created: false, resumed: false, handed };
     }
     const { topic, created } = await this.topics.ensure(topicName, topicGoal ?? goal);
-    const session = await this.feed.startSession(topic.title, topic.slug, goal, kind);
-    await this.topics.addSession(topic.slug, session.id);
-    return { session, topic, created };
+    const { session, resumed, handed } = await this.feed.startSession(topic.title, topic.slug, goal, kind);
+    if (!topic.sessions.includes(session.id)) await this.topics.addSession(topic.slug, session.id);
+    return { session, topic, created, resumed, handed };
   }
 
   /** Shows the handoff, closes the session, and keeps the handoff on its topic for next time. */

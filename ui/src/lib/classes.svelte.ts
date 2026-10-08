@@ -26,8 +26,11 @@ class Classes {
         void this.load(slug);
       });
     }
-    const records = past.filter((r) => r.session.id !== live?.id);
-    if (live) records.push({ session: live, items: feed.items });
+    // The current session as the feed has it, in its place (one picked up again is older than others on the topic,
+    // and its record here may be from before it was).
+    const current = session?.topicSlug === slug ? session : null;
+    const records = past.map((r) => (r.session.id === current?.id ? { session: current, items: feed.items } : r));
+    if (live && !past.some((r) => r.session.id === live.id)) records.push({ session: live, items: feed.items });
     return pagesOf(records, live?.id);
   }
 

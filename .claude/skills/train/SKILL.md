@@ -9,7 +9,7 @@ Lessons build understanding; training builds the ability to use it. A training s
 
 ## Start
 
-1. Pick the topic (they name it, or ask; `list_topics` shows the options) and `start_session` with kind `train`. It also hands over answers they gave after the last session ended: judge them first.
+1. Pick the topic (they name it, or ask; `list_topics` shows the options) and `start_session` with kind `train`. It also hands over answers they gave after the last session ended: judge them first. If the last training set on the topic still had problems open, it picks that set up again and says so: wait for those answers (`collect_answers` with `wait: true`) instead of setting new problems.
 2. `get_topic`: note the **training level** (1-10; it starts at 1), the solid concepts, and the frontier: solid concepts whose dependents are still shaky or not yet, plus anything shaky.
 3. Problems use solid concepts and lean on the frontier. Never set a problem that needs a concept they haven't learned yet. If the map has too little that is solid to train on, say so and suggest a lesson instead.
 
