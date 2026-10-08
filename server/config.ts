@@ -106,8 +106,13 @@ export const GLOSS_IMAGES = process.env.ARISTOTLE_GLOSS_IMAGES !== 'off';
 /** A command that reads a question on stdin and prints the answer, in place of Claude Code (oneshot.ts); tests swap one in. */
 export const ONESHOT_CMD = process.env.ARISTOTLE_ONESHOT_CMD;
 
-/** How long quiz and ask wait for an answer before handing control back to Claude. */
+/**
+ * How long quiz and ask wait without a sign of him before handing control back to Claude: from the question, or from
+ * the last time the interface said he was there (POST /api/presence), whichever is later.
+ */
 export const WAIT_MS = Number(process.env.ARISTOTLE_WAIT_MS ?? 15 * 60_000);
+/** The longest a quiz or ask waits however long he keeps working on it, so a page left open can't hold a call forever. */
+export const WAIT_CAP_MS = Number(process.env.ARISTOTLE_WAIT_CAP_MS ?? 3 * 60 * 60_000);
 /** Interval of progress notifications while a tool waits, so the call doesn't look idle. */
 export const KEEPALIVE_MS = 15_000;
 

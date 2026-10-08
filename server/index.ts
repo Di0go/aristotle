@@ -173,6 +173,11 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ro
     return json(res, 200, { ok: true, instance: INSTANCE, root: ROOT, pid: process.pid });
   if (req.method === 'GET' && route === '/api/state') return json(res, 200, feed.state());
   if (req.method === 'GET' && route === '/api/events') return streamEvents(req, res);
+  // He is at the page working on an open question: a quiz or ask waiting for him keeps waiting (feed.ts waitFor).
+  if (req.method === 'POST' && route === '/api/presence') {
+    feed.present();
+    return json(res, 200, { ok: true });
+  }
   if (req.method === 'POST' && route === '/api/answer') {
     const body = (await readJson(req)) as Partial<QuizAnswerBody & AskAnswerBody> | null;
     if (!body || typeof body.id !== 'string') return json(res, 400, { error: 'Missing id' });

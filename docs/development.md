@@ -127,7 +127,8 @@ Every setting is an environment variable with a default. `.env` is not read: set
 | `ARISTOTLE_COMMONS_API` | Wikimedia Commons' API, which find_images and glosses search; tests point it at a local stand-in. | [`config.ts`](../server/config.ts) |
 | `ARISTOTLE_GLOSS_IMAGES` | Whether a gloss may carry a picture from Wikimedia Commons, when one would help (off in the tests: no network). | [`config.ts`](../server/config.ts) |
 | `ARISTOTLE_ONESHOT_CMD` | A command that reads a question on stdin and prints the answer, in place of Claude Code (oneshot.ts); tests swap one in. | [`config.ts`](../server/config.ts) |
-| `ARISTOTLE_WAIT_MS` | How long quiz and ask wait for an answer before handing control back to Claude. | [`config.ts`](../server/config.ts) |
+| `ARISTOTLE_WAIT_MS` | How long quiz and ask wait without a sign of him before handing control back to Claude: from the question, or from the last time the interface said he was there (POST /api/presence), whichever is later. | [`config.ts`](../server/config.ts) |
+| `ARISTOTLE_WAIT_CAP_MS` | The longest a quiz or ask waits however long he keeps working on it, so a page left open can't hold a call forever. | [`config.ts`](../server/config.ts) |
 | `ARISTOTLE_CLAUDE_CWD` |  | [`config.ts`](../server/config.ts) |
 | `ARISTOTLE_DRAWER` | The tutor in Aristotle's terminal drawer (server/terminal.ts sets this): a lesson, where commits released meanwhile must never send it off to write docs. | [`claude-stop-hook.ts`](../scripts/claude-stop-hook.ts) |
 | `ARISTOTLE_RELEASE_DIR` | Where the release copy lives: a Git worktree of this repository that the live service runs. | [`release.ts`](../scripts/release.ts) |

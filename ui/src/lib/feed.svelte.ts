@@ -26,6 +26,11 @@ const IDLE_MS = 15 * 60_000;
 /** Nothing from the live stream for this long (it pings every 20 s) and it is taken for dead, and opened again. */
 const STALE_MS = 50_000;
 
+/** How often the page tells the server he is there while a question waits for him (POST /api/presence). */
+const PRESENCE_MS = 60_000;
+/** He counts as there while he has typed, clicked, scrolled or moved the pointer on the page this recently. */
+const ACTIVE_MS = 5 * 60_000;
+
 class LiveFeed {
   session = $state<Session | null>(null);
   items = $state<PublicItem[]>([]);
@@ -68,6 +73,9 @@ class LiveFeed {
   /** Aristotle's answer being written, by thread: its id and the text so far. */
   chatDrafts = $state<Record<string, { id: string; text: string }>>({});
 
+  /** When this page last told the server he was there, working on a question still waiting for him. */
+  presentAt = $state(0);
+
   /** The first question still waiting for the learner, if any. Once a session has ended, nothing is. */
   pending = $derived(this.session?.endedAt ? null : (this.items.find((i) => isInteractive(i) && !i.answeredAt) ?? null));
   /** The topic of the lesson running right now, or null when none is. */
@@ -91,7 +99,7 @@ class LiveFeed {
 
   /** inProgress at time `t` (a page with its own clock reads it as the clock ticks). */
   inProgressAt(t: number): boolean {
-    return Boolean(this.session && !this.session.endedAt && t - this.lastActivity < IDLE_MS);
+    return Boolean(this.session && !this.session.endedAt && t - Math.max(this.lastActivity, this.presentAt) < IDLE_MS);
   }
   currentTopic = $derived(this.session ? (this.topics[this.session.topicSlug] ?? null) : null);
   /** Roadmaps, most recently changed first. */
@@ -124,6 +132,25 @@ class LiveFeed {
     addEventListener('online', check);
     addEventListener('pageshow', check);
     document.addEventListener('visibilitychange', () => document.visibilityState === 'visible' && check());
+    this.watchPresence();
+  }
+
+  /**
+   * While a question waits for him and he is working on the page (it is showing and he has touched it lately), tells
+   * the server every PRESENCE_MS, so quiz and ask keep waiting: a long think over a hard problem is not stepping away.
+   */
+  private watchPresence() {
+    let inputAt = Date.now();
+    const touched = () => (inputAt = Date.now());
+    for (const type of ['keydown', 'input', 'pointerdown', 'pointermove', 'wheel', 'scroll']) {
+      addEventListener(type, touched, { capture: true, passive: true });
+    }
+    setInterval(() => {
+      if (!this.pending || document.visibilityState !== 'visible' || Date.now() - inputAt > ACTIVE_MS) return;
+      fetch('/api/presence', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
+        .then((res) => res.ok && (this.presentAt = Date.now()))
+        .catch(() => {});
+    }, PRESENCE_MS);
   }
 
   private open() {

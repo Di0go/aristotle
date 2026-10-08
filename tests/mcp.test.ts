@@ -354,6 +354,20 @@ test('an answer given after the wait ends is collected later', async () => {
   assert.equal(textOf(await call('collect_answers')), 'No new answers.');
 });
 
+test('a question keeps waiting while he is at the page working on it', async () => {
+  const pending = call('ask', { prompt: 'Prove that d(dω) = 0 for a 0-form.', kind: 'problem' });
+  const open = await waitForPending('ask');
+  // Three times the wait, with the interface saying he is there more often than the wait lasts.
+  const presence = () => fetch(`${BASE}/api/presence`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+  for (let i = 0; i < 8; i++) {
+    assert.equal((await presence()).status, 200);
+    await sleep(300);
+  }
+  const res = await answer({ id: open.id, text: 'Mixed partials commute, so the terms cancel.' });
+  assert.equal(res.headers.get('X-Aristotle-Heard'), 'yes');
+  assert.match(textOf(await pending), /Mixed partials commute/);
+});
+
 test('rejects requests from other sites', async () => {
   const post = (headers: Record<string, string>) =>
     fetch(`${BASE}/api/answer`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...headers }, body: '{}' });
@@ -401,7 +415,7 @@ test('a restarted server keeps the session and the map', async () => {
   await restart();
   const s = await get<FeedState>('/api/state');
   assert.equal(s.session?.goal, 'Wedge products');
-  assert.equal(s.items.length, 1);
+  assert.equal(s.items.length, 2); // the two asks above
   assert.equal((await get<Topic>('/api/topics/differential-forms')).concepts.length, 3);
   const files = await readdir(path.join(dataDir, 'topics'));
   assert.deepEqual(files, ['differential-forms.json']);

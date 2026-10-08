@@ -914,7 +914,7 @@ async function waitForLearner(gym: Gym, ids: string | string[], extra: Extra) {
 function notAnswered(): CallToolResult {
   const minutes = Math.round(WAIT_MS / 60_000);
   return text(
-    `No answer yet: they haven't answered in Aristotle within ${minutes} minutes, so they have stepped away. ` +
+    `No answer yet: ${minutes} minutes have gone by with no sign of them in Aristotle, so they have stepped away. ` +
       'Close the sitting now, without asking them anything: in one message, a final `update_map` if this sitting changed what they hold and ' +
       '`end_session` with the handoff. The question stays open in Aristotle; when they answer it, you are asked to continue ' +
       'and `collect_answers` gives you their answer. Then end your turn.',
