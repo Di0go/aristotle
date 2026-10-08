@@ -77,7 +77,8 @@
     count = 0;
   });
 
-  // On the live page, follow it as it grows, unless he has scrolled back up to reread.
+  // A step opens at its top, to be read from the start. On the live page, what arrives after that is followed
+  // only while he is at the bottom: a question landing never pulls him away from what he is reading.
   $effect(() => {
     void number;
     const n = page ? page.warmup.length + page.items.length : 0;
@@ -87,12 +88,13 @@
     }
     const first = count === 0;
     count = n;
+    if (first) return;
     const nearBottom = window.innerHeight + window.scrollY >= document.body.scrollHeight - 400;
-    if (!first && !nearBottom && !feed.pending) return;
+    if (!nearBottom) return;
     void tick().then(() => {
       const target = feed.pending ? document.getElementById(`item-${feed.pending.id}`) : null;
-      if (target) target.scrollIntoView({ behavior: first ? 'instant' : 'smooth', block: 'start' });
-      else window.scrollTo({ top: document.body.scrollHeight, behavior: first ? 'instant' : 'smooth' });
+      if (target) target.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      else window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
     });
   });
 
