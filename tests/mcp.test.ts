@@ -1017,9 +1017,11 @@ test('the live feed sends one record per change, and warnings as they change', a
         if (done) break;
         buffer += new TextDecoder().decode(value);
         for (let i = buffer.indexOf('\n\n'); i !== -1; i = buffer.indexOf('\n\n')) {
-          const data = buffer.slice(0, i).match(/^data: (.*)$/m)?.[1];
+          const block = buffer.slice(0, i);
+          const data = block.match(/^data: (.*)$/m)?.[1];
           buffer = buffer.slice(i + 2);
-          if (data) events.push(JSON.parse(data) as FeedEvent);
+          // Pings (a named event) only say the stream is alive.
+          if (data && !/^event: /m.test(block)) events.push(JSON.parse(data) as FeedEvent);
         }
       }
     } catch {}

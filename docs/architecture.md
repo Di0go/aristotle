@@ -17,7 +17,7 @@ flowchart LR
 
 1. A skill (say `teach`) calls the MCP tool `show` with Markdown. Claude Code talks stdio to [`bridge.ts`](../server/bridge.ts), which starts the server if needed and relays to `/mcp`.
 2. [`mcp.ts`](../server/mcp.ts) validates the input (zod) and calls the [`Gym`](../server/gym.ts), which adds an item to the session's [`Feed`](../server/feed.ts). The feed appends it to the session log in `data/sessions/` and emits an event.
-3. The server streams the event over SSE (`/api/events`); [`feed.svelte.ts`](../ui/src/lib/feed.svelte.ts) puts it in reactive state, and the Now page renders it.
+3. The server streams the event over SSE (`/api/events`); [`feed.svelte.ts`](../ui/src/lib/feed.svelte.ts) puts it in reactive state, and the Now page renders it. The server pings every 20 seconds as a named event the page can see; a stream not heard from for 50 seconds, or one the browser has given up on, is opened again (which reloads the whole state), so a connection that died while the machine slept never leaves the page on a stale sitting.
 4. For `quiz` and `ask`, the tool call **waits** (up to `ARISTOTLE_WAIT_MS`, sending progress notifications so it does not look idle) until the learner answers in the page (`POST /api/answer`). The answer is recorded as evidence on the concept's map, and returned to Claude as the tool's result. If he is away, the tool returns "No answer yet" and Claude collects it later with `collect_answers`.
 5. `update_map` changes the topic's knowledge map ([`topics.ts`](../server/topics.ts)), which the interface draws; `record_practice` moves spaced-review cards ([`reviews.ts`](../server/reviews.ts), FSRS).
 

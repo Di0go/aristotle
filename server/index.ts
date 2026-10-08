@@ -359,7 +359,10 @@ function chatContext(thread: string, where?: string, page?: string, step?: strin
   return parts.join('\n\n');
 }
 
-/** The live feed as server-sent events, with a ping every 20 seconds while nothing happens. */
+/**
+ * The live feed as server-sent events, with a ping every 20 seconds while nothing happens: an event the page can see
+ * (a comment it could not), so it can tell a stream that went silent from a quiet one and connect again.
+ */
 function streamEvents(req: http.IncomingMessage, res: http.ServerResponse) {
   res.writeHead(200, {
     'Content-Type': 'text/event-stream',
@@ -368,7 +371,7 @@ function streamEvents(req: http.IncomingMessage, res: http.ServerResponse) {
   });
   res.write('retry: 2000\n\n');
   const onEvent = (event: FeedEvent) => res.write(`data: ${JSON.stringify(event)}\n\n`);
-  const ping = setInterval(() => res.write(': ping\n\n'), 20_000);
+  const ping = setInterval(() => res.write('event: ping\ndata: .\n\n'), 20_000);
   feed.events.on('event', onEvent);
   req.on('close', () => {
     clearInterval(ping);
