@@ -1254,6 +1254,25 @@ test('continuing a class whose last sitting left a question open picks that sitt
   assert.match(textOf(await waiting), /20 to 30 minutes in/);
 });
 
+test('a review left with a question open is picked up again, so its answer and feedback stay together', async () => {
+  await call('start_session', { kind: 'review', goal: 'Review, then walk away' });
+  assert.match(textOf(await call('ask', { prompt: 'What does the HPA axis release?', kind: 'recall' })), /No answer yet/);
+  const open = await waitForPending('ask');
+  const left = (await get<FeedState>('/api/state')).session!.id;
+  // He answers a quarter of an hour later: the tutor is asked to review again.
+  assert.equal((await answer({ id: open.id, text: 'Cortisol' })).status, 200);
+
+  const resumed = textOf(await call('start_session', { kind: 'review', goal: "Review what's fading" }));
+  assert.match(resumed, /Picked up the review[\s\S]*All its questions are answered[\s\S]*fading[\s\S]*Cortisol/);
+  assert.equal((await get<FeedState>('/api/state')).session?.id, left, 'the feedback goes where the answer is');
+  await call('end_session', { locked: 'A', shaky: 'B', next: 'C' });
+
+  // With nothing left open, the next review is a new one.
+  await call('start_session', { kind: 'review', goal: 'Another day' });
+  assert.notEqual((await get<FeedState>('/api/state')).session?.id, left);
+  await call('end_session', { locked: 'A', shaky: 'B', next: 'C' });
+});
+
 test('a question of an earlier sitting can still be answered, and its sitting is picked up again', async () => {
   await call('start_session', { topic: 'Answer later', goal: 'Step away' });
   assert.match(

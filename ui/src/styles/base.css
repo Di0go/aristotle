@@ -550,3 +550,60 @@ html.show-scroll:hover {
 .sk.w90 {
   width: 90%;
 }
+
+/* A list of sessions, each a row linking to its record: the Log, and the sittings before on Review and Training. */
+.session-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-width: 60rem;
+}
+
+.session-row {
+  display: grid;
+  grid-template-columns: 70px minmax(0, 1fr) 150px;
+  gap: 20px;
+  padding: 18px 0;
+  border-top: 1px solid var(--rule);
+  color: var(--fg);
+  text-decoration: none;
+}
+
+.session-row:hover strong {
+  color: var(--cyan-ink);
+}
+
+.session-row .when {
+  font: 0.83rem var(--sans);
+  color: var(--muted);
+  padding-top: 3px;
+}
+
+.session-row .what {
+  display: grid;
+  gap: 3px;
+  font: 0.9rem / 1.65 var(--sans);
+}
+
+.session-row .what strong {
+  font-weight: 560;
+  font-size: 0.9rem;
+}
+
+.session-row .stats {
+  font-size: 0.78rem;
+  line-height: 1.6;
+  text-align: right;
+  /* One number per line. */
+  white-space: pre-line;
+}
+
+@media (max-width: 700px) {
+  .session-row {
+    grid-template-columns: 56px minmax(0, 1fr);
+  }
+
+  .session-row .stats {
+    display: none;
+  }
+}

@@ -538,9 +538,9 @@ function defineTools(gym: Gym): ToolDef[] {
       if (resumed && t) return text(resumedText(gym, session.startedAt, t.slug) + answers);
       if (!t) {
         const fading = gym.topics.fading();
-        return text(
-          `Review session started. ${fading.length} concepts are fading:\n${fading.map(formatFading).join('\n') || '(none)'}${answers}`,
-        );
+        const list = `${fading.length} concepts are fading:\n${fading.map(formatFading).join('\n') || '(none)'}`;
+        if (resumed) return text(`${resumedText(gym, session.startedAt, '')}\n\n${list}${answers}`);
+        return text(`Review session started. ${list}${answers}`);
       }
       if (created)
         return text(
@@ -946,7 +946,7 @@ function resumedText(gym: Gym, startedAt: string, slug: string): string {
   const open = gym.feed.items.filter((i): i is InteractiveItem => isInteractive(i) && !i.answeredAt);
   const steps = gym.feed.items.filter((i) => i.type === 'block' && i.kind === 'step').length;
   const head =
-    `Picked up the sitting on ${slug} from ${startedAt.slice(0, 10)} again instead of starting a new one ` +
+    `Picked up the ${slug ? `sitting on ${slug}` : 'review'} from ${startedAt.slice(0, 10)} again instead of starting a new one ` +
     `(${steps} steps shown in it); everything in it is on their screen as it was.`;
   if (!open.length) return `${head} All its questions are answered: judge the answers below, then carry on from there.`;
   const lines = open.map((i) => {

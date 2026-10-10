@@ -210,8 +210,8 @@ export class Feed {
   }
 
   /**
-   * Opens a session log: a new one, or, for a lesson or a training set, the topic's last sitting of that kind when it
-   * still has questions open or answers the tutor hasn't had. Then he comes back to the step he left, not a new one.
+   * Opens a session log: a new one, or the last sitting of that kind (on the topic, for a lesson or a training set)
+   * when it still has questions open or answers the tutor hasn't had. Then he comes back to the step he left, not a new one.
    * `handed` are the answers of the session it closed that the tutor hadn't had, now marked delivered: they go to the
    * tutor with this call, or they would be out of `collect_answers`' reach.
    */
@@ -221,7 +221,7 @@ export class Feed {
     goal: string,
     kind: SessionKind = 'learn',
   ): Promise<{ session: Session; resumed: boolean; handed: InteractiveItem[] }> {
-    const left = kind === 'review' ? null : await this.lastSitting(topicSlug, kind);
+    const left = await this.lastSitting(topicSlug, kind);
     if (left && openItems(left.record.items).length) {
       const handed = await this.resume(left.file, left.record);
       return { session: this.session!, resumed: true, handed };
@@ -257,16 +257,16 @@ export class Feed {
 
   /**
    * The topic's sitting of this kind that last had anything happen (the current one, if it is that), or null: the
-   * newest, unless an older one was picked up again since.
+   * newest, unless an older one was picked up again since. Reviews belong to no topic: the last review.
    */
   private async lastSitting(topicSlug: string, kind: SessionKind): Promise<{ file: string; record: SessionRecord } | null> {
-    if (!topicSlug) return null;
+    if (!topicSlug && kind !== 'review') return null;
     const same = (s: Session | null) => s?.topicSlug === topicSlug && (s.kind ?? 'learn') === kind;
     if (this.file && same(this.session)) return { file: this.file, record: this.record };
     let best: { file: string; record: SessionRecord } | null = null;
-    // Log names end with the topic's slug.
+    // Log names end with the topic's slug, or with "review".
     for (const name of (await sessionFiles()).reverse()) {
-      if (!name.endsWith(`-${topicSlug}.jsonl`)) continue;
+      if (!name.endsWith(`-${topicSlug || kind}.jsonl`)) continue;
       const file = path.join(SESSIONS_DIR, name);
       const record = file === this.file ? this.record : await readSession(file);
       if (same(record.session) && (!best || (record.lastAt ?? '') > (best.record.lastAt ?? ''))) best = { file, record };

@@ -154,13 +154,13 @@ export class Gym {
   }
 
   /**
-   * Starts a session: on a topic (found or created), or a review across all of them. `resumed` when the topic's last
-   * sitting still had questions open and was picked up again instead (feed.ts).
+   * Starts a session: on a topic (found or created), or a review across all of them. `resumed` when the last sitting
+   * (the topic's, or the last review) still had questions open and was picked up again instead (feed.ts).
    */
   async startSession(topicName: string, goal: string, topicGoal?: string, kind: SessionKind = 'learn') {
     if (kind === 'review') {
-      const { session, handed } = await this.feed.startSession('Review', '', goal, kind);
-      return { session, topic: undefined, created: false, resumed: false, handed };
+      const { session, resumed, handed } = await this.feed.startSession('Review', '', goal, kind);
+      return { session, topic: undefined, created: false, resumed, handed };
     }
     const { topic, created } = await this.topics.ensure(topicName, topicGoal ?? goal);
     const { session, resumed, handed } = await this.feed.startSession(topic.title, topic.slug, goal, kind);

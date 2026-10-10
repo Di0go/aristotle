@@ -1,15 +1,16 @@
 <script lang="ts">
   // Review (#/review) and training sets (#/train/<slug>): sittings that belong to no lesson, each in its own place.
   // With one open, it is shown as it grows, with the composer and its bench (the review queue, or the class); with
-  // none, what there is to do and one button to begin. Leaving is pausing: nothing has to be stopped, answers are
-  // kept, and a question left waiting is still here to answer later, which picks the sitting up again.
+  // none, what there is to do, one button to begin, and the sittings before, to reread. Leaving is pausing: nothing has
+  // to be stopped, answers are kept, and a question left waiting is still here to answer later, which picks the sitting
+  // up again. One that has just ended stays in view, its last feedback and summary with it, until he sets it aside.
   import { setContext, tick } from 'svelte';
   import { actions } from '../lib/actions.ts';
   import { bench } from '../lib/bench.svelte.ts';
   import { tutor } from '../lib/tutor.svelte.ts';
   import { placeFigures } from '../lib/explorables/index.ts';
   import { feed, refetching } from '../lib/feed.svelte.ts';
-  import { ago, onDay } from '../lib/format.ts';
+  import { ago, formatDay, formatTime, onDay, sessionStats } from '../lib/format.ts';
   import { countsOf } from '../lib/library.ts';
   import { link } from '../lib/router.svelte.ts';
   import Composer from '../lib/Composer.svelte';
@@ -18,7 +19,10 @@
   import LessonActivity from '../lib/LessonActivity.svelte';
   import LessonBench from '../lib/LessonBench.svelte';
   import ReviewPanel from '../lib/ReviewPanel.svelte';
-  import type { ReviewQueue } from '../../../shared/types.ts';
+  import type { ReviewQueue, SessionSummary } from '../../../shared/types.ts';
+
+  /** How long a sitting that has ended stays on its page, so its last feedback and summary can be read. */
+  const ENDED_MS = 2 * 60 * 60_000;
 
   let { kind, slug = '' }: { kind: 'review' | 'train'; slug?: string } = $props();
 
@@ -28,14 +32,23 @@
   /** A clock, so a sitting left alone is seen as left (feed.svelte.ts inProgressAt). */
   let now = $state(Date.now());
   let queue = $state<ReviewQueue | null>(null);
+  let sessions = $state<SessionSummary[] | null>(null);
+  /** The ended sitting he set aside ("Done"), back to what there is to do. */
+  let setAside = $state<string | null>(null);
 
   const reviewing = $derived(kind === 'review');
-  /** This page's sitting: the open review, or the open training set on this class. */
+  const ours = (s: { kind?: string; topicSlug: string }) => (s.kind ?? 'learn') === kind && (reviewing || s.topicSlug === slug);
+  /** This page's sitting: the open review, or the open training set on this class; or one that ended a moment ago. */
   const mine = $derived(
-    feed.session && !feed.session.endedAt && feed.session.kind === kind && (reviewing || feed.session.topicSlug === slug)
+    feed.session &&
+      ours(feed.session) &&
+      (!feed.session.endedAt || (now - Date.parse(feed.session.endedAt) < ENDED_MS && setAside !== feed.session.id))
       ? feed.session
       : null,
   );
+  const ended = $derived(Boolean(mine?.endedAt));
+  /** The sittings of this kind before, newest first, to reread with his answers. */
+  const past = $derived((sessions ?? []).filter((s) => ours(s) && s.id !== mine?.id));
   /** Something happened in it lately (rather than left open since another day). */
   const going = $derived(Boolean(mine) && feed.inProgressAt(now));
   const topic = $derived(reviewing ? null : (feed.topics[slug] ?? null));
@@ -47,6 +60,10 @@
   refetching(
     async () => (await (await fetch('/api/reviews')).json()) as ReviewQueue,
     (q) => (queue = q),
+  );
+  refetching(
+    () => feed.sessions(),
+    (s) => (sessions = s),
   );
 
   $effect(() => {
@@ -103,7 +120,11 @@
           {/if}
         </div>
         <p class="page-lede">
-          {#if going}
+          {#if ended}
+            Done{reviewing && queue?.fading.length ? `: ${queue.fading.length} still fading` : ''}. Your answers and the feedback stay in
+            <a href={link.session(mine.id)}>its record</a>.
+            <button class="ghost small" onclick={() => (setAside = mine.id)}>{reviewing ? 'Back to Review' : 'Back to training'}</button>
+          {:else if going}
             {mine.goal}. Leave whenever you like: your answers are kept, and it waits here for you.
           {:else if feed.pending}
             You left this {ago(feed.lastActivity ? new Date(feed.lastActivity).toISOString() : mine.startedAt)}. Answer the question below
@@ -158,8 +179,15 @@
 
     {#if reviewing}
       {#if queue}
-        <section class="sheet start">
-          {#if queue.fading.length}
+        <section class="sheet start" aria-live="polite">
+          {#if feed.starting}
+            <span class="spinner" aria-hidden="true"></span>
+            <p class="start-line">
+              <strong>{feed.starting.label}.</strong>
+              {tutor.asking ? `${tutor.name} is asking something in the terminal first.` : `${tutor.name} is getting it ready.`}
+            </p>
+            <button class={tutor.asking ? 'primary' : 'ghost'} onclick={() => tutor.toggle(true)}>Open the terminal</button>
+          {:else if queue.fading.length}
             <p class="start-line">
               <strong>{queue.fading.length} {queue.fading.length === 1 ? 'concept is' : 'concepts are'} fading.</strong>
               {#if queue.upcoming}{queue.upcoming} more come due in the next 7 days.{/if}
@@ -189,16 +217,45 @@
         <p class="muted">Loading…</p>
       {/if}
     {:else if topic}
-      <section class="sheet start">
-        <p class="start-line">
-          <strong>{counts.solid} of {counts.total} concepts solid</strong>{topic.training
-            ? `, training level ${topic.training.level}/10`
-            : ''}.
-        </p>
-        <button class="primary" onclick={begin}>Start a training set</button>
+      <section class="sheet start" aria-live="polite">
+        {#if feed.starting}
+          <span class="spinner" aria-hidden="true"></span>
+          <p class="start-line">
+            <strong>{feed.starting.label}.</strong>
+            {tutor.asking ? `${tutor.name} is asking something in the terminal first.` : `${tutor.name} is getting it ready.`}
+          </p>
+          <button class={tutor.asking ? 'primary' : 'ghost'} onclick={() => tutor.toggle(true)}>Open the terminal</button>
+        {:else}
+          <p class="start-line">
+            <strong>{counts.solid} of {counts.total} concepts solid</strong>{topic.training
+              ? `, training level ${topic.training.level}/10`
+              : ''}.
+          </p>
+          <button class="primary" onclick={begin}>Start a training set</button>
+        {/if}
       </section>
     {:else}
       <p class="muted">No such class.</p>
+    {/if}
+
+    {#if past.length}
+      <section class="past">
+        <h2 class="section-title">{reviewing ? 'Past reviews' : 'Past training sets'}</h2>
+        <ul class="session-list">
+          {#each past as s (s.id)}
+            <li>
+              <a class="session-row" href={link.session(s.id)}>
+                <span class="when">{formatDay(s.startedAt)}, {formatTime(s.startedAt)}</span>
+                <span class="what">
+                  <strong>{s.goal || s.topic}</strong>
+                  {#if s.handoff}<span>{s.handoff.locked}</span>{/if}
+                </span>
+                <span class="stats muted">{sessionStats(s, 'log')}</span>
+              </a>
+            </li>
+          {/each}
+        </ul>
+      </section>
     {/if}
   </div>
 {/if}
@@ -220,7 +277,12 @@
     padding: 18px 20px;
   }
 
+  .start .spinner {
+    flex: none;
+  }
+
   .start-line {
+    flex: 1;
     margin: 0;
     color: var(--muted);
   }
@@ -248,6 +310,31 @@
     display: flex;
     align-items: center;
     gap: 8px;
+  }
+
+  .past {
+    margin-top: 40px;
+  }
+
+  /* The day as well as the time: these span weeks, not one day like the Log's. */
+  .past .session-row {
+    grid-template-columns: 120px minmax(0, 1fr) 150px;
+  }
+
+  /* What locked in, in two lines: the record has the rest. */
+  .past .what span {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    color: var(--muted);
+  }
+
+  @media (max-width: 700px) {
+    .past .session-row {
+      grid-template-columns: 90px minmax(0, 1fr);
+    }
   }
 
   .due .muted {

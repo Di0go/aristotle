@@ -20,6 +20,9 @@ const STARTING_MS = 10_000;
 const SETTLED_MS = 4000;
 /** The status word in that line, e.g. "Pondering…". */
 const STATUS_WORD = /(\p{Lu}\p{Ll}{2,}…)/gu;
+/** What is kept to send when the connection is back: requests, not raw keystrokes or terminal sizes. */
+const HELD = new Set(['run', 'send', 'clear', 'start', 'stop']);
+
 /** An agent asking something only the terminal can answer: a permission or a trust prompt. */
 const ASKING = /Do you want to|Would you like to|Enter to confirm|Esc to cancel|Allow (once|always)|\(y\/n\)/;
 
@@ -63,12 +66,17 @@ class Tutor {
   private idleTimer: ReturnType<typeof setTimeout> | undefined;
   /** An agent is started once per page load, not again after it is stopped or exits. */
   private autoStarted = false;
+  /** Requests made while the connection was down, sent when it opens. */
+  private held: object[] = [];
 
   connect() {
     if (this.ws) return;
     const ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/api/terminal`);
     this.ws = ws;
-    ws.onopen = () => (this.connected = true);
+    ws.onopen = () => {
+      this.connected = true;
+      for (const msg of this.held.splice(0)) ws.send(JSON.stringify(msg));
+    };
     ws.onmessage = (e) => this.receive(JSON.parse(e.data) as TutorMessage);
     ws.onclose = () => {
       this.ws = null;
@@ -184,8 +192,14 @@ class Tutor {
     return () => this.listeners.delete(listener);
   }
 
-  private post(msg: object) {
+  private post(msg: { type: string; [key: string]: unknown }) {
     if (this.ws?.readyState === WebSocket.OPEN) this.ws.send(JSON.stringify(msg));
+    // A request made while the connection is down (the laptop just woke, the app restarted) is sent once it is back,
+    // not lost: a click on Start that does nothing is the worst kind of failure. Keystrokes and sizes are not kept.
+    else if (HELD.has(msg.type)) {
+      this.held.push(msg);
+      this.connect();
+    }
   }
 
   /** Raw terminal input. Includes xterm's automatic replies to terminal queries, so it doesn't clear `asking`. */
