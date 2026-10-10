@@ -361,10 +361,6 @@
     color: var(--solid);
   }
 
-  .mark.mixed {
-    color: var(--shaky);
-  }
-
   .mark.todo {
     color: var(--acc);
   }

@@ -9,7 +9,7 @@ import path from 'node:path';
 import { legacySlugify, slugCandidates, slugify } from '../server/slug.ts';
 import { AppendLog, endLastLine, readLog, WriteQueue } from '../server/store.ts';
 import { leanTopic } from '../server/topics.ts';
-import { pagesOf } from '../ui/src/lib/steps.ts';
+import { pagesOf, stepMark } from '../ui/src/lib/steps.ts';
 import { LEAN_EVIDENCE, type PublicItem, type Session, type Topic } from '../shared/types.ts';
 
 test('slugs: Latin titles keep the ids they always had; other scripts get ids of their own', () => {
@@ -110,4 +110,41 @@ test('a warm-up that ended its sitting stays with its step when an older sitting
       [2, ['s2']],
     ],
   );
+});
+
+test('a finished step stays finished, and a warm-up the class went on without no longer waits', () => {
+  const session = (id: string, startedAt: string, endedAt?: string): Session => ({
+    id,
+    kind: 'learn',
+    topic: 'T',
+    topicSlug: 't',
+    goal: '',
+    startedAt,
+    ...(endedAt ? { endedAt } : {}),
+  });
+  const step: PublicItem = { id: 's1', type: 'block', kind: 'step', markdown: '', at: '2026-10-05T00:01:00Z' };
+  const quiz: PublicItem = {
+    id: 'q',
+    type: 'quiz',
+    at: '2026-10-05T00:02:00Z',
+    questions: [
+      { question: 'a', options: ['x', 'y'] },
+      { question: 'b', options: ['x', 'y'] },
+    ],
+    responses: [
+      { choice: 0, correct: true },
+      { choice: 1, correct: false },
+    ],
+  };
+  const recall: PublicItem = { id: 'r', type: 'ask', kind: 'recall', prompt: 'p', at: '2026-10-06T00:01:00Z' };
+  const later: PublicItem = { id: 's2', type: 'block', kind: 'step', markdown: '', at: '2026-10-07T00:00:00Z' };
+  const first = (...items: PublicItem[]) => ({ session: session('a', '2026-10-05T00:00:00Z'), items });
+
+  // One answer wrong is still a finished step.
+  assert.equal(stepMark(pagesOf([first(step, quiz)])[0]).text, '✓');
+  // A sitting that ended in its warm-up still waits on him while nothing came after it...
+  const warm = { session: session('b', '2026-10-06T00:00:00Z', '2026-10-06T00:30:00Z'), items: [recall] };
+  assert.equal(stepMark(pagesOf([first(step, quiz), warm])[0]).text, 'to answer');
+  // ...and no longer once the class went on without it.
+  assert.equal(stepMark(pagesOf([first(step, quiz, later), warm])[0]).text, '✓');
 });

@@ -42,6 +42,9 @@ export const cleanTitle = (t?: string) => t?.replace(/^\s*(step\s*)?\d+\s*[.:)·
 /** The pages of a class from its lesson sessions, oldest first; `liveId` is the session running now, if any. */
 export function pagesOf(sessions: SessionRecord[], liveId?: string): ClassPage[] {
   const pages: ClassPage[] = [];
+  /** Questions of a sitting that ended in its warm-up and was followed by teaching: they no longer wait on him. */
+  const passed = new Set<string>();
+  const latest = sessions.reduce((m, r) => r.items.reduce((n, i) => (i.at > n ? i.at : n), m), '');
   let step = 0;
   for (const { session, items } of sessions) {
     if (session.kind !== 'learn') continue;
@@ -83,24 +86,25 @@ export function pagesOf(sessions: SessionRecord[], liveId?: string): ClassPage[]
         }
       }
       back.items.push(...before);
+      // Later teaching went on without it: it stays answerable, but no longer counts as waiting.
+      if (session.endedAt && latest > session.endedAt) for (const i of before) passed.add(i.id);
     }
   }
-  for (const p of pages) for (const item of [...p.warmup, ...p.items]) tally(p.checks, item);
+  for (const p of pages) for (const item of [...p.warmup, ...p.items]) if (!passed.has(item.id)) tally(p.checks, item);
   return pages;
 }
 
 /**
- * One mark for how a page went, the same in the tree and on the class page: ✓ when every check is answered and
- * none went wrong (a written answer counts as done), right out of graded when one went wrong, "to answer" while a
- * question waits, nothing when it has no checks (or is the intro).
+ * One mark for a page, the same in the tree and on the class page: ✓ once every check is answered, whatever the
+ * answers were (a finished step stays finished; how each went is on the step itself and on the map), "to answer"
+ * while a question waits, nothing when it has no checks (or is the intro).
  */
-export function stepMark(p: ClassPage): { text: string; tone: '' | 'done' | 'mixed' | 'todo'; title?: string } {
+export function stepMark(p: ClassPage): { text: string; tone: '' | 'done' | 'todo'; title?: string } {
   const c = p.checks;
   const graded = c.right + c.wrong + c.dontKnow;
   if (c.unanswered) return { text: 'to answer', tone: 'todo' };
   // The intro's checks find out what he knew before the class: nothing to score.
   if (p.number === 0) return { text: '', tone: '' };
-  if (graded > c.right) return { text: `${c.right}/${graded}`, tone: 'mixed', title: `${c.right} of ${graded} right` };
   if (graded || c.written) return { text: '✓', tone: 'done', title: 'Done' };
   return { text: '', tone: '' };
 }

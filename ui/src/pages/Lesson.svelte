@@ -315,10 +315,6 @@
     color: var(--solid);
   }
 
-  .steps .m.mixed {
-    color: var(--shaky);
-  }
-
   .steps .m.todo,
   .steps .now-tag {
     color: var(--acc);
