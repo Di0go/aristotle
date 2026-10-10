@@ -72,8 +72,17 @@ export function pagesOf(sessions: SessionRecord[], liveId?: string): ClassPage[]
       // Warming up for a step not taught yet: a page of its own, until the step arrives.
       pages.push({ ...page(step + 1, undefined, true), warmup: before, upcoming: true });
     } else {
-      // A sitting that ended in its warm-up: it stays with the step it went back over.
-      pages.at(-1)!.items.push(...before);
+      // A sitting that ended in its warm-up: it stays with the step it went back over, the last one taught before
+      // it began. An older sitting picked up again may have taught later steps since, and they never take it over.
+      let back = pages.at(-1)!;
+      for (let i = pages.length - 1; i >= 0; i--) {
+        const p = pages[i];
+        if (p.number > 0 && (p.items[0]?.at ?? '') <= session.startedAt) {
+          back = p;
+          break;
+        }
+      }
+      back.items.push(...before);
     }
   }
   for (const p of pages) for (const item of [...p.warmup, ...p.items]) tally(p.checks, item);

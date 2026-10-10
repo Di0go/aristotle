@@ -1,7 +1,7 @@
 <script lang="ts">
   // One page of a class: the intro, or one step with its checks and the feedback on his answers, with Previous
   // and Next. The step being taught now is the same page, live: it grows as Claude adds to it, carries the
-  // composer, and moves on to the next step when Claude starts it, if he was on it.
+  // composer, and offers the next step when Claude starts it, if he was on it, without moving him there.
   import { setContext, tick } from 'svelte';
   import { actions } from './actions.ts';
   import { asides } from './aside.svelte.ts';
@@ -29,6 +29,8 @@
   let count = 0;
   /** How many pages the class had last time we looked, to tell a new step arriving from him moving between steps. */
   let seen = 0;
+  /** A step Claude started while he was on this one, offered at the foot of the page until he goes to it. */
+  let ready = $state<number | null>(null);
 
   const pages = $derived(classes.pages(slug));
   const index = $derived(pages ? pages.findIndex((p) => p.number === number) : -1);
@@ -56,16 +58,17 @@
 
   setContext('topic-slug', () => slug);
 
-  // When the live class gains a page while he is on what was its last one, take him to the new one. Moving to an
-  // earlier step himself changes no count, so it never pulls him back.
+  // When the live class gains a page while he is on what was its last one, offer him the new one: he may still be
+  // reading the feedback, so the page never moves under him. Moving between steps himself changes no count.
   $effect(() => {
     if (!pages) return;
     const before = seen;
     seen = pages.length;
     if (before && pages.length > before && feed.liveSlug === slug && pages[before - 1]?.number === number) {
-      location.hash = link.step(slug, pages.at(-1)!.number);
+      ready = pages.at(-1)!.number;
     }
   });
+  const readyPage = $derived(ready === null ? null : (pages?.find((p) => p.number === ready) ?? null));
 
   // The page stays mounted from step to step: another step starts as if opened afresh, with the panel closed (on a
   // narrow screen) and the live page followed from its start.
@@ -75,6 +78,7 @@
     shown = number;
     benchOpen = false;
     count = 0;
+    ready = null;
   });
 
   // A step opens at its top, to be read from the start. On the live page, what arrives after that is followed
@@ -161,6 +165,15 @@
             </article>
           {/each}
         </section>
+      {/if}
+
+      {#if readyPage}
+        <a class="next-ready" href={link.step(slug, readyPage.number)}
+          ><span class="ready-text"><span class="dir">{tutor.name} has started the next step</span>{name(readyPage)}</span><span
+            class="ready-arrow"
+            aria-hidden="true">→</span
+          ></a
+        >
       {/if}
 
       {#if live}
@@ -326,6 +339,42 @@
   .dir {
     font-size: 0.75rem;
     color: var(--faint);
+  }
+
+  /* Kept in sight at the foot of the screen while he reads, until he goes to the step or reaches its link below. */
+  .next-ready {
+    position: sticky;
+    bottom: 16px;
+    z-index: 5;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    width: fit-content;
+    max-width: min(420px, calc(100% - 32px));
+    margin: 32px max(0px, calc((100% - var(--measure)) / 2)) 0 auto;
+    padding: 10px 16px;
+    border: 1px solid var(--acc-line);
+    border-radius: var(--radius-lg);
+    background: var(--b1);
+    box-shadow: var(--shadow);
+    color: var(--fg);
+    text-decoration: none;
+    line-height: 1.4;
+  }
+
+  .next-ready:hover {
+    border-color: var(--acc);
+  }
+
+  .ready-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .ready-arrow {
+    color: var(--acc);
+    font-size: 1.1rem;
   }
 
   .next-continue {

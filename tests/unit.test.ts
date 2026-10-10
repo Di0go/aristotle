@@ -9,7 +9,8 @@ import path from 'node:path';
 import { legacySlugify, slugCandidates, slugify } from '../server/slug.ts';
 import { AppendLog, endLastLine, readLog, WriteQueue } from '../server/store.ts';
 import { leanTopic } from '../server/topics.ts';
-import { LEAN_EVIDENCE, type Topic } from '../shared/types.ts';
+import { pagesOf } from '../ui/src/lib/steps.ts';
+import { LEAN_EVIDENCE, type PublicItem, type Session, type Topic } from '../shared/types.ts';
 
 test('slugs: Latin titles keep the ids they always had; other scripts get ids of their own', () => {
   for (const title of ['Café au lait!', 'Differential forms', "Newton's laws", 'How the heart keeps time', 'Gödel']) {
@@ -84,4 +85,29 @@ test('the live map carries only the newest evidence of each concept, and says ho
   assert.equal(lean.concepts[0]?.evidenceTotal, LEAN_EVIDENCE + 3);
   assert.equal(lean.concepts[1]?.evidenceTotal, undefined);
   assert.equal(topic.concepts[0]?.evidence.length, LEAN_EVIDENCE + 3, 'the topic itself is untouched');
+});
+
+test('a warm-up that ended its sitting stays with its step when an older sitting picked up again teaches the next', () => {
+  const session = (id: string, startedAt: string): Session => ({
+    id,
+    kind: 'learn',
+    topic: 'T',
+    topicSlug: 't',
+    goal: '',
+    startedAt,
+  });
+  const block = (id: string, kind: 'step' | 'note', at: string): PublicItem => ({ id, type: 'block', kind, markdown: id, at });
+  const older = {
+    session: session('a', '2026-10-05T00:00:00Z'),
+    items: [block('s1', 'step', '2026-10-05T00:01:00Z'), block('s2', 'step', '2026-10-10T10:20:00Z')],
+  };
+  const warmup = { session: session('b', '2026-10-08T00:00:00Z'), items: [block('w', 'note', '2026-10-08T00:01:00Z')] };
+  const pages = pagesOf([older, warmup]);
+  assert.deepEqual(
+    pages.map((p) => [p.number, p.items.map((i) => i.id)]),
+    [
+      [1, ['s1', 'w']],
+      [2, ['s2']],
+    ],
+  );
 });
