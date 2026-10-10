@@ -22,6 +22,7 @@
     roadmap: {
       title: 'Plan a course',
       help: 'Name a field or a big goal. Your tutor asks what you want from it, checks the field, and drafts its classes on the course page for you to change. Nothing is taught until you approve it.',
+      notes: 'Notes (optional): what draws you to it, what you already know, what to cover or leave out',
       what: 'e.g. sports psychology',
       whatLabel: 'Field or goal',
       goal: 'Where you want to end up (optional)',
@@ -33,6 +34,7 @@
       what: 'e.g. how sleep consolidates memory',
       whatLabel: 'Subject',
       goal: 'What you want to be able to do (optional)',
+      notes: 'Notes (optional): what you already know, what you are curious about',
       submit: 'Start',
     },
   } as const;
@@ -40,6 +42,7 @@
   let making = $state<'roadmap' | 'topic' | null>(null);
   let what = $state('');
   let goal = $state('');
+  let notes = $state('');
   let filter = $state('');
   let sort = $state<Sort>('recent');
   let input = $state<HTMLInputElement>();
@@ -76,6 +79,7 @@
     making = making === kind ? null : kind;
     what = '';
     goal = '';
+    notes = '';
     queueMicrotask(() => input?.focus());
   }
 
@@ -85,8 +89,8 @@
       input?.focus();
       return;
     }
-    if (making === 'roadmap') actions.planRoadmap(what, goal);
-    else actions.learn(what, goal);
+    if (making === 'roadmap') actions.planRoadmap(what, goal, notes);
+    else actions.learn(what, goal, notes);
     making = null;
   }
 
@@ -126,6 +130,7 @@
         <input class="field" bind:value={goal} autocomplete="off" placeholder={m.goal} aria-label="Goal" />
         <button class="primary" type="submit">{m.submit}</button>
       </div>
+      <textarea class="maker-notes" bind:value={notes} rows="3" placeholder={m.notes} aria-label="Notes"></textarea>
       <p class="maker-foot muted">
         {tutor.running ? `${tutor.name} switches to it.` : `Starts ${tutor.name} here.`}
         <button type="button" class="link" onclick={() => (making = null)}>Cancel</button>
@@ -283,6 +288,11 @@
     display: grid;
     grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) auto;
     gap: 8px;
+  }
+
+  .maker-notes {
+    margin-top: 8px;
+    font-size: 0.92rem;
   }
 
   .maker-foot {

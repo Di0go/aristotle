@@ -25,9 +25,9 @@ export const actions = {
     if (!result.heard && !feed.items.some((i) => (i.type === 'quiz' || i.type === 'ask') && !i.answeredAt)) pickUp(going);
     return null;
   },
-  learn(topic: string, goal = '') {
+  learn(topic: string, goal = '', notes = '') {
     const what = oneLine(topic);
-    const want = oneLine(goal) ? `. What I want from it: ${oneLine(goal)}` : '';
+    const want = wants(goal, notes);
     go(`/teach ${what}${want}`, `Use the teach skill to teach me: ${what}${want}`, `A class on ${what}`);
   },
   /** A step's topic is named after the step, so the lesson must use the title exactly. */
@@ -43,9 +43,9 @@ export const actions = {
       step.topic,
     );
   },
-  planRoadmap(area: string, goal = '') {
+  planRoadmap(area: string, goal = '', notes = '') {
     const what = oneLine(area);
-    const want = oneLine(goal) ? `. What I want from it: ${oneLine(goal)}` : '';
+    const want = wants(goal, notes);
     go(`/roadmap ${what}${want}`, `Use the roadmap skill to plan a roadmap with me: ${what}${want}`, `Planning a course: ${what}`, true);
   },
   editRoadmap(slug: string) {
@@ -175,6 +175,12 @@ function go(
   const route = router.route;
   if (topic && (route.page === 'lesson' || route.page === 'step') && route.slug === topic) return;
   location.hash = topic ? link.lesson(topic) : link.now();
+}
+
+/** What he wants from a new class or course, and his notes on it, as they follow its name in the request. */
+function wants(goal: string, notes: string): string {
+  const want = oneLine(goal) ? `. What I want from it: ${oneLine(goal)}` : '';
+  return oneLine(notes) ? `${want}. My notes: ${oneLine(notes)}` : want;
 }
 
 function oneLine(s: string): string {
