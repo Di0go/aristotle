@@ -59,6 +59,8 @@ Understanding is not something you can be handed. It is built by **struggling wi
 
 Bigger subjects are planned as **courses**: an ordered path of classes, agreed with you before any of it is taught, ending in a final mission that uses the whole path at once. A class is its steps, one page each, whichever sitting taught them.
 
+There is no stop button. Take as long as a hard question needs: while you are working on the page, the tutor waits. Walk away with a question open and the sitting closes itself; answer it whenever you come back and the tutor picks up at that same step, not a new one.
+
 ## Learn anything
 
 Any subject, at any depth. Here is one lesson from each of four courses, in medicine, chemistry, physics and history, and the figures move: these are recordings of the app itself. Click one to see it full size.
