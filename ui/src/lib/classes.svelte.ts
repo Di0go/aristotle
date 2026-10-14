@@ -9,6 +9,13 @@ class Classes {
   /** Finished sessions by topic, oldest first. */
   private past = $state<Record<string, SessionRecord[]>>({});
   private loading = new Set<string>();
+  /** Topics to load once more when their current load is done. */
+  private again = new Set<string>();
+  /**
+   * The session each topic's class last showed from the live feed instead of its loaded record. Plain, not state:
+   * reading it never makes a page depend on it.
+   */
+  private overlaid: Record<string, string | undefined> = {};
 
   /** The topic's class, page by page; null while its sessions load for the first time. */
   pages(slug: string): ClassPage[] | null {
@@ -23,12 +30,18 @@ class Classes {
     if (session?.topicSlug === slug && !live && !past.some((r) => r.session.id === session.id)) {
       queueMicrotask(() => {
         delete this.past[slug];
-        void this.load(slug);
+        void this.load(slug, true);
       });
     }
     // The current session as the feed has it, in its place (one picked up again is older than others on the topic,
     // and its record here may be from before it was).
     const current = session?.topicSlug === slug ? session : null;
+    // The feed has moved off a session it was standing in for (it ended, and another sitting began): its loaded
+    // record is from before the feed took over (a sitting picked up again, answered and finished since), so load
+    // the class again, keeping what is shown until the fresh copy arrives.
+    const before = this.overlaid[slug];
+    this.overlaid[slug] = current?.id;
+    if (before && before !== current?.id && past.some((r) => r.session.id === before)) queueMicrotask(() => void this.load(slug, true));
     const records = past.map((r) => (r.session.id === current?.id ? { session: current, items: feed.items } : r));
     if (live && !past.some((r) => r.session.id === live.id)) records.push({ session: live, items: feed.items });
     return pagesOf(records, live?.id);
@@ -51,8 +64,12 @@ class Classes {
     return this.liveHref();
   }
 
-  private async load(slug: string) {
-    if (this.loading.has(slug)) return;
+  /** Loads a topic's sessions; `fresh` when they changed, so a load already on its way (it may have read them before) is followed by another. */
+  private async load(slug: string, fresh = false) {
+    if (this.loading.has(slug)) {
+      if (fresh) this.again.add(slug);
+      return;
+    }
     this.loading.add(slug);
     try {
       const all = (await topicSessions(slug)).reverse();
@@ -62,6 +79,7 @@ class Classes {
       this.past[slug] = records.filter((r) => r.session);
     } finally {
       this.loading.delete(slug);
+      if (this.again.delete(slug)) void this.load(slug);
     }
   }
 }

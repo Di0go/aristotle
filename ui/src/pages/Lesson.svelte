@@ -8,7 +8,7 @@
   import { classes } from '../lib/classes.svelte.ts';
   import { feed } from '../lib/feed.svelte.ts';
   import { ago } from '../lib/format.ts';
-  import { countsOf, markOf, outline, placeOf } from '../lib/library.ts';
+  import { countsOf, markOf, nextClassOf, outline, placeOf } from '../lib/library.ts';
   import { link } from '../lib/router.svelte.ts';
   import { pageLabel, stepMark, type ClassPage } from '../lib/steps.ts';
   import StatusBar from '../lib/StatusBar.svelte';
@@ -26,6 +26,8 @@
   const started = $derived(Boolean(topic));
   const pages = $derived(started ? classes.pages(slug) : []);
   const concepts = $derived(topic ? outline(topic) : []);
+  /** The next class of the course, once this one is finished: where Continue goes. */
+  const nextClass = $derived(nextClassOf(slug, feed.roadmapList, feed.topics));
   /** His missions on this class, not the dropped ones. */
   const missions = $derived(feed.missionList.filter((m) => m.topic === slug && m.scope !== 'capstone' && m.status !== 'dropped'));
   /** Where he is, said from the class itself (never from the tutor's notes), with the one thing to do about it. */
@@ -42,6 +44,7 @@
     }
     const open = pages.find((p) => p.checks.unanswered > 0);
     if (open) return { text: `${name(open)} has a question waiting for you.`, page: open, action: 'Answer it' };
+    if (nextClass) return { text: `This class is done. Next in the course: ${nextClass.title}.`, action: 'Continue' };
     return { text: `Last: ${name(last)}, studied ${ago(topic!.updated)}.`, action: 'Continue' };
   });
 
@@ -54,7 +57,7 @@
 
   /** Interacting is what starts the class: his words go to Claude as the first thing it hears. */
   function begin(said = '') {
-    if (started) actions.continueTopic(slug, said);
+    if (started) actions.continueClass(slug, said);
     else if (place) actions.startStep(place.roadmap, place.index, said);
     // Neither a topic nor a course's class (an old link, or one since removed): start a lesson on it anyway.
     else actions.learn(title, said);
@@ -142,7 +145,9 @@
                 ? `Anything to tell ${tutor.name} first? Or just continue…`
                 : 'Say what you want from it, or just start…'}
               aria-label="Your first words to the tutor"></textarea>
-            <button class={where?.page ? 'ghost' : 'primary'} onclick={() => begin(text)}>{started ? 'Continue' : 'Start'}</button>
+            <button class={where?.page ? 'ghost' : 'primary'} onclick={() => begin(text)}
+              >{nextClass && !text.trim() ? 'Next class' : started ? 'Continue' : 'Start'}</button
+            >
           </div>
           {#if feed.starting}
             <p class="composer-off picking-up"><span class="spinner" aria-hidden="true"></span>{tutor.name} is picking up the class…</p>

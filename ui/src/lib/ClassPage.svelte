@@ -11,7 +11,7 @@
   import { bench } from './bench.svelte.ts';
   import { feed } from './feed.svelte.ts';
   import { focus } from './focus.svelte.ts';
-  import { placeOf } from './library.ts';
+  import { nextClassOf, placeOf } from './library.ts';
   import { renderMarkdown } from './markdown.ts';
   import { link } from './router.svelte.ts';
   import { pageLabel, type ClassPage } from './steps.ts';
@@ -50,6 +50,19 @@
     ),
   );
   const steps = $derived(pages?.filter((p) => p.number > 0).length ?? 0);
+  /** The next class of the course, once this one is finished: where continuing goes. */
+  const nextClass = $derived(nextClassOf(slug, feed.roadmapList, feed.topics));
+  /**
+   * Asked for and not on the page yet: the sitting hasn't started, or it has (on this class) and its first step
+   * hasn't arrived. The button gives way to a line saying so, so a second press never starts it twice.
+   */
+  const picking = $derived(Boolean(feed.starting) || (last && !live && feed.liveSlug === slug));
+  /** A lesson going on in another class (often the next one, when this one was finished): where to find it. */
+  const elsewhere = $derived.by(() => {
+    const other = feed.session?.kind === 'learn' ? feed.liveSlug : null;
+    if (!last || !other || other === slug) return null;
+    return { href: classes.liveHref() ?? link.lesson(other), title: feed.topics[other]?.title ?? feed.session!.topic };
+  });
   /** The questions he asked on passages of this page, oldest first. */
   const questions = $derived.by(() => {
     const ids = new Set([...(page?.warmup ?? []), ...(page?.items ?? [])].map((i) => i.id));
@@ -181,13 +194,25 @@
         <Composer />
       {/if}
 
+      {#if last && nextClass && !live}
+        <p class="class-done">This was the last step: everything this class set out to teach is solid.</p>
+      {/if}
+
       <nav class="step-nav" aria-label="Steps">
         {#if prev}<a class="prev" href={link.step(slug, prev.number)}><span class="dir">Previous</span>{name(prev)}</a>{:else}<span
           ></span>{/if}
         {#if next}<a class="next" href={link.step(slug, next.number)}><span class="dir">Next</span>{name(next)}</a>
+        {:else if elsewhere}
+          <a class="next" href={elsewhere.href}><span class="dir">{tutor.name} is teaching now</span>{elsewhere.title}</a>
+        {:else if picking}
+          <p class="picking-up" aria-live="polite">
+            <span class="spinner" aria-hidden="true"></span>{nextClass
+              ? `${tutor.name} is starting the next class…`
+              : `${tutor.name} is picking up the class…`}
+          </p>
         {:else if !live}
-          <button class="primary next-continue" onclick={() => actions.continueTopic(slug)}
-            >{feed.starting ? `${tutor.name} is picking up the class…` : 'Continue the class'}</button
+          <button class="primary next-continue" onclick={() => actions.continueClass(slug)}
+            >{nextClass ? `Next class: ${nextClass.title}` : 'Continue the class'}</button
           >
         {/if}
       </nav>
@@ -375,6 +400,21 @@
   .ready-arrow {
     color: var(--acc);
     font-size: 1.1rem;
+  }
+
+  .class-done {
+    max-width: var(--measure);
+    margin: 32px auto 0;
+    color: var(--muted);
+  }
+
+  .picking-up {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0 0 0 auto;
+    align-self: center;
+    color: var(--muted);
   }
 
   .next-continue {

@@ -19,6 +19,21 @@ export interface Place {
   index: number;
 }
 
+/**
+ * The class that comes after a finished one in its course (every goal concept solid, and a next step to go to), so
+ * continuing a finished class goes on to it rather than back over the old one. Null when there is none.
+ */
+export function nextClassOf(
+  slug: string,
+  roadmaps: Roadmap[],
+  topics: Record<string, Topic>,
+): (Place & { title: string; topic: string }) | null {
+  const place = placeOf(slug, roadmaps);
+  if (!place || stepState(topics[slug]) !== 'done') return null;
+  const step = place.roadmap.steps[place.index + 1];
+  return step ? { roadmap: place.roadmap, index: place.index + 1, title: step.title, topic: step.topic } : null;
+}
+
 /** The roadmap a topic is a step of, if any (the first one, when several share it). */
 export function placeOf(slug: string, roadmaps: Roadmap[]): Place | null {
   for (const roadmap of roadmaps) {

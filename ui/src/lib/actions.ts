@@ -4,6 +4,7 @@
 
 import { tutor } from './tutor.svelte.ts';
 import { feed } from './feed.svelte.ts';
+import { nextClassOf } from './library.ts';
 import { link, router } from './router.svelte.ts';
 import type { Roadmap } from '../../../shared/types.ts';
 
@@ -50,6 +51,16 @@ export const actions = {
   },
   editRoadmap(slug: string) {
     go(`/roadmap change ${slug}`, `Use the roadmap skill: I want to change my roadmap ${slug}.`, 'Changing the course', true);
+  },
+  /**
+   * "Continue" on a class: picks it up where he left it, or, once it is finished, goes on to the next class of its
+   * course. What he typed stays with this class, since it may be about it.
+   */
+  continueClass(slug: string, said = '') {
+    const next = oneLine(said) ? null : nextClassOf(slug, feed.roadmapList, feed.topics);
+    if (!next) actions.continueTopic(slug, said);
+    else if (feed.topics[next.topic]) actions.continueTopic(next.topic);
+    else actions.startStep(next.roadmap, next.index);
   },
   /** Continue a topic's lesson; what he typed, if anything, goes along as his first words. */
   continueTopic(slug: string, said = '') {
