@@ -1,6 +1,8 @@
 <script lang="ts">
   // An open question in a lesson: the prompt, a text box with a live maths preview, and the answer once sent.
+  import { untrack } from 'svelte';
   import { actions } from './actions.ts';
+  import { drafts } from './drafts.ts';
   import { feed } from './feed.svelte.ts';
   import Markdown from './Markdown.svelte';
   import type { AskItem } from '../../../shared/types.ts';
@@ -14,7 +16,9 @@
 
   let { item, active, readonly = false }: { item: AskItem; active: boolean; readonly?: boolean } = $props();
 
-  let text = $state('');
+  /** Where what he is writing is kept until he sends it, so leaving the step and coming back finds it. */
+  const key = $derived(`ask:${item.id}`);
+  let text = $state(untrack(() => drafts.get(key, '')));
   let sending = $state(false);
   let error = $state<string | null>(null);
   let box = $state<HTMLTextAreaElement>();
@@ -28,11 +32,17 @@
     if (active && !answered) box?.focus({ preventScroll: true });
   });
 
+  // Answered (here or anywhere else): nothing left to keep.
+  $effect(() => {
+    if (answered) drafts.clear(key);
+  });
+
   async function submit() {
     if (!text.trim() || sending || answered) return;
     sending = true;
     error = await actions.answer({ id: item.id, text });
     sending = false;
+    if (!error) drafts.clear(key);
   }
 
   function onKey(e: KeyboardEvent) {
@@ -58,6 +68,7 @@
     <textarea
       bind:this={box}
       bind:value={text}
+      oninput={() => drafts.text(key, text)}
       onkeydown={onKey}
       rows="6"
       placeholder={item.placeholder ?? 'Write your answer. Maths works: $x^2$ or $$\\int_0^1 f$$'}></textarea>

@@ -4,6 +4,7 @@
   import { setContext } from 'svelte';
   import { tutor } from '../lib/tutor.svelte.ts';
   import { actions } from '../lib/actions.ts';
+  import { drafts } from '../lib/drafts.ts';
   import { feed } from '../lib/feed.svelte.ts';
   import { formatDay } from '../lib/format.ts';
   import { markOf, missionSource, SCOPE_LABEL, STATUS_LABEL, STATUS_TONE, splitRef, VERDICT_LABEL } from '../lib/library.ts';
@@ -32,6 +33,16 @@
   );
 
   setContext('topic-slug', () => mission?.topic);
+
+  /** The mission the box's text belongs to: a debrief he hasn't sent is kept, for when he comes back. */
+  let draftFor = '';
+  $effect.pre(() => {
+    if (id === draftFor) return;
+    draftFor = id;
+    text = drafts.get(`debrief:${id}`, '');
+    writing = Boolean(text.trim());
+  });
+  $effect(() => drafts.text(`debrief:${draftFor}`, text));
 
   function rewrite() {
     text = mission?.debrief?.text ?? '';

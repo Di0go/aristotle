@@ -6,6 +6,7 @@
   // and he can clear it to start over.
   import { tick } from 'svelte';
   import { classes } from './classes.svelte.ts';
+  import { drafts } from './drafts.ts';
   import { feed } from './feed.svelte.ts';
   import { formatTime } from './format.ts';
   import { markOf, outline } from './library.ts';
@@ -106,6 +107,15 @@
   $effect(() => {
     void feed.loadChat(thread);
   });
+
+  /** The conversation the box's text belongs to: what he hasn't sent is kept per conversation, for when he comes back. */
+  let draftFor = '';
+  $effect.pre(() => {
+    if (thread === draftFor) return;
+    draftFor = thread;
+    text = drafts.get(`chat:${thread}`, '');
+  });
+  $effect(() => drafts.text(`chat:${draftFor}`, text));
 
   // Keep the newest message in view as the conversation grows and an answer streams in, unless he has scrolled up
   // to reread: at most once a frame, however fast the text arrives.

@@ -1,16 +1,23 @@
 <script lang="ts">
   // A graded multiple-choice check: options, "I don't know", a note per question, and right or wrong once answered.
+  import { untrack } from 'svelte';
   import { actions } from './actions.ts';
+  import { drafts } from './drafts.ts';
   import { feed } from './feed.svelte.ts';
   import Markdown from './Markdown.svelte';
   import type { PublicQuizItem } from '../../../shared/types.ts';
 
   let { item, active, readonly = false }: { item: PublicQuizItem; active: boolean; readonly?: boolean } = $props();
 
+  /** Picks and notes made but not checked yet, kept so leaving the step and coming back finds them. */
+  type Draft = { picks: Record<number, number | null>; notes: string[] };
+  const key = $derived(`quiz:${item.id}`);
+  const draft = untrack(() => drafts.get<Draft>(key, { picks: {}, notes: [] }));
+
   // Per question. In picks, undefined = not picked yet, null = "I don't know".
-  let picks = $state<(number | null | undefined)[]>([]);
-  let notes = $state<string[]>([]);
-  let noteOpen = $state<boolean[]>([]);
+  let picks = $state<(number | null | undefined)[]>(untrack(() => item.questions.map((_, i) => draft.picks[i])));
+  let notes = $state<string[]>(draft.notes);
+  let noteOpen = $state<boolean[]>(draft.notes.map(Boolean));
   let showAll = $state<boolean[]>([]);
   let sending = $state(false);
   let error = $state<string | null>(null);
@@ -30,7 +37,21 @@
   function pick(q: number, choice: number | null) {
     if (answered || sending || readonly) return;
     picks[q] = choice;
+    keep();
   }
+
+  function keep() {
+    const kept: Draft = { picks: {}, notes: Array.from(notes, (n) => n ?? '') };
+    picks.forEach((p, i) => {
+      if (p !== undefined) kept.picks[i] = p;
+    });
+    drafts.set(key, kept, !Object.keys(kept.picks).length && !kept.notes.some((n) => n.trim()));
+  }
+
+  // Checked (here or anywhere else): nothing left to keep.
+  $effect(() => {
+    if (answered) drafts.clear(key);
+  });
 
   async function submit() {
     if (!ready || sending || answered || readonly) return;
@@ -40,6 +61,7 @@
       picks: item.questions.map((_, i) => ({ choice: picks[i] ?? null, note: notes[i] || undefined })),
     });
     sending = false;
+    if (!error) drafts.clear(key);
   }
 
   /** Number keys pick for the current question (0 for "I don't know"), Enter checks; never while typing a note. */
@@ -124,8 +146,12 @@
       {:else if readonly}
         <p class="unanswered">Not answered.</p>
       {:else if noteOpen[qi]}
-        <textarea class="note" rows="2" placeholder="Your reasoning, or what you're unsure about (optional)" bind:value={notes[qi]}
-        ></textarea>
+        <textarea
+          class="note"
+          rows="2"
+          placeholder="Your reasoning, or what you're unsure about (optional)"
+          bind:value={notes[qi]}
+          oninput={keep}></textarea>
       {:else}
         <button class="link add-note" onclick={() => (noteOpen[qi] = true)}>Add a note on your reasoning</button>
       {/if}

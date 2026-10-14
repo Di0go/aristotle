@@ -1,10 +1,14 @@
 <script lang="ts">
   // Talk to the tutor from Aristotle: the message goes to the agent running in the drawer (typed in), or to the API tutor.
+  import { drafts } from './drafts.ts';
   import { link } from './router.svelte.ts';
   import { tutor } from './tutor.svelte.ts';
 
-  let text = $state('');
+  /** What he hasn't sent yet, kept for when he comes back. */
+  let text = $state(drafts.get('composer', ''));
   let box = $state<HTMLTextAreaElement>();
+
+  $effect(() => drafts.text('composer', text));
 
   function send() {
     if (!text.trim()) return;

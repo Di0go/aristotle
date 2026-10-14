@@ -273,6 +273,7 @@ Only for the interface (and the tests); tutors use MCP.
 | [`automatic.svelte.ts`](../ui/src/lib/automatic.svelte.ts) | What Aristotle does on its own, from what he does, so he never presses a button for the app's housekeeping. |
 | [`bench.svelte.ts`](../ui/src/lib/bench.svelte.ts) | The panel beside a step: whether it is folded away (so the step gets the whole width), and which of its tabs is open, This step or Chat. |
 | [`classes.svelte.ts`](../ui/src/lib/classes.svelte.ts) | Each topic's class as pages (steps.ts), for the library tree, the class page and its step pages: past sessions loaded on first use and kept, the session running now read from the live feed as it grows. |
+| [`drafts.ts`](../ui/src/lib/drafts.ts) | What he has typed and not sent yet (an answer, a quiz note, a message), kept in the browser so leaving a step and coming back finds it where he left it. |
 | [`feed.svelte.ts`](../ui/src/lib/feed.svelte.ts) | Live copy of the server's state, kept current over Server-Sent Events. |
 | [`focus.svelte.ts`](../ui/src/lib/focus.svelte.ts) | Focus mode: everything but the page hides (ribbon, library, tabs, status line, the bench beside a lesson), for reading and answering with nothing else in view. |
 | [`format.ts`](../ui/src/lib/format.ts) | Dates, times, durations and plurals, written the way the interface shows them. |
