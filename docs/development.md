@@ -128,8 +128,7 @@ Every setting is an environment variable with a default. `.env` is not read: set
 | `ARISTOTLE_COMMONS_API` | Wikimedia Commons' API, which find_images and glosses search; tests point it at a local stand-in. | [`config.ts`](../server/config.ts) |
 | `ARISTOTLE_GLOSS_IMAGES` | Whether a gloss may carry a picture from Wikimedia Commons, when one would help (off in the tests: no network). | [`config.ts`](../server/config.ts) |
 | `ARISTOTLE_ONESHOT_CMD` | A command that reads a question on stdin and prints the answer, in place of Claude Code (oneshot.ts); tests swap one in. | [`config.ts`](../server/config.ts) |
-| `ARISTOTLE_WAIT_MS` | How long quiz and ask wait without a sign of him before handing control back to Claude: from the question, or from the last time the interface said he was there (POST /api/presence), whichever is later. | [`config.ts`](../server/config.ts) |
-| `ARISTOTLE_WAIT_CAP_MS` | The longest a quiz or ask waits however long he keeps working on it, so a page left open can't hold a call forever. | [`config.ts`](../server/config.ts) |
+| `ARISTOTLE_WAIT_MS` | How long quiz and ask hold the tutor's call waiting for his answer, from when the question was asked. | [`config.ts`](../server/config.ts) |
 | `ARISTOTLE_WAIT_SLICE_MS` | How long one piece of a wait lasts for a client that ends tool calls after a minute whatever they report (Cursor's CLI, mcp.ts): the wait comes in pieces, each ending in "still waiting"; short in tests. | [`config.ts`](../server/config.ts) |
 | `ARISTOTLE_CLAUDE_CWD` |  | [`config.ts`](../server/config.ts) |
 | `ARISTOTLE_DRAWER` | The tutor in Aristotle's terminal drawer (server/terminal.ts sets this): a lesson, where commits released meanwhile must never send it off to write docs. | [`claude-stop-hook.ts`](../scripts/claude-stop-hook.ts) |

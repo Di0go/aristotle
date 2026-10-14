@@ -8,7 +8,7 @@ import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { STATE_DIR, URL_CLEAN, WAIT_CAP_MS } from './config.ts';
+import { STATE_DIR, URL_CLEAN, WAIT_MS } from './config.ts';
 import type { Gym } from './gym.ts';
 import { chat, type Completion, type Endpoint, LlmError, type LlmMessage, type LlmPart, type LlmTool, stripThinking } from './llm.ts';
 import { essentials, skills } from './method.ts';
@@ -25,7 +25,7 @@ const SAVE_FILE = path.join(STATE_DIR, 'tutor-api.json');
 /** The tools that only make sense for a model that can see what they return. */
 const SEEING = new Set(['preview_svg', 'view_image']);
 /** A tool call may wait for the learner this long in all (quiz and ask), plus a margin. */
-const TOOL_TIMEOUT_MS = WAIT_CAP_MS + 10 * 60_000;
+const TOOL_TIMEOUT_MS = WAIT_MS + 10 * 60_000;
 
 /** The runner's own tools: the web, which an agent CLI brings and a bare model doesn't. */
 const LOCAL_TOOLS: LlmTool[] = [

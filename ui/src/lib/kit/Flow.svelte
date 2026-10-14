@@ -67,6 +67,8 @@
   const RISE_S = 2.4;
   /** Things carried on an arrow are drawn at this scale; two ride it at once, half a trip apart. */
   const CARRY_SCALE = 1.05;
+  /** A figure is never shown smaller than this share of its drawn size if another layout avoids it. */
+  const MIN_SCALE = 0.8;
 
   let at = $state(-1);
   let drawing = $state<SVGSVGElement>();
@@ -81,10 +83,22 @@
   const steps = $derived(spec.steps ?? []);
   const lit = $derived(at >= 0 && steps[at] ? new Set(steps[at].on) : null);
 
+  /** The width the figure has on the page, to tell whether a side-by-side layout would shrink its text unreadably. */
+  let room = $state(0);
+
+  // Left to right is the default, but a long chain laid out sideways is far wider than the column and gets scaled
+  // down until its words are too small to read. Below MIN_SCALE it is laid out top to bottom instead, whichever
+  // direction was asked for, as long as that keeps the text larger.
+  const wide = $derived(lay(spec.direction ?? 'LR'));
   const layout = $derived.by(() => {
+    if (!room || wide.w * MIN_SCALE <= room) return wide;
+    const tall = lay(spec.direction === 'TB' ? 'LR' : 'TB');
+    return Math.min(1, room / tall.w) > room / wide.w ? tall : wide;
+  });
+
+  function lay(dir: 'LR' | 'TB') {
     // A multigraph: two arrows may join the same pair (the brake and the accelerator both reach the heart).
     const g = new dagre.graphlib.Graph({ multigraph: true });
-    const dir = spec.direction ?? 'LR';
     // Room above the boxes for what rises out of them.
     const rising = spec.nodes.some((n) => n.makes?.length);
     const carrying = spec.edges.some((e) => e.carries);
@@ -149,7 +163,7 @@
     });
     const gr = g.graph();
     return { nodes, edges, w: Math.ceil(gr.width ?? 400), h: Math.ceil(gr.height ?? 200) };
-  });
+  }
 
   /** An edge label's pill width, from an estimate of its text's. */
   function labelW(label: string): number {
@@ -177,7 +191,7 @@
   }
 </script>
 
-<figure class="kit kit-flow">
+<figure class="kit kit-flow" bind:clientWidth={room}>
   {#if spec.title}<p class="kit-title">{spec.title}</p>{/if}
   <div class="flow-scroll">
     <svg

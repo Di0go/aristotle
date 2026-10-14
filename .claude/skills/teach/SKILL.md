@@ -42,7 +42,7 @@ The learner must never land in a topic cold. Before the first probe question, `s
 - **Where it sits**: what came before on the roadmap and what this unlocks next. One or two lines.
 - **A picture of the territory**: one figure that shows the whole system the lesson moves through, labelled, before any detail (the nervous system's two branches and what they reach; the layers of a network; the parts of a cell). It is the map they'll place every later step on. Ask the `illustrator` for it, or use a verified image.
 - **The words they'll meet**: the 4 to 8 key terms, each with a one-line plain meaning (a `[!term]` callout or a short list). Names learned first make the explanations lighter later.
-- **How the session goes**: a short probe to find where their knowledge ends (misses are expected and useful), then a plan for their OK, then one step at a time.
+- **How the session goes**: a short probe to find where their knowledge ends (misses are expected and useful), then the plan, then one step at a time.
 
 Keep it to one screen. On a continuing session, replace it with a three-line "where we are" (`[!context]` callout): what's done, what this sitting does, and why now.
 
@@ -69,8 +69,8 @@ Two unknowns, two tools.
 - **Build from what is already solid.** Don't reteach it, and don't start beyond their edge without a ramp.
 - **Find the motivated path.** For each step: why would anyone reach for this?
 - **Write the plan into the map**: concepts with `deps`, the goal concept(s) with `goal: true`. One node is one reasoning step, not a chapter; a session's plan is usually 5 to 12 nodes.
-- `show` (kind `plan`): a few sentences on what you'll cover, in what order, and why this way given their edge and goal. Aristotle draws the map, so don't redraw it.
-- **Wait for their go-ahead** in the terminal. A wrong root is cheap to fix now and expensive mid-lesson.
+- `show` (kind `plan`): a few sentences on what you'll cover, in what order, and why this way given their edge and goal, ending with one line saying they can change it any time by writing to you. Aristotle draws the map, so don't redraw it.
+- **Don't stop for a go-ahead**: send the first step and its check in the same message as the plan. A turn that ends on the plan leaves them on a page with nothing to answer and no idea what is expected. If they object to the plan, change it then.
 
 ## Phase 3: teach, one node at a time
 
@@ -110,8 +110,8 @@ The learner has to trust the teacher completely. One confidently delivered error
 
 ## Hopping in and out
 
-- They come and go as they like, and there is no stop button: a sitting closes itself. If `quiz` or `ask` returns "No answer yet", they have stepped away: in one message, a final `update_map` if anything changed and `end_session` with the handoff, and end your turn. When they answer later, Aristotle asks you to continue: `collect_answers` first, then carry on. If they ask for something else while a sitting is open (another class, a review), close this one the same way before starting it.
-- When they say they're done, step away (no answer in time) or the goal is reached: final `update_map`, then `end_session` with what locked in, what is shaky, and the next step, specific enough that a fresh session can resume from it alone.
+- They come and go as they like, and there is no stop button. `quiz` and `ask` wait a few minutes, never longer, so you never sit there looking stuck. If one returns "No answer yet", they are thinking it over or away: a final `update_map` if anything changed and not yet recorded, then end your turn, leaving the sitting open (no `end_session`). When they answer, Aristotle tells you to collect it: `collect_answers`, then carry on as if they had answered in the moment. If they ask for something else while a sitting is open (another class, a review), close this one with `end_session` and its handoff before starting it.
+- When they say they're done or the goal is reached: final `update_map`, then `end_session` with what locked in, what is shaky, and the next step, specific enough that a fresh session can resume from it alone.
 
 ## Continuing
 

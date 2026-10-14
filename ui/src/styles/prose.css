@@ -335,14 +335,15 @@
   color: var(--fg-2);
 }
 
-/* Hover terms ({{term|definition}}) and concept links ([[concept]]). */
-.md .term {
+/* Hover terms ({{term|definition}}) and concept links ([[concept]]). Only the inline span: a [!term] callout
+   shares the class name and must not look like one giant hover term. */
+.md span.term {
   border-bottom: 1px dashed var(--acc-line);
   cursor: help;
 }
 
-.md .term:hover,
-.md .term:focus-visible {
+.md span.term:hover,
+.md span.term:focus-visible {
   border-bottom-color: var(--acc);
   outline: none;
 }

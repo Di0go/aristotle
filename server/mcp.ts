@@ -54,7 +54,7 @@ const THEME = {
 /** Everything a lesson's Markdown can hold. Written out once, in `show`; quiz and ask point here. */
 const MATH_AND_DIAGRAMS =
   'Markdown is rendered with LaTeX maths ($...$ inline, $$...$$ on its own lines; write a literal dollar as \\$), ' +
-  '```mermaid code blocks as diagrams, and inline <svg> elements (which may animate with SMIL <animate>; Aristotle adds play and replay buttons). ' +
+  '```mermaid code blocks as diagrams, and inline <svg> elements (which may animate with SMIL <animate>; Aristotle adds play and replay buttons; keep the viewBox at most 680 units wide with text at 14 units or more, since a wider drawing is shrunk to the column until its text cannot be read). ' +
   'Hover cards: {{term|short definition}} marks a term with a definition they can hover (inside a ==highlight== too: =={{term|definition}}==); [[concept-id]], [[other-topic/concept-id]] or [[concept-id|text]] links a concept on the map and shows its preview. ' +
   'Also: ==highlighted text==; callouts as Obsidian writes them (> [!idea] Title, then > lines; kinds: idea, key, why, context, example, you, careful, term, note); ' +
   '<figure> with <figcaption> around a drawing; ![alt](https://upload.wikimedia.org/… "caption") for an image with a caption (Wikimedia Commons only: the page shows no other host); ' +
@@ -1024,16 +1024,15 @@ async function waitForLearner(gym: Gym, ids: string | string[], extra: Extra): P
 }
 
 /**
- * What Claude gets when he doesn't answer in time: he has stepped away, so the sitting closes itself. There is no stop
- * button; the question stays open, and answering it later brings Claude back to carry on.
+ * What Claude gets when he hasn't answered within the wait: he may be thinking it over or away, so it hands back rather
+ * than hold the call (a tutor held for minutes reads as stuck). The sitting stays open; his answer brings Claude back.
  */
 function notAnswered(): CallToolResult {
   const minutes = Math.round(WAIT_MS / 60_000);
   return text(
-    `No answer yet: ${minutes} minutes have gone by with no sign of them in Aristotle, so they have stepped away. ` +
-      'Close the sitting now, without asking them anything: in one message, a final `update_map` if this sitting changed what they hold and ' +
-      '`end_session` with the handoff. The question stays open in Aristotle; when they answer it, you are asked to continue ' +
-      'and `collect_answers` gives you their answer. Then end your turn.',
+    `No answer yet after ${minutes} minutes: they may be thinking it over, or away. Don't wait any longer, ask anything else or close the sitting: ` +
+      'send a final `update_map` only if this sitting changed what they hold and has not recorded it yet, then end your turn with no further tool calls. ' +
+      'The question stays open in Aristotle; when they answer it, you are told to collect it (`collect_answers`) and carry on from there.',
   );
 }
 

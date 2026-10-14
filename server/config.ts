@@ -116,12 +116,11 @@ export const GLOSS_IMAGES = process.env.ARISTOTLE_GLOSS_IMAGES !== 'off';
 export const ONESHOT_CMD = process.env.ARISTOTLE_ONESHOT_CMD;
 
 /**
- * How long quiz and ask wait without a sign of him before handing control back to Claude: from the question, or from
- * the last time the interface said he was there (POST /api/presence), whichever is later.
+ * How long quiz and ask hold the tutor's call waiting for his answer, from when the question was asked. Then the call
+ * returns and the tutor ends its turn with the sitting still open: a tutor held for long reads as stuck, while his
+ * answer, whenever it comes, brings it back (actions.ts pickUp).
  */
-export const WAIT_MS = Number(process.env.ARISTOTLE_WAIT_MS ?? 15 * 60_000);
-/** The longest a quiz or ask waits however long he keeps working on it, so a page left open can't hold a call forever. */
-export const WAIT_CAP_MS = Number(process.env.ARISTOTLE_WAIT_CAP_MS ?? 3 * 60 * 60_000);
+export const WAIT_MS = Number(process.env.ARISTOTLE_WAIT_MS ?? 3 * 60_000);
 /**
  * How long one piece of a wait lasts for a client that ends tool calls after a minute whatever they report (Cursor's
  * CLI, mcp.ts): the wait comes in pieces, each ending in "still waiting"; short in tests.

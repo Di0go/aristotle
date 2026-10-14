@@ -25,7 +25,7 @@ export interface AgentLaunch {
   working?: string;
 }
 
-/** Waiting for the learner takes minutes: no agent may give up on a quiz or ask before Aristotle does (3 hours at most). */
+/** Waiting for the learner takes minutes: no agent may give up on a quiz or ask before Aristotle does (ARISTOTLE_WAIT_MS), with room to spare. */
 const TOOL_TIMEOUT_S = 3 * 60 * 60 + 600;
 
 const PRESETS: Record<AgentId, Omit<AgentLaunch, 'id' | 'name' | 'file'> & { command: string }> = {

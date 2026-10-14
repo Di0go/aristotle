@@ -2,6 +2,7 @@
 // by default, or Codex, Gemini CLI, opencode), or Aristotle's own tutor on a model API, whose conversation the drawer
 // shows instead. Opening Aristotle starts an agent, so it is there, idle, before the learner asks for anything.
 
+import type { Terminal } from '@xterm/xterm';
 import type { TutorEngine, TutorEntry, TutorMessage } from '../../../shared/tutor.ts';
 
 type Listener = (data: string, replay: boolean) => void;
@@ -68,6 +69,14 @@ class Tutor {
   private autoStarted = false;
   /** Requests made while the connection was down, sent when it opens. */
   private held: object[] = [];
+  /**
+   * The agent's screen as a terminal draws it, never shown: what it said is read from here, since agents redraw only
+   * the cells that change and the raw output alone drops letters ("the stres r sponse"). Loaded on first output.
+   */
+  private shadow: Terminal | null = null;
+  private shadowLoading = false;
+  /** The terminal's size, as the drawer last set it (the server's default until then). */
+  private size = { cols: 100, rows: 30 };
 
   connect() {
     if (this.ws) return;
@@ -128,6 +137,7 @@ class Tutor {
     if (switched) {
       // Another tutor took over: nothing of the last one's screen or work carries over.
       this.screen = '';
+      this.shadow?.reset();
       this.entries = [];
       this.busy = false;
       this.doing = '';
@@ -141,6 +151,10 @@ class Tutor {
 
   private output(data: string, replay: boolean) {
     this.screen = replay ? data : (this.screen + data).slice(-256 * 1024);
+    if (this.shadow) {
+      if (replay) this.shadow.reset();
+      this.shadow.write(data);
+    } else void this.loadShadow();
     for (const l of this.listeners) l(data, replay);
     if (replay) return;
     // Agents move the cursor between words instead of printing spaces, so each escape becomes a space.
@@ -171,9 +185,34 @@ class Tutor {
     }, ms);
   }
 
+  /** Starts the hidden terminal, fed everything shown so far. */
+  private async loadShadow() {
+    if (this.shadowLoading) return;
+    this.shadowLoading = true;
+    const { Terminal } = await import('@xterm/xterm');
+    const term = new Terminal({ ...this.size, scrollback: 2000 });
+    term.write(this.screen);
+    this.shadow = term;
+  }
+
+  /** The text on the hidden terminal's screen and scrollback, with wrapped rows joined back into their lines. */
+  private shadowText(): string | null {
+    const buf = this.shadow?.buffer.active;
+    if (!buf) return null;
+    const lines: string[] = [];
+    for (let i = 0; i < buf.length; i++) {
+      const line = buf.getLine(i);
+      if (!line) continue;
+      const text = line.translateToString(true);
+      if (line.isWrapped && lines.length) lines[lines.length - 1] += text;
+      else lines.push(text);
+    }
+    return lines.join('\n');
+  }
+
   /** Claude Code prints its replies after a "●" marker ("⏺" in older versions); the text runs until its input box. */
   private readLastSaid(): string {
-    const text = this.screen.replace(ANSI, ' ').replace(/[ \t]+/g, ' ');
+    const text = (this.shadowText() ?? this.screen.replace(ANSI, ' ')).replace(/[ \t]+/g, ' ');
     const at = Math.max(text.lastIndexOf('●'), text.lastIndexOf('⏺'));
     if (at === -1) return '';
     const said = text
@@ -237,6 +276,8 @@ class Tutor {
   }
 
   resize(cols: number, rows: number) {
+    this.size = { cols, rows };
+    this.shadow?.resize(cols, rows);
     this.post({ type: 'resize', cols, rows });
   }
 

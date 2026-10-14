@@ -361,18 +361,19 @@ test('an answer given after the wait ends is collected later', async () => {
   assert.equal(textOf(await call('collect_answers')), 'No new answers.');
 });
 
-test('a question keeps waiting while he is at the page working on it', async () => {
+test('a question hands back after the wait even while he is at the page, and his answer is collected after', async () => {
   const pending = call('ask', { prompt: 'Prove that d(dω) = 0 for a 0-form.', kind: 'problem' });
   const open = await waitForPending('ask');
-  // Three times the wait, with the interface saying he is there more often than the wait lasts.
+  // He is there, thinking: the call still returns after the wait, so the tutor never sits there looking stuck.
   const presence = () => fetch(`${BASE}/api/presence`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
-  for (let i = 0; i < 8; i++) {
-    assert.equal((await presence()).status, 200);
-    await sleep(300);
-  }
-  const res = await answer({ id: open.id, text: 'Mixed partials commute, so the terms cancel.' });
-  assert.equal(res.headers.get('X-Aristotle-Heard'), 'yes');
-  assert.match(textOf(await pending), /Mixed partials commute/);
+  assert.equal((await presence()).status, 200);
+  const res = textOf(await pending);
+  assert.match(res, /No answer yet/);
+  assert.match(res, /end your turn/);
+  assert.doesNotMatch(res, /`end_session`/);
+  const late = await answer({ id: open.id, text: 'Mixed partials commute, so the terms cancel.' });
+  assert.equal(late.headers.get('X-Aristotle-Heard'), 'no');
+  assert.match(textOf(await call('collect_answers')), /Mixed partials commute/);
 });
 
 test('rejects requests from other sites', async () => {

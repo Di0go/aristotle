@@ -5,7 +5,7 @@ import { randomUUID } from 'node:crypto';
 import { EventEmitter } from 'node:events';
 import { mkdir, readdir } from 'node:fs/promises';
 import path from 'node:path';
-import { SESSIONS_DIR, WAIT_CAP_MS } from './config.ts';
+import { SESSIONS_DIR } from './config.ts';
 import { slugify } from './slug.ts';
 import { AppendLog, endLastLine, readLog } from './store.ts';
 import { warnings } from './warnings.ts';
@@ -172,8 +172,6 @@ export class Feed {
   private log = new AppendLog('The session log', (file) => logVersions.set(file, (logVersions.get(file) ?? 0) + 1));
   /** Tool calls waiting for an answer, by item id. */
   private waiters = new Map<string, Set<(item: InteractiveItem) => void>>();
-  /** When the interface last said he was there, working on the page (`present`); 0 until it has. */
-  private presentAt = 0;
 
   get session() {
     return this.record.session;
@@ -376,26 +374,20 @@ export class Feed {
     return item;
   }
 
-  /** Notes that he is at the page, working: a wait in progress then keeps waiting (`waitFor`). */
-  present() {
-    this.presentAt = Date.now();
-  }
-
   /**
-   * How long a wait on the question `id` has left before it counts as no answer: `ms` from when it was asked or from
-   * the last sign of the learner, whichever is later, and never past WAIT_CAP_MS from when it was asked. For a client
-   * that waits in pieces (mcp.ts), so the pieces add up to one wait.
+   * How long a wait on the question `id` has left before it counts as no answer yet: `ms` from when it was asked. For a
+   * client that waits in pieces (mcp.ts), so the pieces add up to one wait.
    */
   waitLeft(id: string, ms: number): number {
     const item = findInteractive(this.items, id);
     if (!item) return 0;
     const asked = Date.parse(item.at) || Date.now();
-    return Math.max(0, Math.min(Math.max(asked, this.presentAt) + ms, asked + WAIT_CAP_MS) - Date.now());
+    return Math.max(0, asked + ms - Date.now());
   }
 
   /**
-   * Resolves with the answered item, or null on abort, or once `ms` have gone by with no sign of him (since the wait
-   * began or since he was last `present`), or after WAIT_CAP_MS in all. Thinking hard over a question is not leaving.
+   * Resolves with the answered item, or null on abort or once `ms` have gone by without an answer (the question stays
+   * open: answering it later brings the tutor back).
    */
   waitFor(id: string, ms: number, signal?: AbortSignal): Promise<InteractiveItem | null> {
     const item = findInteractive(this.items, id);
@@ -413,14 +405,7 @@ export class Feed {
         resolve(value);
       };
       const onAbort = () => done(null);
-      const began = Date.now();
-      const expire = () => {
-        const now = Date.now();
-        const left = Math.min(Math.max(began, this.presentAt) + ms, began + WAIT_CAP_MS) - now;
-        if (left <= 0) done(null);
-        else timer = setTimeout(expire, left);
-      };
-      let timer = setTimeout(expire, ms);
+      const timer = setTimeout(() => done(null), ms);
       signal?.addEventListener('abort', onAbort, { once: true });
       set.add(done);
     });

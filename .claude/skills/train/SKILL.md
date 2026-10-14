@@ -36,6 +36,6 @@ Vary the concepts and problem types across a set, and mix in an older solid conc
 
 ## Ending
 
-When they say they are done or step away (`ask` returns "No answer yet"): `end_session` with what they can now do (`locked`), where they struggled (`shaky`), and what to train or learn next (`next`).
+If `ask` returns "No answer yet", end your turn and leave the set open: their answer brings you back to `collect_answers`. When they say they are done: `end_session` with what they can now do (`locked`), where they struggled (`shaky`), and what to train or learn next (`next`).
 
 Everything else follows the `teach` skill: they read in Aristotle, terminal replies are one line, maths in LaTeX, verify anything you're unsure of.
