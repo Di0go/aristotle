@@ -336,6 +336,8 @@ class LiveFeed {
         this.changed();
         break;
       case 'item':
+        // Something new from the tutor means it has started, whatever happened to the session event.
+        if (this.starting && !this.items.some((x) => x.id === event.item.id)) this.starting = null;
         this.upsert(event.item);
         break;
       case 'roadmap':
