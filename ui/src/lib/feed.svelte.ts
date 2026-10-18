@@ -320,9 +320,11 @@ class LiveFeed {
         this.session = event.session;
         // A session picked up again comes with its items; a new one starts empty.
         if (event.items) this.items = event.items;
+        // What was asked for has started: a new session, or one picked up again, even the current one (answering an
+        // old question makes its sitting current before the tutor continues it, so the id doesn't change).
+        if (changed || event.items) this.starting = null;
         if (changed) {
           if (!event.items) this.items = [];
-          this.starting = null;
           if (event.session.topicSlug && !this.topics[event.session.topicSlug]) void this.loadTopic(event.session.topicSlug);
         }
         this.changed();
