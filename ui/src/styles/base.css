@@ -116,6 +116,7 @@
   --files-w: 290px;
   --side-w: 340px;
   --measure: 58rem;
+  --page-w: 1600px;
   --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
 }
 

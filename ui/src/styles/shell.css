@@ -73,9 +73,10 @@ body.resizing {
   display: none;
 }
 
-/* Pages: left-aligned, generous, never cramped. */
+/* Pages: left-aligned, generous, never cramped. They take the width there is, up to --page-w; a panel opened beside
+   them takes its column from that, so the page narrows rather than the panel covering it. */
 .page {
-  max-width: 1120px;
+  max-width: var(--page-w);
   padding: 44px clamp(24px, 4vw, 56px) 96px;
 }
 

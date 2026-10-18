@@ -35,6 +35,11 @@
   grid-template-columns: minmax(0, 1fr) var(--side-w);
 }
 
+/* With the bench hidden the class has the whole stage, so its column widens. */
+.lesson:not(.with-bench) {
+  --measure: 68rem;
+}
+
 .lesson-main {
   min-width: 0;
   padding: 56px clamp(20px, 3.5vw, 64px) 0;
@@ -601,7 +606,6 @@ textarea.note {
 
 /* Home: the dashboard (Home.svelte has the rest). */
 .home {
-  max-width: 980px;
 }
 
 .home-section {
