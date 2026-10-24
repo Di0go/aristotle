@@ -57,7 +57,10 @@
    * hasn't arrived. The button gives way to a line saying so, so a second press never starts it twice.
    */
   const picking = $derived(Boolean(feed.starting) || (last && !live && feed.liveSlug === slug));
-  /** A lesson going on in another class (often the next one, when this one was finished): where to find it. */
+  /**
+   * A lesson going on in another class (often the next one, when this one was finished): where to find it. Shown
+   * beside the button to continue this one, never instead of it: he moves between classes freely.
+   */
   const elsewhere = $derived.by(() => {
     const other = feed.session?.kind === 'learn' ? feed.liveSlug : null;
     if (!last || !other || other === slug) return null;
@@ -202,8 +205,6 @@
         {#if prev}<a class="prev" href={link.step(slug, prev.number)}><span class="dir">Previous</span>{name(prev)}</a>{:else}<span
           ></span>{/if}
         {#if next}<a class="next" href={link.step(slug, next.number)}><span class="dir">Next</span>{name(next)}</a>
-        {:else if elsewhere}
-          <a class="next" href={elsewhere.href}><span class="dir">{tutor.name} is teaching now</span>{elsewhere.title}</a>
         {:else if picking}
           <p class="picking-up" aria-live="polite">
             <span class="spinner" aria-hidden="true"></span>{nextClass
@@ -211,9 +212,13 @@
               : `${tutor.name} is picking up the class…`}
           </p>
         {:else if !live}
-          <button class="primary next-continue" onclick={() => actions.continueClass(slug)}
-            >{nextClass ? `Next class: ${nextClass.title}` : 'Continue the class'}</button
-          >
+          <!-- Another class being taught never holds him there: continuing this one takes the tutor here. -->
+          <div class="go-on">
+            <button class="primary" onclick={() => actions.continueClass(slug)}
+              >{nextClass ? `Next class: ${nextClass.title}` : 'Continue the class'}</button
+            >
+            {#if elsewhere}<a class="elsewhere" href={elsewhere.href}>{tutor.name} is teaching {elsewhere.title} now</a>{/if}
+          </div>
         {/if}
       </nav>
     {/if}
@@ -417,8 +422,24 @@
     color: var(--muted);
   }
 
-  .next-continue {
+  .go-on {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 8px;
     margin-left: auto;
     align-self: center;
+  }
+
+  .step-nav .elsewhere {
+    max-width: none;
+    padding: 0;
+    border: 0;
+    color: var(--muted);
+    font-size: 0.85rem;
+  }
+
+  .step-nav .elsewhere:hover {
+    color: var(--fg);
   }
 </style>

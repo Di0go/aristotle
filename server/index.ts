@@ -184,17 +184,23 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ro
   // He is at the page working on an open question: the page counts the sitting as going on (feed.svelte.ts
   // inProgress), so his answer is handed to the tutor still holding it rather than to a fresh one.
   if (req.method === 'POST' && route === '/api/presence') return json(res, 200, { ok: true });
+  // He asked for another sitting (continuing another class) while the tutor waits on a question here: wake it.
+  if (req.method === 'POST' && route === '/api/leave') return json(res, 200, { released: feed.release() });
   if (req.method === 'POST' && route === '/api/answer') {
     const body = (await readJson(req)) as Partial<QuizAnswerBody & AskAnswerBody> | null;
     if (!body || typeof body.id !== 'string') return json(res, 400, { error: 'Missing id' });
     if (Array.isArray(body.picks) && !body.picks.every(isPick)) return json(res, 400, { error: 'Malformed picks' });
     try {
-      // Whether Claude hears this answer now (a quiz or ask call is waiting), or has to be told to collect it.
+      // Whether Claude hears this answer now (a quiz or ask call is waiting), or has to be told to collect it. An
+      // answer in another sitting is heard too when a call was waiting in this one: it is woken with where he went.
       const heard = feed.awaited(body.id);
+      const waiting = feed.waiting();
+      const before = feed.session?.id;
       const item = Array.isArray(body.picks)
         ? await gym.answerQuiz(body.id, body.picks)
         : await gym.answerAsk(body.id, String(body.text ?? ''));
-      res.setHeader('X-Aristotle-Heard', heard ? 'yes' : 'no');
+      const moved = waiting && feed.session?.id !== before;
+      res.setHeader('X-Aristotle-Heard', heard || moved ? 'yes' : 'no');
       // The session the answer went to: an earlier one, when answering it picked that sitting up again.
       res.setHeader('X-Aristotle-Session', feed.session?.id ?? '');
       return json(res, 200, publicItem(item));

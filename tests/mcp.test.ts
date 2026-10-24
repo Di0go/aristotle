@@ -1310,9 +1310,6 @@ test('a question of an earlier sitting can still be answered, and its sitting is
   const open = await waitForPending('quiz');
   const earlier = (await get<FeedState>('/api/state')).session!.id;
   await call('start_session', { kind: 'review', goal: 'Something else' });
-
-  // Not while the other sitting is going on.
-  assert.equal((await answer({ id: open.id, picks: [{ choice: 1 }] })).status, 400);
   await call('end_session', { locked: 'A', shaky: 'B', next: 'C' });
 
   const res = await answer({ id: open.id, picks: [{ choice: 1 }] });
@@ -1328,4 +1325,75 @@ test('a question of an earlier sitting can still be answered, and its sitting is
   // A restart lands on it too, though it is not the newest log.
   await restart();
   assert.equal((await get<FeedState>('/api/state')).session?.id, earlier);
+});
+
+test('he answers a question of another class while one is being taught, and the tutor follows him there and back', async () => {
+  // A question left open in the first class...
+  await call('start_session', { topic: 'First course', goal: 'Start here' });
+  await call('show', { markdown: 'The hose {{x|y}}', title: 'The hose', kind: 'step' });
+  assert.match(textOf(await call('ask', { prompt: 'Why less blood per beat? Think of the hose.', kind: 'explain' })), /No answer yet/);
+  const first = (await get<FeedState>('/api/state')).session!.id;
+  const hose = await waitForPending('ask');
+
+  // ...while the tutor teaches another one, waiting on a question of its own.
+  await call('start_session', { topic: 'Second course', goal: 'Go on elsewhere' });
+  await call('show', { markdown: 'Bonds {{x|y}}', title: 'Bonds', kind: 'step' });
+  const second = (await get<FeedState>('/api/state')).session!.id;
+  const asking = call('ask', { prompt: 'What holds a bond together?', kind: 'recall' });
+  const bonds = await waitForPending('ask');
+  await sleep(100);
+
+  // He goes back to the first class and answers there: it is taken, and the waiting tutor hears where he went at once.
+  const res = await answer({ id: hose.id, text: 'The hose is stiffer' });
+  assert.equal(res.status, 200, await res.clone().text());
+  assert.equal(res.headers.get('X-Aristotle-Session'), first);
+  assert.equal(res.headers.get('X-Aristotle-Heard'), 'yes', 'the tutor was told at once');
+  const moved = textOf(await asking);
+  assert.match(moved, /First course[\s\S]*end_session[\s\S]*start_session[\s\S]*first-course/);
+  assert.equal((await get<FeedState>('/api/state')).session?.id, first);
+
+  // Nothing of the class he left lands in the one he is in now.
+  assert.match(textOf(await call('show', { markdown: 'More on bonds' })), /First course/);
+  assert.ok(!(await get<FeedState>('/api/state')).items.some((i) => i.type === 'block' && i.markdown === 'More on bonds'));
+
+  // The tutor leaves the second class with its handoff, and the first keeps going.
+  await call('end_session', { locked: 'Bonds', shaky: 'Why they hold', next: 'The open recall' });
+  const sessions = await get<SessionSummary[]>('/api/sessions');
+  assert.equal(sessions.find((s) => s.id === second)?.handoff?.next, 'The open recall', 'the handoff is the class he left');
+  assert.ok(!sessions.find((s) => s.id === first)?.endedAt, 'the class he is in goes on');
+  assert.equal((await get<Topic>('/api/topics/second-course')).handoff?.next, 'The open recall');
+
+  // Picking up the first class hands over his answer, in the same sitting.
+  const resumed = textOf(await call('start_session', { topic: 'first-course', goal: 'Follow him' }));
+  assert.match(resumed, /The hose is stiffer/);
+  assert.equal((await get<FeedState>('/api/state')).session?.id, first);
+
+  // And back: the question left open in the second class is still answerable, on the same step.
+  const back = await answer({ id: bonds.id, text: 'Shared electrons' });
+  assert.equal(back.status, 200, await back.clone().text());
+  assert.equal(back.headers.get('X-Aristotle-Session'), second);
+  await call('end_session', { locked: 'Hose', shaky: 'nothing', next: 'Pressure' });
+  const again = textOf(await call('start_session', { topic: 'second-course', goal: 'Back again' }));
+  assert.match(again, /Picked up the sitting on second-course[\s\S]*Shared electrons/);
+  assert.equal((await get<FeedState>('/api/state')).session?.id, second, 'no new step: the same sitting');
+  await call('end_session', { locked: 'A', shaky: 'B', next: 'C' });
+});
+
+test('asking for another class while the tutor waits on a question here lets the wait go at once', async () => {
+  await call('start_session', { topic: 'Waited on', goal: 'Hold a question' });
+  const asking = call('ask', { prompt: 'Still thinking?', kind: 'open' });
+  const open = await waitForPending('ask');
+  await sleep(100);
+  const res = await fetch(`${BASE}/api/leave`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+  assert.deepEqual(await res.json(), { released: true });
+  assert.match(textOf(await asking), /another class[\s\S]*end_session[\s\S]*do what they ask/);
+  // The question stays open, to answer whenever he comes back.
+  assert.ok(!(await get<FeedState>('/api/state')).items.find((i) => i.id === open.id && 'answeredAt' in i && i.answeredAt));
+  assert.deepEqual(
+    await (await fetch(`${BASE}/api/leave`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })).json(),
+    {
+      released: false,
+    },
+  );
+  await call('end_session', { locked: 'A', shaky: 'B', next: 'C' });
 });

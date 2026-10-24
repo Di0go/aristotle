@@ -43,9 +43,9 @@ Each `Concept` has an id, a label, a status (`unknown`, `shaky`, `solid`), its p
 | `answer` | the learner answered a quiz or an ask |
 | `delivered` | the answer was handed back to Claude |
 | `end` | the session ended, with its handoff |
-| `resume` | a closed session was picked up again: he answered one of its questions later, or a lesson (or a review) continued it because questions were still open |
+| `resume` | a closed session was picked up again: he answered one of its questions later (even while another sitting was going on, which then closes where it was), or a lesson (or a review) continued it because questions were still open |
 
-The current session is the one that last had anything happen, open ones first: the newest log, unless an older one was picked up again since. On start the server looks for it among the newest 50 logs.
+The current session is the one that last had anything happen, open ones first: the newest log, unless an older one was picked up again since. On start the server looks for it among the newest 50 logs. A session he left for another while the tutor was in it closes with an `end` that has no handoff; the tutor's handoff (and any map change it records before following him) is appended to it afterwards, so such a log can end in two `end` lines, the last one holding the handoff.
 
 Quiz items keep the right answers and explanations; the interface only receives them once the question is answered (`PublicItem`).
 

@@ -163,6 +163,9 @@ export class SessionCache<T> {
   }
 }
 
+/** What a waiting tool call gets when he went to another sitting instead of answering: where from, and where to. */
+export type Moved = { moved: true; from: Session; to: Session | null };
+
 /** The current session: its items in memory, every change appended to its log and announced on `events`. */
 export class Feed {
   readonly events = new EventEmitter<{ event: [FeedEvent] }>();
@@ -170,8 +173,13 @@ export class Feed {
   private file: string | null = null;
   /** Appends in order; a failed one is retried by the next (store.ts). Each append bumps the log's version. */
   private log = new AppendLog('The session log', (file) => logVersions.set(file, (logVersions.get(file) ?? 0) + 1));
-  /** Tool calls waiting for an answer, by item id. */
-  private waiters = new Map<string, Set<(item: InteractiveItem) => void>>();
+  /** Tool calls waiting for an answer, by item id: woken by the answer, or by his going to another sitting. */
+  private waiters = new Map<string, Set<(item: InteractiveItem | Moved) => void>>();
+  /**
+   * The sitting the tutor was in when he went to another one by answering a question there, until the tutor follows
+   * him (start_session): its handoff and map changes still go to it, and nothing else of it lands in his new sitting.
+   */
+  private leftFor: { file: string; record: SessionRecord } | null = null;
 
   get session() {
     return this.record.session;
@@ -179,6 +187,11 @@ export class Feed {
 
   get items() {
     return this.record.items;
+  }
+
+  /** The sitting the tutor was in before he went to the current one, while the tutor hasn't followed him yet. */
+  get left(): Session | null {
+    return this.leftFor?.record.session ?? null;
   }
 
   /**
@@ -219,6 +232,8 @@ export class Feed {
     goal: string,
     kind: SessionKind = 'learn',
   ): Promise<{ session: Session; resumed: boolean; handed: InteractiveItem[] }> {
+    // The tutor follows him: whatever it left behind is done with.
+    this.leftFor = null;
     const left = await this.lastSitting(topicSlug, kind);
     if (left && openItems(left.record.items).length) {
       const handed = await this.resume(left.file, left.record);
@@ -291,12 +306,11 @@ export class Feed {
 
   /**
    * Finds a question of an earlier session and makes that session the current one, so he can answer it whenever he
-   * comes back, and the tutor carries on from there. Not while another sitting is going on: its tool call is waiting
-   * on a question of its own, and switching would strand it.
+   * likes, even while another sitting is going on: he moves between classes freely. The sitting he leaves closes where
+   * it was (its questions stay answerable, so he can come back to it), and a tool call waiting in it is woken with
+   * where he went, so the tutor follows him (mcp.ts movedText).
    */
   private async reopenFor(id: string): Promise<InteractiveItem | undefined> {
-    const busy = [...this.waiters.values()].some((s) => s.size > 0);
-    const recent = this.session && !this.session.endedAt && Date.now() - Date.parse(this.record.lastAt ?? '') < IDLE_MS;
     for (const name of (await sessionFiles()).reverse()) {
       const file = path.join(SESSIONS_DIR, name);
       if (file === this.file) continue;
@@ -304,13 +318,50 @@ export class Feed {
       const item = findInteractive(record.items, id);
       if (!item) continue;
       if (item.answeredAt) throw new AnswerError('Already answered');
-      if (busy || recent) throw new AnswerError('Another sitting is going on: answer this once it is over.');
+      const from = this.session;
+      if (from && !from.endedAt && this.file) {
+        // The tutor's sitting is the first one he left, however many he goes through before it follows him; going
+        // back to it is no move at all.
+        if (!this.leftFor) this.leftFor = { file: this.file, record: this.record };
+        else if (this.leftFor.file === file) this.leftFor = null;
+      }
       // No tool call is here to take the closed session's undelivered answers: they stay in it, and continuing its
       // topic picks it up again for them.
       await this.resume(file, record, false);
+      if (from && this.leftFor) {
+        const moved: Moved = { moved: true, from: this.leftFor.record.session!, to: this.session! };
+        for (const [waiting, set] of this.waiters) {
+          for (const wake of set) wake(moved);
+          this.waiters.delete(waiting);
+        }
+      }
       return findInteractive(this.items, id);
     }
     return undefined;
+  }
+
+  /**
+   * Closes the sitting the tutor was in before he went elsewhere with its handoff, written to its own log. No summary
+   * is added to it: he is not there to read one, and coming back finds it as he left it.
+   */
+  async endLeft(handoff: Handoff): Promise<Session | null> {
+    const left = this.leftFor;
+    if (!left) return null;
+    this.leftFor = null;
+    const op: Op = { op: 'end', at: handoff.at, handoff: { ...handoff, session: left.record.session!.id } };
+    applyOp(left.record, op);
+    await this.log.append(left.file, op);
+    return left.record.session;
+  }
+
+  /** A map change the tutor makes for the sitting it was in, after he went elsewhere: recorded in that sitting. */
+  async addToLeft(fields: Extract<NewItem, { type: 'map' }>): Promise<boolean> {
+    const left = this.leftFor;
+    if (!left) return false;
+    const op: Op = { op: 'add', item: { ...fields, id: randomUUID(), at: new Date().toISOString() } as Item };
+    applyOp(left.record, op);
+    await this.log.append(left.file, op);
+    return true;
   }
 
   /** Closes the session with its handoff; a no-op when there is none. */
@@ -342,6 +393,25 @@ export class Feed {
   /** Whether a tool call is waiting for this question's answer right now. */
   awaited(id: string): boolean {
     return (this.waiters.get(id)?.size ?? 0) > 0;
+  }
+
+  /**
+   * He asked for another sitting from the interface (continuing another class) while a tool call waits in this one:
+   * it is woken, so the tutor takes his request at once instead of after the wait. Whether one was waiting.
+   */
+  release(): boolean {
+    const from = this.session;
+    if (!from || from.endedAt || !this.waiting()) return false;
+    for (const [waiting, set] of this.waiters) {
+      for (const wake of set) wake({ moved: true, from, to: null });
+      this.waiters.delete(waiting);
+    }
+    return true;
+  }
+
+  /** Whether any tool call is waiting for an answer right now. */
+  waiting(): boolean {
+    return [...this.waiters.values()].some((s) => s.size > 0);
   }
 
   /** Records his picks, one per question, and wakes the waiting tool call. */
@@ -389,7 +459,7 @@ export class Feed {
    * Resolves with the answered item, or null on abort or once `ms` have gone by without an answer (the question stays
    * open: answering it later brings the tutor back).
    */
-  waitFor(id: string, ms: number, signal?: AbortSignal): Promise<InteractiveItem | null> {
+  waitFor(id: string, ms: number, signal?: AbortSignal): Promise<InteractiveItem | Moved | null> {
     const item = findInteractive(this.items, id);
     if (!item) return Promise.resolve(null);
     if (item.answeredAt) return Promise.resolve(item);
@@ -398,7 +468,7 @@ export class Feed {
     return new Promise((resolve) => {
       const set = this.waiters.get(id) ?? new Set();
       this.waiters.set(id, set);
-      const done = (value: InteractiveItem | null) => {
+      const done = (value: InteractiveItem | Moved | null) => {
         clearTimeout(timer);
         signal?.removeEventListener('abort', onAbort);
         set.delete(done);

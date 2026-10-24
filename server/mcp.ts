@@ -11,6 +11,7 @@ import type { CallToolResult, ServerNotification, ServerRequest } from '@modelco
 import { AjvJsonSchemaValidator } from '@modelcontextprotocol/sdk/validation/ajv';
 import * as z from 'zod';
 import { KEEPALIVE_MS, URL_CLEAN, WAIT_MS, WAIT_SLICE_MS } from './config.ts';
+import type { Moved } from './feed.ts';
 import type { Gym } from './gym.ts';
 import { findImages, rsvgConvert, viewImage } from './images.ts';
 import { essentials, OTHER_AGENTS, skill, skills } from './method.ts';
@@ -26,6 +27,7 @@ import {
   type MapChange,
   type QuizItem,
   type QuizQuestion,
+  type Session,
   type TopicSummary,
 } from '../shared/types.ts';
 
@@ -686,6 +688,7 @@ function defineTools(gym: Gym): ToolDef[] {
     },
     async ({ markdown, title, kind, concept }) => {
       if (!gym.feed.session) return noSession();
+      if (gym.feed.left) return error(`Not shown. ${movedText(gym)}`);
       const unlearned = notYetLearned(gym, [concept]);
       if (unlearned) return error(unlearned);
       await gym.feed.add({ type: 'block', kind, markdown, ...(title ? { title } : {}), ...(concept ? { concept } : {}) });
@@ -746,6 +749,7 @@ function defineTools(gym: Gym): ToolDef[] {
     },
     async ({ questions, lead }, extra) => {
       if (!gym.feed.session) return noSession();
+      if (gym.feed.left) return error(`Not asked. ${movedText(gym)}`);
       const unlearned = notYetLearned(
         gym,
         questions.map((q) => q.concept),
@@ -760,6 +764,7 @@ function defineTools(gym: Gym): ToolDef[] {
       const item = await gym.feed.add({ type: 'quiz', questions: questions.map(shuffle) });
       const answered = await waitForLearner(gym, item.id, extra);
       if (answered === 'later') return stillWaiting();
+      if (answered && 'moved' in answered) return text(movedText(gym, answered));
       if (answered?.type !== 'quiz') return notAnswered();
       await gym.feed.markDelivered(item.id);
       return text(formatQuiz(answered, gym));
@@ -788,6 +793,7 @@ function defineTools(gym: Gym): ToolDef[] {
     },
     async ({ prompt, kind, concept, placeholder, lead }, extra) => {
       if (!gym.feed.session) return noSession();
+      if (gym.feed.left) return error(`Not asked. ${movedText(gym)}`);
       const unlearned = notYetLearned(gym, [concept]);
       if (unlearned) return error(unlearned);
       await showLead(gym, lead);
@@ -800,6 +806,7 @@ function defineTools(gym: Gym): ToolDef[] {
       });
       const answered = await waitForLearner(gym, item.id, extra);
       if (answered === 'later') return stillWaiting();
+      if (answered && 'moved' in answered) return text(movedText(gym, answered));
       if (answered?.type !== 'ask') return notAnswered();
       await gym.feed.markDelivered(item.id);
       return text(formatAsk(answered));
@@ -819,12 +826,14 @@ function defineTools(gym: Gym): ToolDef[] {
       },
     },
     async ({ wait }, extra) => {
+      if (gym.feed.left) return text(movedText(gym));
       const late = await deliverLate(gym);
       if (late || !wait) return text(late || 'No new answers.');
       const open = gym.feed.items.filter((i) => isInteractive(i) && !i.answeredAt).map((i) => i.id);
       if (!open.length) return text('No new answers, and no question of this session is open.');
       const answered = await waitForLearner(gym, open, extra);
       if (answered === 'later') return stillWaiting();
+      if (answered && 'moved' in answered) return text(movedText(gym, answered));
       if (!answered) return notAnswered();
       return text((await deliverLate(gym)) || 'No new answers.');
     },
@@ -926,7 +935,7 @@ function defineTools(gym: Gym): ToolDef[] {
       description:
         'Close the session with a handoff for next time: what locked in, what is still shaky, and the next step. ' +
         'Shown to them as a summary and read back by `get_topic` when they continue. Call it when they say they are done or stopping, ' +
-        'after updating the map.',
+        'after updating the map. When they have moved to another sitting (a tool said so), it closes the one you were in, not theirs.',
       inputSchema: {
         locked: z.string().min(1).describe('What locked in this session (concept names and what they can now do)'),
         shaky: z.string().min(1).describe('What is still shaky or untested, or "nothing"'),
@@ -990,6 +999,36 @@ function resumedText(gym: Gym, startedAt: string, slug: string): string {
   );
 }
 
+/**
+ * What the tutor reads when he went to another sitting (answering a question there, or opening it) while it was in
+ * this one: follow him, without asking. Its handoff and map changes still go to the sitting it was in; nothing else does.
+ */
+function movedText(gym: Gym, moved?: Moved): string {
+  const name = (s: Session) => (s.kind === 'review' ? 'the review' : `${s.topic} (${s.topicSlug})`);
+  // Asked for from the interface: the request itself comes as their next message.
+  if (moved && !moved.to) {
+    return (
+      'They went to another class and asked to carry on there; their request comes as their next message. ' +
+      `They move between classes freely: follow them. ${name(moved.from)} stays where it was, its open questions answerable ` +
+      'whenever they go back to it: `update_map` if needed, `end_session` with its handoff, then do what they ask.'
+    );
+  }
+  const from = gym.feed.left;
+  const to = gym.feed.session;
+  if (!from || !to) return 'They moved to another sitting: call start_session on it.';
+  const start =
+    to.kind === 'review'
+      ? '`start_session` with kind "review"'
+      : `\`start_session\` with kind "${to.kind ?? 'learn'}" and topic "${to.topicSlug}" (with \`get_topic\` on it)`;
+  return (
+    `They left ${name(from)} and answered a question in ${name(to)}: that is the sitting going on now. ` +
+    'They move between classes freely: follow them there without asking, and teach nothing more of the one they left. ' +
+    'It stays where it was, its open questions answerable whenever they go back to it. ' +
+    `In one message: \`update_map\` if needed and \`end_session\` with its handoff (both still go to ${name(from)}, not to the sitting they are in now), ` +
+    `then ${start}, which hands over what they answered there.`
+  );
+}
+
 /** The step that leads into a question, when it comes in the same call. */
 async function showLead(gym: Gym, lead?: { markdown: string; title?: string; concept?: string }) {
   if (!lead) return;
@@ -1014,7 +1053,7 @@ const SHORT_WAIT = /cursor/i;
  * Waits for the learner, sending progress notifications so the call doesn't look idle; for any of `ids`, if several.
  * The answered item, null when they are away, or "later" when a client that waits in pieces should ask again.
  */
-async function waitForLearner(gym: Gym, ids: string | string[], extra: Extra): Promise<InteractiveItem | null | 'later'> {
+async function waitForLearner(gym: Gym, ids: string | string[], extra: Extra): Promise<InteractiveItem | Moved | null | 'later'> {
   const agent = extra.requestInfo?.headers?.['x-aristotle-agent'];
   const sliced = typeof agent === 'string' && SHORT_WAIT.test(agent);
   const list = [ids].flat();
@@ -1041,7 +1080,7 @@ async function waitForLearner(gym: Gym, ids: string | string[], extra: Extra): P
   if (extra.signal.aborted) stop.abort();
   let slice: ReturnType<typeof setTimeout> | undefined;
   try {
-    const waits: Promise<InteractiveItem | null | 'later'>[] = list.map((id) => gym.feed.waitFor(id, ms, stop.signal));
+    const waits: Promise<InteractiveItem | Moved | null | 'later'>[] = list.map((id) => gym.feed.waitFor(id, ms, stop.signal));
     if (sliced && ms > WAIT_SLICE_MS) waits.push(new Promise((r) => (slice = setTimeout(() => r('later'), WAIT_SLICE_MS))));
     return await Promise.race(waits);
   } finally {

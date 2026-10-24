@@ -170,6 +170,15 @@ export class Gym {
 
   /** Shows the handoff, closes the session, and keeps the handoff on its topic for next time. */
   async endSession(locked: string, shaky: string, next: string): Promise<Handoff> {
+    // He went to another sitting while the tutor was in this one: the handoff closes the one the tutor was in.
+    const left = this.feed.left;
+    if (left) {
+      const handoff: Handoff = { at: new Date().toISOString(), session: left.id, locked, shaky, next };
+      await this.feed.endLeft(handoff);
+      if (left.topicSlug && this.topics.get(left.topicSlug)) await this.topics.setHandoff(left.topicSlug, handoff);
+      this.backup.schedule(5_000);
+      return handoff;
+    }
     const session = this.feed.session;
     if (!session) throw new Error('No session to end.');
     const handoff: Handoff = { at: new Date().toISOString(), session: session.id, locked, shaky, next };
@@ -187,12 +196,16 @@ export class Gym {
 
   /** Changes a map (the session's topic by default); status changes also show in the feed. */
   async updateMap(inputs: ConceptInput[], remove: string[], focus?: string, topicSlug?: string): Promise<MapChange[]> {
-    const topic = topicSlug ? this.topics.get(topicSlug) : this.currentTopic();
+    // While he is elsewhere and the tutor hasn't followed, its map changes are still about the sitting it was in.
+    const left = this.feed.left;
+    const slug = topicSlug || left?.topicSlug;
+    const topic = slug ? this.topics.get(slug) : left ? undefined : this.currentTopic();
     if (!topic) {
-      throw new Error(topicSlug ? `No topic "${topicSlug}"` : 'This session has no topic: pass `topic` (a topic slug).');
+      throw new Error(slug ? `No topic "${slug}"` : 'This session has no topic: pass `topic` (a topic slug).');
     }
     const changes = await this.topics.update(topic.slug, inputs, remove, focus);
-    if (changes.length && this.feed.session) await this.feed.add({ type: 'map', topic: topic.slug, changes });
+    const map = { type: 'map' as const, topic: topic.slug, changes };
+    if (changes.length && this.feed.session && !(left && (await this.feed.addToLeft(map)))) await this.feed.add(map);
     return changes;
   }
 

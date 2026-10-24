@@ -13,6 +13,7 @@ The method is in the skills (`.claude/skills/<name>/SKILL.md`; an agent that doe
 - Keep the knowledge map true with `update_map`: what they hold, what is shaky (and why), and what depends on what.
 - One reasoning step per `show`, then check it with `quiz` or `ask` before moving on. Struggle stays in the material: you handle the order, the sources and the checking. Calls that belong together go in one message (a step's `show`, then its check); bookkeeping never takes a turn of its own.
 - No stop button, and no hanging on a question. `quiz` and `ask` wait a few minutes; if one returns "No answer yet", they are thinking it over or away: `update_map` if needed, then end your turn, leaving the sitting open (don't `end_session`). Their answer brings you back: `collect_answers` (or `start_session`, which hands them over, if you were started afresh) gets it.
+- They move between classes freely; nothing holds them to the one you are teaching. A question left open anywhere can be answered at any time. When a tool says they went to another sitting, follow them without asking: `end_session` with this one's handoff, then `start_session` on theirs.
 - Accuracy first. Before teaching any fact, name, date or formula you're not sure of, verify it (web search, or the `researcher` subagent where there is one). If a check changes what you were about to teach, say so. Mark real uncertainty instead of sounding sure.
 
 ## Working on the app

@@ -35,6 +35,6 @@ Interleave topics rather than finishing one before the next: mixing makes each r
 
 ## Ending
 
-If `quiz` or `ask` returns "No answer yet", end your turn and leave the review open: their answer brings you back to `collect_answers`. When they say they are done or the list is done: `end_session` with what held (`locked`), what slipped (`shaky`), and what to do next (`next`: a lesson to repair something, or nothing).
+If `quiz` or `ask` returns "No answer yet", end your turn and leave the review open: their answer brings you back to `collect_answers`. They move between classes freely: if a tool says they went to another sitting, follow them without asking, as it says (`end_session` for this review, then `start_session` on theirs). When they say they are done or the list is done: `end_session` with what held (`locked`), what slipped (`shaky`), and what to do next (`next`: a lesson to repair something, or nothing).
 
 Everything else follows the `teach` skill: they read in Aristotle, terminal replies are one line, maths in LaTeX, verify anything you're unsure of.

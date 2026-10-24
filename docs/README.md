@@ -10,6 +10,7 @@ For anyone changing Aristotle, including Claude Code. The project [README](../RE
 | [interface.md](interface.md) | change how it looks or behaves: tokens, themes, layout, pages, and the Markdown a lesson can use |
 | [extending.md](extending.md) | add something: an MCP tool, an API route, a page, a figure for the visual kit, an explorable, a setting, a skill |
 | [teaching.md](teaching.md) | change the method: how the skills, the subagents and the MCP tools teach together |
+| [plan.md](plan.md) | know the rules he asked for that must never slip again (in Portuguese, written with him): read it before changing sessions, classes or the method |
 | [../CONTRIBUTING.md](../CONTRIBUTING.md) | send a change |
 
 ## How these docs stay true

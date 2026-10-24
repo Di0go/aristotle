@@ -6,7 +6,7 @@ import { tutor } from './tutor.svelte.ts';
 import { feed } from './feed.svelte.ts';
 import { nextClassOf } from './library.ts';
 import { link, router } from './router.svelte.ts';
-import type { Roadmap } from '../../../shared/types.ts';
+import type { Roadmap, Session } from '../../../shared/types.ts';
 
 /** How long an agent's /clear is given before the sitting's command is typed in after it. */
 const CLEAR_MS = 1500;
@@ -21,9 +21,17 @@ export const actions = {
   async answer(body: unknown): Promise<string | null> {
     // Whether the sitting was going on before this answer: the answer itself is activity, so read it first.
     const going = feed.inProgress;
+    const from = feed.session;
     const result = await feed.answer(body);
     if ('error' in result) return result.error;
-    if (!result.heard && !feed.items.some((i) => (i.type === 'quiz' || i.type === 'ask') && !i.answeredAt)) pickUp(going);
+    if (result.heard) return null;
+    // An answer in another class while one was going on: the tutor follows him there (mcp.ts movedText), whatever is
+    // still open where he answered.
+    if (going && tutor.running && from && feed.session && feed.session.id !== from.id) {
+      tutor.say(`I went to ${where(feed.session)} and answered a question there. Please follow me there.`);
+      return null;
+    }
+    if (!feed.items.some((i) => (i.type === 'quiz' || i.type === 'ask') && !i.answeredAt)) pickUp(going);
     return null;
   },
   learn(topic: string, goal = '', notes = '') {
@@ -166,7 +174,13 @@ function go(
     tutor.clear();
     // An agent gets the request after its /clear has run, not typed into the same input box.
     setTimeout(() => tutor.run(command, initial), tutor.mode === 'terminal' ? CLEAR_MS : 0);
-  } else tutor.run(command, initial);
+  } else {
+    // Another sitting asked for while the tutor waits on a question of this one: the wait gives way at once, so his
+    // request is taken now rather than after it (server feed.ts release).
+    const s = feed.session;
+    if (!converse && feed.pending && s && (s.kind !== kind || (topic !== undefined && s.topicSlug !== topic))) leave();
+    tutor.run(command, initial);
+  }
   if (converse) {
     tutor.toggle(true);
     return;
@@ -186,6 +200,16 @@ function go(
   const route = router.route;
   if (topic && (route.page === 'lesson' || route.page === 'step') && route.slug === topic) return;
   location.hash = topic ? link.lesson(topic) : link.now();
+}
+
+/** Wakes a tool call waiting on his answer in the sitting he is leaving. */
+function leave() {
+  void fetch('/api/leave', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }).catch(() => {});
+}
+
+/** A sitting as he would name it to the tutor. */
+function where(s: Session): string {
+  return s.kind === 'review' ? 'the review' : `${s.kind === 'train' ? 'the training set on ' : ''}${s.topic} (${s.topicSlug})`;
 }
 
 /** What he wants from a new class or course, and his notes on it, as they follow its name in the request. */
