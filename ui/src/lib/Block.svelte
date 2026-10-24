@@ -13,15 +13,16 @@
     note: 'Note',
   };
 
+  /** `number`: its place among the class's steps; 0 where steps aren't numbered (a review). */
   let { item, number = 0 }: { item: BlockItem; number?: number } = $props();
 
   /** "2. Wired and broadcast" is shown as "Wired and broadcast": the label already carries the number. */
   const title = $derived(cleanTitle(item.title));
-  const label = $derived(item.kind === 'step' && number ? `Step ${number}` : (LABELS[item.kind] ?? 'Note'));
+  const label = $derived(item.kind === 'step' ? (number ? `Step ${number}` : 'Review') : (LABELS[item.kind] ?? 'Note'));
 </script>
 
 <article class="block kind-{item.kind}">
   <p class="kicker">{label}</p>
   {#if title}<h2 class="block-title">{title}</h2>{/if}
-  <Markdown source={item.markdown} />
+  <Markdown source={item.markdown} concept={item.concept} />
 </article>

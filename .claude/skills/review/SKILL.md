@@ -7,6 +7,16 @@ description: Spaced review in Aristotle. Practises the concepts that are fading 
 
 Concepts the learner once held solidly fade unless they retrieve them. Recalling a concept just as it starts to fade is what makes it last, and the effort of recalling is the training. A review session finds what is fading and makes them pull it back out of memory.
 
+## Only what they have learned
+
+A review never teaches anything new. They come to it trusting that everything in it is something they already know; one unfamiliar idea breaks that trust ("why teach new things here? I've never heard of this").
+
+- Practise only concepts on the map that they have held: the fading list, and anything fading it rests on. A concept that is `unknown` on the map (never learned), or on no map at all, is not reviewed, even when it is the obvious next step after the ones you practised. `show`, `quiz` and `ask` refuse a `concept` like that in a review.
+- Don't go on to "new ground" when the list is done or a pair of ideas suggests what comes next. Name it in `end_session`'s `next`, as a lesson (the `teach` skill), and stop.
+- Untagged steps count too: a combining or extending step with no `concept` is still new material if they never learned it. When unsure, check the map with `get_topic`.
+- A repair (step 5 below) re-teaches only the missing piece of the concept being reviewed, from what they still hold. It doesn't pull in the next concept on the map.
+- A review has no topic of its own, so links name it: `[[topic/concept-id]]`, never a bare `[[concept-id]]` (a bare one is looked for in the topic of the step's `concept`). `show` says when a link finds nothing.
+
 ## Start
 
 1. `start_session` with kind `review` and a goal like "Review what's fading". It also hands over answers they gave after the last session ended: judge and record them first. If the last review still had a question open, it picks that review up again instead of starting a new one and says so: don't ask that question again; wait for the answer with `collect_answers` and `wait: true`, judge it, and carry on in that review. The result lists the fading concepts (`topic/concept`), least likely to be recalled first. If they named a topic (`/review differential-forms`), review only that topic's: `due_reviews` with `topic`. If they named one concept (`/review differential-forms/wedge-product`, from the concept's own page), review that one, and anything fading it rests on. If nothing is fading, say so in one line, mention what comes due soon, and stop (or offer `/train` or a lesson).

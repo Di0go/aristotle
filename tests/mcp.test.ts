@@ -509,6 +509,28 @@ test('a concept past its review date is fading, and a review session practises i
   const evidence = (await get<Topic>('/api/topics/spaced')).concepts.find((c) => c.id === 'a')!.evidence;
   assert.equal(evidence.at(-2)?.kind, 'ask', 'the written answer is recorded on the concept in the other topic');
 
+  // A review practises what he holds: something he never learned is refused, whichever tool would bring it in.
+  await call('update_map', { topic: 'spaced', concepts: [{ id: 'b', label: 'B', status: 'unknown', deps: ['a'] }] });
+  const before = (await get<FeedState>('/api/state')).items.length;
+  const refusals = [
+    await call('show', { markdown: 'B is A twice.', title: 'B', kind: 'step', concept: 'spaced/b' }),
+    await call('ask', { prompt: 'What is B?', kind: 'problem', concept: 'spaced/b' }),
+    await call('quiz', {
+      questions: [{ question: 'B?', options: ['A twice', 'A once'], correct: 0, explanation: 'B is A twice.', concept: 'spaced/b' }],
+    }),
+  ];
+  for (const r of refusals) {
+    assert.equal(r.isError, true);
+    assert.match(textOf(r), /B \(spaced\/b\) is not something they have learned yet[\s\S]*a lesson/);
+  }
+  assert.match(textOf(await call('ask', { prompt: 'X?', concept: 'nowhere/x' })), /"nowhere\/x" is on no map/);
+  assert.equal((await get<FeedState>('/api/state')).items.length, before, 'nothing refused reached the page');
+  // A bare [[link]] in a review is found in the topic of what the step is about; one that finds nothing is named.
+  const shown = textOf(await call('show', { markdown: 'Recall [[a]], ahead of [[b]] and [[zzz]].', kind: 'step', concept: 'spaced/a' }));
+  assert.match(shown, /no concept on a map[^.]*: \[\[zzz\]\]\. This session has no topic of its own: write \[\[topic\/concept-id\]\]/);
+  assert.match(shown, /not learned yet \(unknown on the map\): spaced\/b/);
+  assert.doesNotMatch(shown, /\[\[a\]\]/);
+
   assert.match(textOf(await call('end_session', { locked: 'A', shaky: 'nothing', next: 'nothing' })), /handoff saved/);
   const sessions = await get<SessionSummary[]>('/api/sessions');
   assert.equal(sessions[0].kind, 'review');
@@ -827,7 +849,12 @@ test('a step without hover cards reminds Claude to write them', async () => {
   await call('start_session', { topic: 'Hover cards', goal: 'Terms' });
   assert.match(textOf(await call('show', { markdown: 'Plain words only.', kind: 'step' })), /no hover cards/);
   assert.equal(textOf(await call('show', { markdown: 'A {{form|a field of covectors}}.', kind: 'step' })), 'Shown.');
-  assert.equal(textOf(await call('show', { markdown: 'Builds on [[covector]].', kind: 'step' })), 'Shown.');
+  assert.equal(textOf(await call('show', { markdown: 'Builds on [[differential-forms/covector]].', kind: 'step' })), 'Shown.');
+  // A link that finds nothing shows greyed out with no card: Claude is told which.
+  assert.match(
+    textOf(await call('show', { markdown: 'Builds on [[covector]].', kind: 'step' })),
+    /point at no concept on a map[^.]*: \[\[covector\]\]/,
+  );
 });
 
 test('a question on a passage is answered with its paragraph, kept with its step, and shown to the tutor', async () => {

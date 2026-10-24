@@ -286,6 +286,7 @@ Only for the interface (and the tests); tutors use MCP.
 | [`search.svelte.ts`](../ui/src/lib/search.svelte.ts) | Whether the search palette is open: Ctrl+K or / anywhere, the ribbon's search button, or "Search" on selected text. |
 | [`steps.ts`](../ui/src/lib/steps.ts) | A class as he reads it: one page per step, in order, whatever sitting each was taught in. |
 | [`storage.ts`](../ui/src/lib/storage.ts) | Browser storage helpers: moving a setting saved under the app's old name (Mind Gym) to its new key. |
+| [`tables.ts`](../ui/src/lib/tables.ts) | Pipes inside a table row that aren't cell borders: {{term\|definition}}, [[concept\|label]], $\|x\|$ and `a\|b` all hold a "\|", and a GFM table splits its rows on every unescaped one, cutting the term in half ("{{non-polar covalent" in one cell, the rest of the row shifted). |
 | [`tabs.svelte.ts`](../ui/src/lib/tabs.svelte.ts) | Open pages, as tabs. |
 | [`theme.svelte.ts`](../ui/src/lib/theme.svelte.ts) | Look settings: light or dark, and one accent. |
 | [`tutor.svelte.ts`](../ui/src/lib/tutor.svelte.ts) | The connection to the tutor running inside Aristotle (server/tutor.ts): an agent CLI in a terminal (Claude Code by default, or Codex, Gemini CLI, opencode), or Aristotle's own tutor on a model API, whose conversation the drawer shows instead. |

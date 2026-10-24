@@ -10,6 +10,8 @@ import { legacySlugify, slugCandidates, slugify } from '../server/slug.ts';
 import { AppendLog, endLastLine, readLog, WriteQueue } from '../server/store.ts';
 import { leanTopic } from '../server/topics.ts';
 import { pagesOf, stepMark } from '../ui/src/lib/steps.ts';
+import { escapeTablePipes } from '../ui/src/lib/tables.ts';
+import { Marked, type Tokens } from 'marked';
 import { LEAN_EVIDENCE, type PublicItem, type Session, type Topic } from '../shared/types.ts';
 
 test('slugs: Latin titles keep the ids they always had; other scripts get ids of their own', () => {
@@ -147,4 +149,38 @@ test('a finished step stays finished, and a warm-up the class went on without no
   assert.equal(stepMark(pagesOf([first(step, quiz), warm])[0]).text, 'to answer');
   // ...and no longer once the class went on without it.
   assert.equal(stepMark(pagesOf([first(step, quiz, later), warm])[0]).text, '✓');
+});
+
+test('hover terms, concept links, maths and code keep their "|" inside a table instead of splitting the row', () => {
+  // The table from the review of 2026-10-22, step "Sharing, tugging, handing over", where "{{non-polar covalent" showed.
+  const source = [
+    'Before the table: {{bond|a shared pair}} and [[why-atoms-bond|bond]] stay as they are.',
+    '',
+    '| Gap in pull | Example | Name |',
+    '|---|---|---|',
+    '| none or tiny | H–H, [[why-atoms-bond|a bond]] | {{non-polar covalent|electrons shared about evenly; no charged ends}} |',
+    '| huge | $|q|$ big, `a|b` | {{ionic|one atom has taken the electron outright}} |',
+    '| $5 | $10 | \\| kept | plain |',
+    '',
+    '```',
+    '| {{not|a table}} |',
+    '```',
+    '',
+    'A heading with {{a|term}}',
+    '---',
+  ].join('\n');
+  const tokens = new Marked({ gfm: true }).lexer(escapeTablePipes(source));
+  const table = tokens.find((t): t is Tokens.Table => t.type === 'table');
+  assert.ok(table);
+  const rows = [table.header, ...table.rows].map((row) => row.map((cell) => cell.text));
+  assert.deepEqual(rows, [
+    ['Gap in pull', 'Example', 'Name'],
+    ['none or tiny', 'H–H, [[why-atoms-bond|a bond]]', '{{non-polar covalent|electrons shared about evenly; no charged ends}}'],
+    ['huge', '$|q|$ big, `a|b`', '{{ionic|one atom has taken the electron outright}}'],
+    ['$5', '$10', '| kept'],
+  ]);
+  // Outside tables nothing changes: the paragraph and the code block read as written.
+  assert.equal(tokens[0].raw.trim(), source.split('\n')[0]);
+  assert.ok(escapeTablePipes(source).includes('```\n| {{not|a table}} |\n```'));
+  assert.ok(escapeTablePipes(source).endsWith('A heading with {{a|term}}\n---'));
 });

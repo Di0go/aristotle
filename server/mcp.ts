@@ -55,7 +55,7 @@ const THEME = {
 const MATH_AND_DIAGRAMS =
   'Markdown is rendered with LaTeX maths ($...$ inline, $$...$$ on its own lines; write a literal dollar as \\$), ' +
   '```mermaid code blocks as diagrams, and inline <svg> elements (which may animate with SMIL <animate>; Aristotle adds play and replay buttons; keep the viewBox at most 680 units wide with text at 14 units or more, since a wider drawing is shrunk to the column until its text cannot be read). ' +
-  'Hover cards: {{term|short definition}} marks a term with a definition they can hover (inside a ==highlight== too: =={{term|definition}}==); [[concept-id]], [[other-topic/concept-id]] or [[concept-id|text]] links a concept on the map and shows its preview. ' +
+  'Hover cards: {{term|short definition}} marks a term with a definition they can hover (inside a ==highlight== too: =={{term|definition}}==); [[concept-id]], [[other-topic/concept-id]] or [[concept-id|text]] links a concept on the map and shows its preview (in a review, which has no topic, write [[topic/concept-id]]); both work inside table cells. ' +
   'Also: ==highlighted text==; callouts as Obsidian writes them (> [!idea] Title, then > lines; kinds: idea, key, why, context, example, you, careful, term, note); ' +
   '<figure> with <figcaption> around a drawing; ![alt](https://upload.wikimedia.org/… "caption") for an image with a caption (Wikimedia Commons only: the page shows no other host); ' +
   'and ```sequence code blocks: Markdown frames split by lines of ---, which they step through with Next and Back. ' +
@@ -76,7 +76,12 @@ const STATUSES =
   '"solid" = they got a check on it right without help, ideally by producing or applying it rather than recognising it.';
 
 // Parameters several tools share.
-const conceptParam = z.string().optional().describe('Id of the map concept this is about; "topic/id" for a concept in another topic');
+const conceptParam = z
+  .string()
+  .optional()
+  .describe(
+    'Id of the map concept this is about; "topic/id" for a concept in another topic (always, in a review). A review refuses one they have not learned (unknown on the map): that belongs to a lesson',
+  );
 const leadParam = z
   .object({
     markdown: z.string().min(1),
@@ -681,15 +686,32 @@ function defineTools(gym: Gym): ToolDef[] {
     },
     async ({ markdown, title, kind, concept }) => {
       if (!gym.feed.session) return noSession();
+      const unlearned = notYetLearned(gym, [concept]);
+      if (unlearned) return error(unlearned);
       await gym.feed.add({ type: 'block', kind, markdown, ...(title ? { title } : {}), ...(concept ? { concept } : {}) });
       if (concept) await gym.focus(concept);
+      const notes: string[] = [];
       // Hover cards only exist where Claude writes them, so a step without any gets a reminder.
       if (kind === 'step' && !/\{\{[^}|]+\|[^}]+\}\}|\[\[[^\]]+\]\]/.test(markdown)) {
-        return text(
-          'Shown. It has no hover cards: in the next steps, mark each new technical term {{term|short definition}} and link concepts on the map as [[concept-id]].',
+        notes.push(
+          'It has no hover cards: in the next steps, mark each new technical term {{term|short definition}} and link concepts on the map as [[concept-id]].',
         );
       }
-      return text('Shown.');
+      // A link that finds nothing shows greyed out with no card, so it is as good as none.
+      const { dangling, unknown } = checkLinks(gym, markdown, concept);
+      if (dangling.length) {
+        notes.push(
+          `These links point at no concept on a map, so they show greyed out with no card: ${dangling.map((r) => `[[${r}]]`).join(', ')}. ` +
+            (gym.feed.session.topicSlug ? '' : 'This session has no topic of its own: write [[topic/concept-id]]. ') +
+            'Link only what is on a map; mark anything else {{term|definition}}.',
+        );
+      }
+      if (unknown.length && gym.feed.session.kind === 'review') {
+        notes.push(
+          `This links what they have not learned yet (unknown on the map): ${unknown.join(', ')}. A review only practises what they hold: leave it for a lesson.`,
+        );
+      }
+      return text(notes.length ? `Shown. ${notes.join(' ')}` : 'Shown.');
     },
   );
 
@@ -724,6 +746,11 @@ function defineTools(gym: Gym): ToolDef[] {
     },
     async ({ questions, lead }, extra) => {
       if (!gym.feed.session) return noSession();
+      const unlearned = notYetLearned(
+        gym,
+        questions.map((q) => q.concept),
+      );
+      if (unlearned) return error(unlearned);
       for (const [i, q] of questions.entries()) {
         if (q.correct >= q.options.length) {
           return error(`Question ${i + 1}: correct is ${q.correct} but there are ${q.options.length} options.`);
@@ -761,6 +788,8 @@ function defineTools(gym: Gym): ToolDef[] {
     },
     async ({ prompt, kind, concept, placeholder, lead }, extra) => {
       if (!gym.feed.session) return noSession();
+      const unlearned = notYetLearned(gym, [concept]);
+      if (unlearned) return error(unlearned);
       await showLead(gym, lead);
       const item = await gym.feed.add({
         type: 'ask',
@@ -1027,6 +1056,48 @@ async function waitForLearner(gym: Gym, ids: string | string[], extra: Extra): P
  * What Claude gets when he hasn't answered within the wait: he may be thinking it over or away, so it hands back rather
  * than hold the call (a tutor held for minutes reads as stuck). The sitting stays open; his answer brings Claude back.
  */
+/**
+ * In a review, why a concept can't be taught or asked about, if it can't: a review practises what he already holds,
+ * so a concept on no map, or on one but never learned (unknown), belongs to a lesson. Null when all is well, and
+ * always outside a review. Shaky concepts pass: he held them once, and the review may repair them.
+ */
+function notYetLearned(gym: Gym, refs: (string | undefined)[]): string | null {
+  if (gym.feed.session?.kind !== 'review') return null;
+  for (const ref of refs) {
+    if (!ref) continue;
+    const found = gym.resolve(ref);
+    if (!found) {
+      return `Not shown: "${ref}" is on no map. In a review, tag \`concept\` as topic/concept-id, and only with something they have learned.`;
+    }
+    if (found.concept.status === 'unknown') {
+      return (
+        `Not shown: this is a review, and ${found.concept.label} (${found.topic.slug}/${found.concept.id}) is not something they have learned yet (unknown on the map). ` +
+        'A review only practises what they already hold: new material goes in a lesson (the teach skill). Leave it out of this review, ' +
+        "and name it in end_session's `next` if it is what to learn next."
+      );
+    }
+  }
+  return null;
+}
+
+/**
+ * The [[links]] in a piece of Markdown that find no concept (`dangling`), and those that find one never learned
+ * (`unknown`). A bare id is looked for as the page shows it: in the session's topic, or else in the topic of the
+ * concept the text is about (Markdown.svelte).
+ */
+function checkLinks(gym: Gym, markdown: string, about?: string): { dangling: string[]; unknown: string[] } {
+  const inTopic = about?.includes('/') ? about.split('/')[0] : undefined;
+  const dangling = new Set<string>();
+  const unknown = new Set<string>();
+  for (const m of markdown.matchAll(/\[\[([^[\]|]+?)(?:\|[^[\]]+?)?\]\]/g)) {
+    const ref = (m[1] ?? '').trim();
+    const found = gym.resolve(ref, inTopic);
+    if (!found) dangling.add(ref);
+    else if (found.concept.status === 'unknown') unknown.add(`${found.topic.slug}/${found.concept.id}`);
+  }
+  return { dangling: [...dangling], unknown: [...unknown] };
+}
+
 function notAnswered(): CallToolResult {
   const minutes = Math.round(WAIT_MS / 60_000);
   return text(

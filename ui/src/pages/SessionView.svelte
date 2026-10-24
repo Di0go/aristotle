@@ -49,7 +49,7 @@
       <p class="page-lede">{record.session.goal}</p>
       {#if live}<p><a href={classes.sittingHref() ?? link.now()}>This is the session running now: open it</a></p>{/if}
     </header>
-    <FeedList {items} readonly={!live} pendingId={live ? (feed.pending?.id ?? null) : null} />
+    <FeedList {items} readonly={!live} pendingId={live ? (feed.pending?.id ?? null) : null} numbered={record.session.kind !== 'review'} />
   {:else if missing}
     <div class="empty-state">
       <h2>No such session</h2>

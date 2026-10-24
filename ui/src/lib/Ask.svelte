@@ -55,7 +55,7 @@
 
 <section class="sheet ask kind-{item.kind}" class:active class:answered>
   <p class="kicker">{LABELS[item.kind]}</p>
-  <div class="question-text"><Markdown source={item.prompt} /></div>
+  <div class="question-text"><Markdown source={item.prompt} concept={item.concept} /></div>
 
   {#if answered}
     <div class="your-answer">

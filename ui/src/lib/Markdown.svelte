@@ -34,7 +34,8 @@
   /** Where glossed phrases are never marked: code, maths, drawings, links, other terms and live figures. */
   const SKIP = 'pre, code, .katex, .math-pending, svg, a, button, .term, .figure-live, .figure-loading, .kit, .diagram, script, style';
 
-  let { source, inline = false }: { source: string; inline?: boolean } = $props();
+  /** `concept`: the map concept the text is about ("topic/id"), whose topic a bare [[concept]] falls back on. */
+  let { source, inline = false, concept: about }: { source: string; inline?: boolean; concept?: string } = $props();
 
   let el = $state<HTMLElement>();
 
@@ -49,7 +50,9 @@
     for (const a of el?.querySelectorAll<HTMLAnchorElement>('a.concept-link') ?? []) {
       const ref = a.dataset.ref ?? a.dataset.concept ?? '';
       a.dataset.ref = ref;
-      const { topic: slug = topicOf?.() ?? feed.session?.topicSlug ?? '', concept: id } = splitRef(ref);
+      // A bare id belongs to the page's topic; a review has none, so it falls back on the topic of what the text is about.
+      const fallback = topicOf?.() || (about?.includes('/') ? splitRef(about).topic : '') || feed.session?.topicSlug || '';
+      const { topic: slug = fallback, concept: id } = splitRef(ref);
       const concept = topics[slug]?.concepts.find((c) => c.id === id);
       a.dataset.concept = `${slug}/${id}`;
       a.href = link.topic(slug, id);

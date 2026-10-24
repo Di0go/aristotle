@@ -144,10 +144,10 @@ export class Gym {
     return slug ? this.topics.get(slug) : undefined;
   }
 
-  /** "topic/concept", or a bare concept id in the current session's topic. */
-  resolve(ref: string): { topic: Topic; concept: Concept } | null {
+  /** "topic/concept", or a bare concept id in the current session's topic (or `inTopic`, when the session has none). */
+  resolve(ref: string, inTopic?: string): { topic: Topic; concept: Concept } | null {
     const [a = '', b] = ref.split('/');
-    const topic = b === undefined ? this.currentTopic() : this.topics.get(a);
+    const topic = b === undefined ? (this.currentTopic() ?? (inTopic ? this.topics.get(inTopic) : undefined)) : this.topics.get(a);
     const id = slugify(b ?? a);
     const concept = topic?.concepts.find((c) => c.id === id);
     return topic && concept ? { topic, concept } : null;

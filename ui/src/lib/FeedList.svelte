@@ -1,6 +1,6 @@
 <script lang="ts">
   // A lesson as one long note: each entry a block in the reading column. Teaching steps are numbered in
-  // order; map changes are quiet one-line notes between them.
+  // order (not in a review, which is no sequence of steps); map changes are quiet one-line notes between them.
   import Ask from './Ask.svelte';
   import Block from './Block.svelte';
   import { feed } from './feed.svelte.ts';
@@ -16,6 +16,7 @@
     readonly = false,
     figures = {},
     firstStep = 1,
+    numbered = true,
   }: {
     items: PublicItem[];
     pendingId?: string | null;
@@ -24,6 +25,8 @@
     figures?: Record<string, Explorable[]>;
     /** The number of the first teaching step here, when this is one part of a longer class. */
     firstStep?: number;
+    /** Whether teaching steps are numbered: a lesson's are, a review's are not (it practises ideas, in no order). */
+    numbered?: boolean;
   } = $props();
 
   /**
@@ -36,7 +39,7 @@
   /** Each item's step number, counted across the items (0 for anything that is not a teaching step). */
   const numbers = $derived.by(() => {
     let step = firstStep - 1;
-    return items.map((item) => (item.type === 'block' && item.kind === 'step' ? ++step : 0));
+    return items.map((item) => (numbered && item.type === 'block' && item.kind === 'step' ? ++step : 0));
   });
 </script>
 

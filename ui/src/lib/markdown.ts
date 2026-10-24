@@ -11,6 +11,7 @@
 import { Marked, type TokenizerAndRendererExtension } from 'marked';
 import DOMPurify, { type Config } from 'dompurify';
 import { maths } from './maths.svelte.ts';
+import { escapeTablePipes } from './tables.ts';
 
 /** SVG animation (SMIL), which DOMPurify drops unless told otherwise. */
 const ANIMATION_TAGS = ['animate', 'animateTransform', 'animateMotion', 'set', 'mpath'];
@@ -199,7 +200,7 @@ export function renderMarkdown(source: string, keep = true): string {
     () => {
       const scope = hash(source);
       return withMaths(() => {
-        const fragment = DOMPurify.sanitize(marked.parse(source, { async: false }), BLOCK_CONFIG);
+        const fragment = DOMPurify.sanitize(marked.parse(escapeTablePipes(source), { async: false }), BLOCK_CONFIG);
         enrich(fragment, scope);
         const box = document.createElement('template');
         box.content.append(fragment);

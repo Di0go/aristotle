@@ -142,7 +142,12 @@
           <p>{tutor.name} is getting it ready: it reads what is due and picks where to start.</p>
         </div>
       {:else}
-        <FeedList items={feed.items} pendingId={feed.pending?.id ?? null} figures={placeFigures(mine.topicSlug, feed.items)} />
+        <FeedList
+          items={feed.items}
+          pendingId={feed.pending?.id ?? null}
+          figures={placeFigures(mine.topicSlug, feed.items)}
+          numbered={!reviewing}
+        />
       {/if}
       <LessonActivity />
       <Composer />
