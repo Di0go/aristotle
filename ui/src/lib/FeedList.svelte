@@ -31,8 +31,10 @@
 
   /**
    * The latest session's items, live. A question of it still waiting for him can be answered even where the rest is
-   * read back (a class, a past session), and shows his answer as soon as it is sent. So can one of an earlier session,
-   * unless another sitting is going on: answering it picks that sitting up again (server feed.ts reopenFor).
+   * read back (a class, a past session), and shows his answer as soon as it is sent. So can one of an earlier session:
+   * answering it picks that sitting up again (server feed.ts reopenFor). Its box never closes while he writes, whatever
+   * goes on elsewhere (his own typing keeps the current sitting going, through presence): if the server can't take the
+   * answer yet, it says so under the box and his text stays.
    */
   const live = $derived(new Map(feed.items.map((x) => [x.id, x])));
 
@@ -52,7 +54,7 @@
           <Block {item} number={numbers[i]} />
         {:else if item.type === 'quiz' || item.type === 'ask'}
           {@const current = (live.get(item.id) ?? item) as typeof item}
-          {@const locked = readonly && (Boolean(current.answeredAt) || (!live.has(item.id) && feed.inProgress))}
+          {@const locked = readonly && Boolean(current.answeredAt)}
           {#if current.type === 'quiz'}
             <Quiz item={current} active={pendingId === item.id} readonly={locked} />
           {:else}

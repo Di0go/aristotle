@@ -350,6 +350,7 @@ Only for the interface (and the tests); tutors use MCP.
 | File | What it is |
 |---|---|
 | [`backup.test.ts`](../tests/backup.test.ts) | The backup (server/backup.ts) against a throwaway data repository: it commits what changed with a message naming it, pushes when there is a remote, and when that keeps failing the interface is told (warnings.ts). |
+| [`browser.test.ts`](../tests/browser.test.ts) | In a real browser: what he is writing in an answer box stays there, focused and with the cursor where it was, while the tutor and the page go on around it. |
 | [`docs.test.ts`](../tests/docs.test.ts) | The docs stay true: every doc is in the index, every link resolves, every command and setting is documented, and code that changed since the last release came with a change to the docs that describe it. |
 | [`mcp.test.ts`](../tests/mcp.test.ts) | End-to-end: a real server, a real MCP client in Claude Code's place, and HTTP calls in the interface's place. |
 | [`tutor.test.ts`](../tests/tutor.test.ts) | End-to-end: the tutor on a model API, and the method for any agent. |
