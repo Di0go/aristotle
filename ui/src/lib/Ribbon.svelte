@@ -6,7 +6,7 @@
   import { link, router } from './router.svelte.ts';
   import { searchBox } from './search.svelte.ts';
   import { ACCENTS, theme } from './theme.svelte.ts';
-  import { isFading } from '../../../shared/types.ts';
+  import { reviewsToday } from '../../../shared/types.ts';
 
   /** The places, each with its icon (20×20, stroked) and its name under it. Everything else is reached from them. */
   const HOME = 'M4 4.5h12v11H4zM7 8.5h6M7 11.5h4';
@@ -35,8 +35,8 @@
   /** A lesson going on (Home points to it); a review going on, or waiting for an answer (Review lights up). */
   const live = $derived(feed.session?.kind === 'learn' && feed.liveSlug !== null && feed.inProgress);
   const reviewOpen = $derived(feed.session?.kind === 'review' && !feed.session.endedAt);
-  /** Concepts fading right now, across every class. */
-  const fading = $derived(Object.values(feed.topics).reduce((n, t) => n + t.concepts.filter((c) => isFading(c)).length, 0));
+  /** Today's share of the concepts fading across every class (the day's reviews are capped). */
+  const fading = $derived(reviewsToday(Object.values(feed.topics).flatMap((t) => t.concepts)));
 
   function onWindowKey(e: KeyboardEvent) {
     if (e.key === 'Escape') settings = false;
@@ -54,8 +54,9 @@
   <a class="rib" class:on={section === 'review'} href={link.review()} aria-current={section === 'review' ? 'page' : undefined}>
     <svg viewBox="0 0 20 20" aria-hidden="true"><path d={REVIEW} /></svg>
     <span class="lbl">Review</span>
-    {#if reviewOpen && feed.pending}<i class="pip turn" title="Your turn"></i>{:else if fading}<i class="count" title="{fading} fading"
-        >{fading}</i
+    {#if reviewOpen && feed.pending}<i class="pip turn" title="Your turn"></i>{:else if fading}<i
+        class="count"
+        title="{fading} to review today">{fading}</i
       >{/if}
   </a>
   <a class="rib" class:on={section === 'courses'} href={link.roadmaps()} aria-current={section === 'courses' ? 'page' : undefined}>

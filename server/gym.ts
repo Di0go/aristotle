@@ -238,19 +238,23 @@ export class Gym {
     return item;
   }
 
-  /** Saves his written answer, as evidence on its concept if it has one. */
+  /** Saves his written answer, as evidence on each concept it tests. */
   async answerAsk(id: string, text: string): Promise<AskItem> {
     const item = await this.feed.answerAsk(id, text);
     const session = this.feed.session;
-    const found = item.concept ? this.resolve(item.concept) : null;
-    if (session && found) {
-      await this.topics.recordEvidence(found.topic.slug, found.concept.id, {
-        at: item.answeredAt!,
-        session: session.id,
-        item: item.id,
-        kind: 'ask',
-      });
-    }
+    if (!session) return item;
+    await this.topics.batch(async () => {
+      for (const ref of [item.concept, ...(item.also ?? [])]) {
+        const found = ref ? this.resolve(ref) : null;
+        if (!found) continue;
+        await this.topics.recordEvidence(found.topic.slug, found.concept.id, {
+          at: item.answeredAt!,
+          session: session.id,
+          item: item.id,
+          kind: 'ask',
+        });
+      }
+    });
     return item;
   }
 
@@ -354,7 +358,8 @@ export class Gym {
       }
     }
     practised.sort((a, b) => a.at.localeCompare(b.at));
-    return { fading: this.topics.fading(), practised, upcoming: this.topics.upcoming(7) };
+    const { today, later } = this.topics.dueToday();
+    return { fading: today, later, practised, upcoming: this.topics.upcoming(7) };
   }
 
   /** Every session (or a topic's), newest first. */

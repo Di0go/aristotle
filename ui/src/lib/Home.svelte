@@ -10,7 +10,7 @@
   import { countsOf, stepsOf } from './library.ts';
   import { link } from './router.svelte.ts';
   import { pageLabel } from './steps.ts';
-  import { isFading, type SessionSummary, type Topic } from '../../../shared/types.ts';
+  import { isFading, reviewsToday, type SessionSummary, type Topic } from '../../../shared/types.ts';
   import StartPanel from './StartPanel.svelte';
 
   const RESULT = { right: 'right', partial: 'partly', wrong: 'wrong', 'dont-know': "didn't know" } as const;
@@ -92,6 +92,13 @@
 
   // What needs him.
   const fading = $derived(topics.reduce((n, t) => n + countsOf(t).fading, 0));
+  /** Today's share of what is fading: a day's reviews are capped, so new material keeps most of his time. */
+  const dueToday = $derived(
+    reviewsToday(
+      topics.flatMap((t) => t.concepts),
+      now,
+    ),
+  );
   /** Solid concepts by when they come due for review, soonest first. */
   const due = $derived(
     topics
@@ -195,11 +202,11 @@
         </span>
         <span class="primary">{feed.pending ? 'Answer it' : 'Open the class'}</span>
       </a>
-      {#if !inProgress && fading}
+      {#if !inProgress && dueToday}
         <!-- A question left waiting since another day shouldn't hide what is fading. -->
         <p class="now-also">
-          Or review the {fading}
-          {fading === 1 ? 'concept' : 'concepts'} fading first:
+          Or review today's {dueToday}
+          {dueToday === 1 ? 'concept' : 'concepts'} first:
           <button class="primary small" onclick={() => actions.review()}>Review now</button>
         </p>
       {/if}
@@ -222,15 +229,16 @@
         </span>
         <span class="primary">{feed.pending ? 'Answer it' : 'Open it'}</span>
       </a>
-    {:else if fading}
-      <!-- Spaced review comes first: recalling a concept just as it fades is what makes it last. -->
+    {:else if dueToday}
+      <!-- Today's short review comes first: recalling a concept just as it fades is what makes it last. Once the day's
+           share is done, what else is fading waits for the next days and this goes back to the class. -->
       <section class="now sheet">
         <span class="now-text">
           <span class="now-k">Time to review</span>
-          <span class="now-title">{fading} {fading === 1 ? 'concept is' : 'concepts are'} fading</span>
+          <span class="now-title">{dueToday} {dueToday === 1 ? 'concept is' : 'concepts are'} fading</span>
           <span class="muted"
-            >Recall {fading === 1 ? 'it' : 'them'} now, just before {fading === 1 ? 'it slips' : 'they slip'}: a few questions you answer in
-            your own words.{#if lastClass}
+            >Recall {dueToday === 1 ? 'it' : 'them'} now, just before {dueToday === 1 ? 'it slips' : 'they slip'}: a few short questions, a
+            few minutes.{#if lastClass}
               Or <button class="link inline" onclick={() => actions.continueTopic(lastClass.slug)}>continue {lastClass.title}</button
               >.{/if}</span
           >
@@ -303,7 +311,7 @@
         </section>
 
         <section class="panel">
-          <h2 class="panel-h">To review <span>{fading ? `${fading} fading` : 'soon'}</span></h2>
+          <h2 class="panel-h">To review <span>{dueToday ? `${dueToday} today` : fading ? 'done for today' : 'soon'}</span></h2>
           {#each due as d (`${d.topic.slug}/${d.concept.id}`)}
             <a class="item" href={link.topic(d.topic.slug, d.concept.id)} data-concept="{d.topic.slug}/{d.concept.id}">
               <span class="item-t">{d.concept.label}</span>
@@ -312,8 +320,8 @@
           {:else}
             <p class="empty">Concepts come here once they're solid, to be recalled just before they fade.</p>
           {/each}
-          {#if fading}
-            <button class="primary small panel-action" onclick={() => actions.review()}>Review {fading} fading</button>
+          {#if dueToday}
+            <button class="primary small panel-action" onclick={() => actions.review()}>Review today's {dueToday}</button>
           {/if}
         </section>
 

@@ -121,7 +121,8 @@
         </div>
         <p class="page-lede">
           {#if ended}
-            Done{reviewing && queue?.fading.length ? `: ${queue.fading.length} still fading` : ''}. Your answers and the feedback stay in
+            Done{reviewing && queue?.fading.length ? `: ${queue.fading.length} of today's still to review` : ''}. Your answers and the
+            feedback stay in
             <a href={link.session(mine.id)}>its record</a>.
             <button class="ghost small" onclick={() => (setAside = mine.id)}>{reviewing ? 'Back to Review' : 'Back to training'}</button>
           {:else if going}
@@ -194,10 +195,17 @@
             <button class={tutor.asking ? 'primary' : 'ghost'} onclick={() => tutor.toggle(true)}>Open the terminal</button>
           {:else if queue.fading.length}
             <p class="start-line">
-              <strong>{queue.fading.length} {queue.fading.length === 1 ? 'concept is' : 'concepts are'} fading.</strong>
-              {#if queue.upcoming}{queue.upcoming} more come due in the next 7 days.{/if}
+              <strong>{queue.fading.length} {queue.fading.length === 1 ? 'concept' : 'concepts'} to review today.</strong>
+              {#if queue.later}{queue.later} more {queue.later === 1 ? 'waits' : 'wait'} for the next days: a day's reviews are kept short.{:else if queue.upcoming}{queue.upcoming}
+                more come due in the next 7 days.{/if}
             </p>
             <button class="primary" onclick={begin}>Start a review</button>
+          {:else if queue.later}
+            <p class="start-line">
+              <strong>Done for today.</strong>
+              {queue.later} more {queue.later === 1 ? 'is' : 'are'} fading and {queue.later === 1 ? 'waits' : 'wait'} for the next days: the rest
+              of the day is for new material.
+            </p>
           {:else}
             <p class="start-line">
               <strong>Nothing is fading.</strong>
@@ -207,7 +215,7 @@
         </section>
         {#if queue.fading.length}
           <section>
-            <h2 class="section-title">Fading</h2>
+            <h2 class="section-title">Today's</h2>
             <ul class="due">
               {#each queue.fading as f (`${f.topic}/${f.id}`)}
                 <li>

@@ -1,5 +1,5 @@
 <script lang="ts">
-  // During a review session: what has been practised so far, and what is still fading. It folds away like the panel
+  // During a review session: what has been practised so far, and today's share of what is fading. It folds away like the panel
   // beside a step ("Hide »", bench.svelte.ts), and closes like it on a narrow screen (×).
   import { bench } from './bench.svelte.ts';
   import { refetching } from './feed.svelte.ts';
@@ -44,7 +44,7 @@
     </section>
   {/if}
   <section class="bench-section">
-    <h3 class="bench-title">Still fading ({queue.fading.length})</h3>
+    <h3 class="bench-title">Today's ({queue.fading.length})</h3>
     {#if queue.fading.length}
       <ul class="plan">
         {#each queue.fading as f (f.topic + f.id)}
@@ -56,8 +56,13 @@
           </li>
         {/each}
       </ul>
+    {:else if queue.later}
+      <p class="muted">Done for today.</p>
     {:else}
       <p class="muted">All caught up. {queue.upcoming ? `${queue.upcoming} come due in the next 7 days.` : ''}</p>
+    {/if}
+    {#if queue.later}
+      <p class="muted">{queue.later} more {queue.later === 1 ? 'waits' : 'wait'} for the next days: a day's reviews are kept short.</p>
     {/if}
   </section>
 {:else}

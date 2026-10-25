@@ -449,11 +449,17 @@ test('solid concepts get a review schedule; practice moves it and the training l
   const right = textOf(await call('record_practice', { results: [{ concept: 'a', outcome: 'right', kind: 'recall' }] }));
   assert.match(right, /spaced\/a: right, recall was ~\d+%; next review \d{4}-\d{2}-\d{2}/);
 
+  const graded = topic.concepts.find((c) => c.id === 'a')!.review!;
   const wrong = textOf(await call('record_practice', { results: [{ concept: 'a', outcome: 'wrong', kind: 'recall' }] }));
   assert.match(wrong, /now shaky/);
   topic = await get<Topic>('/api/topics/spaced');
   assert.equal(topic.concepts.find((c) => c.id === 'a')!.status, 'shaky');
-  assert.equal(topic.concepts.find((c) => c.id === 'a')!.review!.lapses, 1);
+  // One grade a day, the worst: it became solid today, so the right answer added nothing, and the slip re-grades the
+  // day (from a new card) instead of counting as another review. It is due again within days.
+  const slipped = topic.concepts.find((c) => c.id === 'a')!.review!;
+  assert.equal(slipped.reps, graded.reps);
+  assert.equal(slipped.today, 'wrong');
+  assert.ok(Date.parse(slipped.due) < Date.parse(graded.due));
   const feedTypes = (await get<FeedState>('/api/state')).items.map((i) => i.type);
   assert.equal(feedTypes.at(-1), 'map');
 
@@ -466,26 +472,30 @@ test('solid concepts get a review schedule; practice moves it and the training l
     /no such concept/,
   );
 
-  // Becoming solid again counts as a successful review on the same card.
+  // Becoming solid again after the repair, the same day, leaves the lapse's schedule: it comes back within days.
+  const lapsed = (await get<Topic>('/api/topics/spaced')).concepts.find((c) => c.id === 'a')!.review!;
   await call('update_map', { concepts: [{ id: 'a', status: 'solid' }] });
   topic = await get<Topic>('/api/topics/spaced');
-  assert.equal(topic.concepts.find((c) => c.id === 'a')!.review!.reps, 4);
+  assert.deepEqual(topic.concepts.find((c) => c.id === 'a')!.review, lapsed);
+  assert.ok(Date.parse(lapsed.due) < Date.now() + 3 * 86_400_000);
 });
 
 test('a concept past its review date is fading, and a review session practises it across topics', async () => {
   // Travel in time: move the review date into the past.
   const file = path.join(dataDir, 'topics', 'spaced.json');
   const topic = JSON.parse(await readFile(file, 'utf8')) as Topic;
-  topic.concepts.find((c) => c.id === 'a')!.review!.due = new Date(Date.now() - 3 * 86_400_000).toISOString();
+  const card = topic.concepts.find((c) => c.id === 'a')!.review!;
+  card.due = new Date(Date.now() - 3 * 86_400_000).toISOString();
+  card.last = new Date(Date.now() - 6 * 86_400_000).toISOString();
   await writeFile(file, JSON.stringify(topic));
   await restart();
 
-  assert.match(textOf(await call('due_reviews')), /1 fading[\s\S]*spaced\/a "A" \(Spaced\): recall ~\d+%/);
+  assert.match(textOf(await call('due_reviews')), /1 concept to review today:[\s\S]*spaced\/a "A" \(Spaced\): recall ~\d+%/);
   const [summary] = (await get<TopicSummary[]>('/api/topics')).filter((t) => t.slug === 'spaced');
   assert.equal(summary.fading, 1);
 
   const started = textOf(await call('start_session', { kind: 'review', goal: "Review what's fading" }));
-  assert.match(started, /Review session started\. 1 concepts are fading/);
+  assert.match(started, /Review session started\. 1 concept to review today:/);
   assert.equal((await get<FeedState>('/api/state')).session?.topicSlug, '');
 
   const res = await call('update_map', { concepts: [{ id: 'a', status: 'solid' }] });
@@ -542,6 +552,57 @@ test('a concept past its review date is fading, and a review session practises i
   assert.ok(progress.answers.length >= 1);
   assert.deepEqual(progress.training, [{ topic: 'spaced', title: 'Spaced', level: 1 }]);
   assert.equal(progress.fading.length, 0);
+});
+
+test('a day asks for at most six concepts, and one question can test several', async () => {
+  await call('start_session', { topic: 'Capped', goal: 'Test the daily cap' });
+  const ids = Array.from({ length: 8 }, (_, i) => `c${i}`);
+  await call('update_map', {
+    concepts: [...ids.map((id) => ({ id, label: id.toUpperCase(), status: 'solid' })), { id: 'new', label: 'New' }],
+  });
+  await call('end_session', { locked: 'all', shaky: 'none', next: 'review' });
+  // Travel in time: every card was last reviewed days ago and is now overdue.
+  const file = path.join(dataDir, 'topics', 'capped.json');
+  const topic = JSON.parse(await readFile(file, 'utf8')) as Topic;
+  for (const c of topic.concepts.filter((x) => x.review)) {
+    c.review!.due = new Date(Date.now() - 2 * 86_400_000).toISOString();
+    c.review!.last = new Date(Date.now() - 6 * 86_400_000).toISOString();
+  }
+  await writeFile(file, JSON.stringify(topic));
+  await restart();
+
+  // An earlier test already reviewed a concept today: it counts against the day's six.
+  const first = await get<ReviewQueue>('/api/reviews');
+  const done = 6 - first.fading.length;
+  assert.ok(done >= 0 && first.fading.length + first.later === 8, `${first.fading.length} today, ${first.later} later`);
+  assert.match(
+    textOf(await call('due_reviews')),
+    new RegExp(`^${first.fading.length} concepts to review today: ${first.later} more are fading, over today's cap of 6`),
+  );
+  assert.match(textOf(await call('due_reviews', { topic: 'capped' })), /^8 fading in capped/, 'a class asked for by name is not capped');
+  assert.match(textOf(await call('start_session', { kind: 'review', goal: "Review what's fading" })), /concepts to review today/);
+
+  const refused = await call('ask', { prompt: '1. C0?\n2. New?', kind: 'recall', concept: 'capped/c0', also: ['capped/new'] });
+  assert.equal(refused.isError, true, 'every concept a question tests must be learned');
+  const asked = call('ask', { prompt: '1. C0?\n2. C1?\n3. C2?', kind: 'recall', concept: 'capped/c0', also: ['capped/c1', 'capped/c2'] });
+  const open = await waitForPending('ask');
+  await answer({ id: open.id, text: 'All three.' });
+  assert.match(textOf(await asked), /concepts capped\/c0, capped\/c1, capped\/c2/);
+  const after = (await get<Topic>('/api/topics/capped')).concepts;
+  for (const id of ['c0', 'c1', 'c2']) assert.equal(after.find((c) => c.id === id)!.evidence.at(-1)?.kind, 'ask', id);
+  await call('record_practice', {
+    results: ['c0', 'c1', 'c2'].map((id) => ({ concept: `capped/${id}`, outcome: 'right', kind: 'recall' })),
+  });
+
+  // Three more reviewed today: the day's share shrinks by three, and as many still wait.
+  const queue = await get<ReviewQueue>('/api/reviews');
+  assert.equal(queue.fading.length, first.fading.length - 3);
+  assert.equal(queue.later, first.later);
+  assert.equal(queue.practised.length, 3);
+  await call('end_session', { locked: 'C0-C2', shaky: 'none', next: 'nothing' });
+  await call('start_session', { topic: 'capped', goal: 'Tidy up' });
+  await call('update_map', { remove: [...ids, 'new'] });
+  await call('end_session', { locked: '', shaky: '', next: '' });
 });
 
 test('the terminal runs the command, takes messages, and only opens to Aristotle itself', async () => {
@@ -1291,7 +1352,10 @@ test('a review left with a question open is picked up again, so its answer and f
   assert.equal((await answer({ id: open.id, text: 'Cortisol' })).status, 200);
 
   const resumed = textOf(await call('start_session', { kind: 'review', goal: "Review what's fading" }));
-  assert.match(resumed, /Picked up the review[\s\S]*All its questions are answered[\s\S]*fading[\s\S]*Cortisol/);
+  assert.match(
+    resumed,
+    /Picked up the review[\s\S]*All its questions are answered[\s\S]*(to review today|Nothing is fading)[\s\S]*Cortisol/,
+  );
   assert.equal((await get<FeedState>('/api/state')).session?.id, left, 'the feedback goes where the answer is');
   await call('end_session', { locked: 'A', shaky: 'B', next: 'C' });
 

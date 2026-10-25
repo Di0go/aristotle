@@ -77,6 +77,8 @@ export interface AskItem extends ItemBase {
   placeholder?: string;
   /** The map concept this question tests. */
   concept?: string;
+  /** In a review, the others it tests too, one per part of the prompt. */
+  also?: string[];
   response?: string;
   answeredAt?: string;
   delivered?: boolean;
@@ -196,6 +198,42 @@ export interface ReviewState {
   lapses: number;
   state: number;
   last?: string;
+  /** The day's result so far, when `last` was a graded review: a worse one later the same day re-grades the day. */
+  today?: ReviewOutcome;
+  /** The card as it stood before the day of `last`, which that re-grading starts from. */
+  before?: Omit<ReviewState, 'today' | 'before'>;
+}
+
+export type ReviewOutcome = 'right' | 'partial' | 'wrong';
+
+/**
+ * At most this many concepts come up for review in a day, least likely to be recalled first; the rest wait for the
+ * days after. New material keeps most of his time, and FSRS takes a late review in its stride (one recalled late
+ * grows more). Concepts already practised in a review session that day count against it.
+ */
+export const DAILY_REVIEWS = 6;
+
+/** The day a review falls on, in local time, as YYYY-MM-DD. The day turns at 4 a.m., so a late night is still that day. */
+export function reviewDay(at: string | number | Date): string {
+  const d = new Date(new Date(at).getTime() - 4 * 3_600_000);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/** Whether a session id is a review's: its start stamp and "review" (feed.ts). */
+export function isReviewSession(id: string): boolean {
+  return /^\d{4}-\d{2}-\d{2}-\d{9}-review$/.test(id);
+}
+
+/** How many of the fading concepts are today's to review: the daily cap, less what he has reviewed today. */
+export function reviewsToday(concepts: Pick<Concept, 'status' | 'review' | 'evidence'>[], now = Date.now()): number {
+  const today = reviewDay(now);
+  let fading = 0;
+  let reviewed = 0;
+  for (const c of concepts) {
+    if (isFading(c, now)) fading++;
+    else if (c.evidence.some((e) => e.kind === 'practice' && isReviewSession(e.session) && reviewDay(e.at) === today)) reviewed++;
+  }
+  return Math.min(fading, Math.max(0, DAILY_REVIEWS - reviewed));
 }
 
 /** Solid, but due for review. */
@@ -338,10 +376,15 @@ export interface FadingConcept {
   /** Estimated chance he'd recall it now, 0 to 1. */
   recall: number;
   lastPractised?: string;
+  /** Stable for a month or more with a clean last review: a one-line check is enough. */
+  mastered?: boolean;
 }
 
 export interface ReviewQueue {
+  /** Today's share of what is fading (DAILY_REVIEWS), least likely to be recalled first. */
   fading: FadingConcept[];
+  /** Fading too, but left for the days after: over the day's cap. */
+  later: number;
   /** Concepts practised in the current session, in order. */
   practised: { topic: string; id: string; label: string; result: string; at: string }[];
   upcoming: number;

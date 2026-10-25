@@ -4,12 +4,13 @@
 import { EventEmitter } from 'node:events';
 import path from 'node:path';
 import { TOPICS_DIR } from './config.ts';
-import { gradeReview, retrievability, startReview, type Outcome } from './reviews.ts';
+import { becameSolid, gradeReview, isMastered, retrievability, type Outcome } from './reviews.ts';
 import { slugCandidates, slugify } from './slug.ts';
 import { isObject, loadJsonDir, WriteQueue, writeJson } from './store.ts';
 import {
   isFading,
   LEAN_EVIDENCE,
+  reviewsToday,
   type Concept,
   type ConceptStatus,
   type Evidence,
@@ -80,10 +81,24 @@ export class Topics {
           due: c.review!.due,
           recall: retrievability(c.review!, now),
           ...(last ? { lastPractised: last } : {}),
+          ...(isMastered(c.review!) ? { mastered: true } : {}),
         });
       }
     }
     return out.sort((a, b) => a.recall - b.recall);
+  }
+
+  /**
+   * Today's review: the fading concepts least likely to be recalled, as many as the daily cap leaves (DAILY_REVIEWS),
+   * and how many more wait for the days after. Naming a topic or a concept is his own choice, so it isn't capped.
+   */
+  dueToday(now = new Date()): { today: FadingConcept[]; later: number } {
+    const all = this.fading(undefined, now);
+    const n = reviewsToday(
+      [...this.topics.values()].flatMap((t) => t.concepts),
+      now.getTime(),
+    );
+    return { today: all.slice(0, n), later: all.length - n };
   }
 
   /** Solid concepts coming due within `days`. */
@@ -151,7 +166,7 @@ export class Topics {
         if (input.note) concept.note = input.note;
         if (concept.status === 'solid') {
           concept.solidSince = now;
-          concept.review = startReview(new Date(now));
+          concept.review = becameSolid(undefined, new Date(now));
         }
         topic.concepts.push(concept);
         changes.push({ id, label: concept.label, added: true, to: concept.status });
@@ -380,13 +395,14 @@ function summarize(topic: Topic): TopicSummary {
 
 /**
  * Changes a concept's status, keeping its review card in step: becoming solid counts as a successful
- * review (or starts the card), and falling from solid counts as a lapse.
+ * review (or starts the card), and falling from solid counts as a lapse. Becoming solid again on a day it was
+ * already graded (a repair after a slip) leaves the card as the day's result set it.
  */
 function setStatus(concept: Concept, status: ConceptStatus, nowIso: string) {
   const now = new Date(nowIso);
   if (status === 'solid') {
     concept.solidSince = nowIso;
-    concept.review = concept.review ? gradeReview(concept.review, 'right', now) : startReview(now);
+    concept.review = becameSolid(concept.review, now);
   } else if (concept.status === 'solid' && concept.review) {
     concept.review = gradeReview(concept.review, 'wrong', now);
   }

@@ -257,7 +257,7 @@ Only for the interface (and the tests); tutors use MCP.
 | [`MapUpdate.svelte`](../ui/src/lib/MapUpdate.svelte) | A map change, set as a small stamp in the notebook: what moved, and to where. |
 | [`Markdown.svelte`](../ui/src/lib/Markdown.svelte) | Renders lesson Markdown and brings it to life: mermaid diagrams, sequences, explorables and the visual kit's figures. |
 | [`Quiz.svelte`](../ui/src/lib/Quiz.svelte) | A graded multiple-choice check: options, "I don't know", a note per question, and right or wrong once answered. |
-| [`ReviewPanel.svelte`](../ui/src/lib/ReviewPanel.svelte) | During a review session: what has been practised so far, and what is still fading. |
+| [`ReviewPanel.svelte`](../ui/src/lib/ReviewPanel.svelte) | During a review session: what has been practised so far, and today's share of what is fading. |
 | [`Ribbon.svelte`](../ui/src/lib/Ribbon.svelte) | The thin strip on the far left: the main places, then Settings (who teaches), focus and the look. |
 | [`Search.svelte`](../ui/src/lib/Search.svelte) | The search palette: everything he has (roadmaps, steps, topics, concepts, missions, and what was said in every session), searched on the server as he types. |
 | [`Sequence.svelte`](../ui/src/lib/Sequence.svelte) | A process he steps through, one frame at a time: written as a ```sequence block, frames split by "---". |
@@ -342,6 +342,7 @@ Only for the interface (and the tests); tutors use MCP.
 | [`gates.ts`](../scripts/gates.ts) | Every check a change must pass, in one command: the same list runs in the pre-push hook, in CI and before a release. |
 | [`install-service.sh`](../scripts/install-service.sh) | Runs Aristotle at login as a systemd user service, so https://aristotle.test (and Claude Code in its terminal drawer) is always there without starting anything first. |
 | [`release.ts`](../scripts/release.ts) | Ships what is committed here to the app you learn in, without ever running half-finished code. |
+| [`review-replay.ts`](../scripts/review-replay.ts) | Replays a learning history through the review scheduler, read-only, to see what it would ask of him: the concepts due each day, then a simulated stretch of days ahead with the daily cap. |
 | [`seed.ts`](../scripts/seed.ts) | Fills the dev instance's data with a fixture (scripts/fixtures/<name>.ts, "demo" by default) by replaying it through a throwaway server's MCP endpoint, exactly as Claude Code would teach it. |
 | [`setup-hostname.sh`](../scripts/setup-hostname.sh) | Gives Aristotle a clean URL: https://aristotle.test How it works: 1. |
 | [`tls.sh`](../scripts/tls.sh) | Makes the certificate for https://aristotle.test, as the user (no root), in .aristotle/tls. |
@@ -355,5 +356,5 @@ Only for the interface (and the tests); tutors use MCP.
 | [`docs.test.ts`](../tests/docs.test.ts) | The docs stay true: every doc is in the index, every link resolves, every command and setting is documented, and code that changed since the last release came with a change to the docs that describe it. |
 | [`mcp.test.ts`](../tests/mcp.test.ts) | End-to-end: a real server, a real MCP client in Claude Code's place, and HTTP calls in the interface's place. |
 | [`tutor.test.ts`](../tests/tutor.test.ts) | End-to-end: the tutor on a model API, and the method for any agent. |
-| [`unit.test.ts`](../tests/unit.test.ts) | Unit tests for the pure pieces the end-to-end tests only reach indirectly: slugs (old ids must keep working), the write queue that carries on after a failure, the append log that retries, the lean map, and the socket table. |
+| [`unit.test.ts`](../tests/unit.test.ts) | Unit tests for the pure pieces the end-to-end tests only reach indirectly: slugs (old ids must keep working), the write queue that carries on after a failure, the append log that retries, the lean map, the socket table, and the review scheduler's rules (replayed with scripts/review-replay.ts, as it replays his real history). |
 <!-- /generated -->

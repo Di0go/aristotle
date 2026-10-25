@@ -19,6 +19,7 @@ import { describeMission, summarizeMission } from './missions.ts';
 import { describeRoadmap } from './roadmaps.ts';
 import { describeTopic } from './topics.ts';
 import {
+  DAILY_REVIEWS,
   isInteractive,
   stepState,
   type AskItem,
@@ -544,8 +545,7 @@ function defineTools(gym: Gym): ToolDef[] {
       const answers = late ? `\n\nAnswers they gave since your last question stopped waiting:\n\n${late}` : '';
       if (resumed && t) return text(resumedText(gym, session.startedAt, t.slug) + answers);
       if (!t) {
-        const fading = gym.topics.fading();
-        const list = `${fading.length} concepts are fading:\n${fading.map(formatFading).join('\n') || '(none)'}`;
+        const list = todaysReview(gym);
         if (resumed) return text(`${resumedText(gym, session.startedAt, '')}\n\n${list}${answers}`);
         return text(`Review session started. ${list}${answers}`);
       }
@@ -564,6 +564,8 @@ function defineTools(gym: Gym): ToolDef[] {
       title: 'List fading concepts',
       description:
         'List solid concepts that are due for review ("fading"), least likely to be recalled first, with an estimate of their chance of recalling each now. ' +
+        `Without \`topic\`, only today's share: at most ${DAILY_REVIEWS} a day, less what was reviewed today; the rest wait for later days. ` +
+        'With `topic` (they asked for that class), all of its fading concepts. ' +
         'Spaced review: practising a concept just as it starts to fade is what makes it last.',
       inputSchema: {
         topic: z.string().optional().describe('Only this topic (slug)'),
@@ -571,6 +573,7 @@ function defineTools(gym: Gym): ToolDef[] {
       },
     },
     async ({ topic, limit }) => {
+      if (!topic) return text(todaysReview(gym, limit));
       const fading = gym.topics.fading(topic);
       const upcoming = gym.topics.upcoming(7);
       if (fading.length === 0)
@@ -787,14 +790,19 @@ function defineTools(gym: Gym): ToolDef[] {
           .default('open')
           .describe('problem: solve it; explain: put it in your own words; recall: answer from memory; open: anything else'),
         concept: conceptParam,
+        also: z
+          .array(z.string().min(1))
+          .max(3)
+          .optional()
+          .describe('In a review: the other concepts ("topic/id") a prompt of several short parts tests, one per part after the first'),
         placeholder: z.string().optional().describe('Hint text shown in the empty box'),
         lead: leadParam,
       },
     },
-    async ({ prompt, kind, concept, placeholder, lead }, extra) => {
+    async ({ prompt, kind, concept, also, placeholder, lead }, extra) => {
       if (!gym.feed.session) return noSession();
       if (gym.feed.left) return error(`Not asked. ${movedText(gym)}`);
-      const unlearned = notYetLearned(gym, [concept]);
+      const unlearned = notYetLearned(gym, [concept, ...(also ?? [])]);
       if (unlearned) return error(unlearned);
       await showLead(gym, lead);
       const item = await gym.feed.add({
@@ -802,6 +810,7 @@ function defineTools(gym: Gym): ToolDef[] {
         kind,
         prompt,
         ...(concept ? { concept } : {}),
+        ...(concept && also?.length ? { also } : {}),
         ...(placeholder ? { placeholder } : {}),
       });
       const answered = await waitForLearner(gym, item.id, extra);
@@ -1261,10 +1270,26 @@ function roadmapContext(gym: Gym, slug: string): string {
     .join('');
 }
 
+/** Today's review queue, capped at DAILY_REVIEWS, with what waits for later days. */
+function todaysReview(gym: Gym, limit = 50): string {
+  const { today, later } = gym.topics.dueToday();
+  const wait = later
+    ? ` ${later} more are fading, over today's cap of ${DAILY_REVIEWS}: they wait for the next days, so leave them out.`
+    : '';
+  if (!today.length) {
+    const upcoming = gym.topics.upcoming(7);
+    return later
+      ? `Today's reviews are done (${DAILY_REVIEWS} a day).${wait}`
+      : `Nothing is fading. ${upcoming} concepts come due in the next 7 days.`;
+  }
+  return `${today.length} ${today.length === 1 ? 'concept' : 'concepts'} to review today:${wait}\n${today.slice(0, limit).map(formatFading).join('\n')}`;
+}
+
 /** One fading concept, with his estimated chance of recalling it. */
 function formatFading(f: FadingConcept): string {
   const last = f.lastPractised ? `, last practised ${f.lastPractised.slice(0, 10)}` : '';
-  return `- ${f.topic}/${f.id} "${f.label}" (${f.topicTitle}): recall ~${Math.round(f.recall * 100)}%, due since ${f.due.slice(0, 10)}${last}${f.summary ? `\n    ${f.summary}` : ''}`;
+  const mastered = f.mastered ? ' MASTERED (a one-line check is enough)' : '';
+  return `- ${f.topic}/${f.id} "${f.label}" (${f.topicTitle}): recall ~${Math.round(f.recall * 100)}%, due since ${f.due.slice(0, 10)}${last}${mastered}${f.summary ? `\n    ${f.summary}` : ''}`;
 }
 
 /** One map change, short: "added x (shaky)", "x unknown → solid". */
@@ -1298,5 +1323,6 @@ function formatQuiz(item: QuizItem, gym: Gym): string {
 
 /** His written answer as Claude reads it. */
 function formatAsk(item: AskItem): string {
-  return `They answered (${item.kind}${item.concept ? `, concept ${item.concept}` : ''}):\n\n${item.response ?? ''}`;
+  const concepts = [item.concept, ...(item.also ?? [])].filter(Boolean).join(', ');
+  return `They answered (${item.kind}${concepts ? `, ${item.also?.length ? 'concepts' : 'concept'} ${concepts}` : ''}):\n\n${item.response ?? ''}`;
 }

@@ -1,5 +1,6 @@
 // Unit tests for the pure pieces the end-to-end tests only reach indirectly: slugs (old ids must keep working),
-// the write queue that carries on after a failure, the append log that retries, the lean map, and the socket table.
+// the write queue that carries on after a failure, the append log that retries, the lean map, the socket table, and the
+// review scheduler's rules (replayed with scripts/review-replay.ts, as it replays his real history).
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -12,7 +13,9 @@ import { leanTopic } from '../server/topics.ts';
 import { pagesOf, stepMark } from '../ui/src/lib/steps.ts';
 import { escapeTablePipes } from '../ui/src/lib/tables.ts';
 import { Marked, type Tokens } from 'marked';
-import { LEAN_EVIDENCE, type PublicItem, type Session, type Topic } from '../shared/types.ts';
+import { becameSolid, gradeReview, isMastered } from '../server/reviews.ts';
+import { dueAt, replay, simulate, type HistoryEvent } from '../scripts/review-replay.ts';
+import { DAILY_REVIEWS, LEAN_EVIDENCE, reviewsToday, type Concept, type PublicItem, type Session, type Topic } from '../shared/types.ts';
 
 test('slugs: Latin titles keep the ids they always had; other scripts get ids of their own', () => {
   for (const title of ['Café au lait!', 'Differential forms', "Newton's laws", 'How the heart keeps time', 'Gödel']) {
@@ -183,4 +186,99 @@ test('hover terms, concept links, maths and code keep their "|" inside a table i
   assert.equal(tokens[0].raw.trim(), source.split('\n')[0]);
   assert.ok(escapeTablePipes(source).includes('```\n| {{not|a table}} |\n```'));
   assert.ok(escapeTablePipes(source).endsWith('A heading with {{a|term}}\n---'));
+});
+
+const DAY = 86_400_000;
+/** Noon on day `n` of a made-up history (noon, so no review falls near the 4 a.m. turn of the day). */
+const day = (n: number) => new Date(2026, 0, 1 + n, 12).getTime();
+const daysUntilDue = (due: string, from: number) => (Date.parse(due) - from) / DAY;
+
+test('reviews: a concept with a clean record goes away for longer each time, and soon for months', () => {
+  let at = day(0);
+  let card = becameSolid(undefined, new Date(at));
+  const gaps: number[] = [];
+  for (let i = 0; i < 4; i++) {
+    at = Date.parse(card.due);
+    card = gradeReview(card, 'right', new Date(at));
+    gaps.push(daysUntilDue(card.due, at));
+  }
+  // Fuzz moves each interval a little; the growth is what matters.
+  assert.ok(gaps[0]! >= 20, `after one clean review: ${gaps[0]} days`);
+  assert.ok(gaps[1]! >= 90, `after two: ${gaps[1]} days`);
+  assert.ok(gaps[2]! > gaps[1]! * 2, `after three: ${gaps[2]} days`);
+  assert.ok(isMastered(card));
+});
+
+test('reviews: a failed concept comes back within days, and only that one', () => {
+  const events: HistoryEvent[] = [
+    { at: day(0), concept: 't/a', kind: 'solid' },
+    { at: day(0), concept: 't/b', kind: 'solid' },
+    { at: day(5), concept: 't/a', kind: 'practice', outcome: 'right', review: true },
+    { at: day(5), concept: 't/b', kind: 'practice', outcome: 'wrong', review: true },
+    { at: day(5) + 300_000, concept: 't/b', kind: 'solid' }, // repaired in the same sitting
+  ];
+  const cards = replay(events);
+  assert.ok(daysUntilDue(cards.get('t/b')!.review!.due, day(5)) <= 2, 'the failed one is due again within two days');
+  assert.ok(daysUntilDue(cards.get('t/a')!.review!.due, day(5)) >= 20, 'the one he got is not');
+  assert.deepEqual(dueAt(cards, new Date(day(8))), ['t/b']);
+  assert.equal(cards.get('t/b')!.review!.lapses, 1);
+});
+
+test('reviews: one grade per concept per day, the worst', () => {
+  const start = becameSolid(undefined, new Date(day(0)));
+  const at = new Date(day(4));
+  const once = gradeReview(start, 'right', at);
+  // More answers the same day don't count again: a right one changes nothing, a partial one re-grades the day.
+  assert.equal(gradeReview(once, 'right', new Date(day(4) + 60_000)), once);
+  const partial = gradeReview(gradeReview(once, 'right', new Date(day(4) + 60_000)), 'partial', new Date(day(4) + 120_000));
+  assert.equal(partial.reps, once.reps);
+  assert.equal(partial.today, 'partial');
+  // A worse one re-grades the day from the morning's card: as if that were the day's only answer.
+  const slip = gradeReview(once, 'wrong', new Date(day(4) + 60_000));
+  const wrongOnly = gradeReview(start, 'wrong', new Date(day(4) + 60_000));
+  assert.equal(slip.reps, start.reps + 1);
+  assert.equal(slip.lapses, 1);
+  assert.equal(slip.stability, wrongOnly.stability);
+  // Becoming solid again after the repair, the same day, leaves the lapse's schedule alone.
+  assert.equal(becameSolid(slip, new Date(day(4) + 300_000)), slip);
+  // The next day is a new day.
+  assert.equal(gradeReview(slip, 'right', new Date(day(5))).reps, slip.reps + 1);
+  // Cards stored before these rules (no `today`) are graded as before.
+  const { today: _t, before: _b, ...old } = once;
+  assert.equal(gradeReview(old, 'right', new Date(day(4) + 60_000)).reps, once.reps + 1);
+});
+
+test('reviews: a day asks for at most DAILY_REVIEWS concepts, less those already reviewed', () => {
+  const now = day(30);
+  const fading = (n: number): Concept => ({
+    id: `c${n}`,
+    label: `C${n}`,
+    status: 'solid',
+    deps: [],
+    firstSeen: '',
+    updated: '',
+    evidence: [],
+    review: { due: new Date(now - DAY).toISOString(), stability: 3, difficulty: 5, scheduledDays: 3, reps: 2, lapses: 0, state: 2 },
+  });
+  const concepts = Array.from({ length: 10 }, (_, i) => fading(i));
+  assert.equal(reviewsToday(concepts, now), DAILY_REVIEWS);
+  const reviewed = (session: string): Concept => ({
+    ...fading(99),
+    review: { ...fading(99).review!, due: new Date(now + 20 * DAY).toISOString() },
+    evidence: [{ at: new Date(now - 3_600_000).toISOString(), session, kind: 'practice', result: 'right', practice: 'recall' }],
+  });
+  assert.equal(reviewsToday([...concepts, reviewed('2026-01-31-100000000-review')], now), DAILY_REVIEWS - 1);
+  assert.equal(
+    reviewsToday([...concepts, reviewed('2026-01-31-100000000-spaced-review')], now),
+    DAILY_REVIEWS,
+    'a lesson on a topic named so is no review',
+  );
+  assert.equal(reviewsToday(concepts.slice(0, 2), now), 2);
+});
+
+test('reviews: simulated months ahead stay under the daily cap', () => {
+  const days = simulate(new Map(), new Date(day(0)), 90, { learn: 2, seed: 7 });
+  assert.ok(days.every((d) => d.reviewed <= DAILY_REVIEWS));
+  const mean = days.slice(30).reduce((a, d) => a + d.reviewed, 0) / 60;
+  assert.ok(mean > 2 && mean <= DAILY_REVIEWS, `about ${mean.toFixed(1)} a day`);
 });

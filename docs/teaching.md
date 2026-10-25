@@ -17,7 +17,7 @@ flowchart LR
 ```
 
 - **teach** probes what the learner knows, plans the map of what depends on what, then teaches one reasoning step per `show`, checking each with `quiz` or `ask` before moving on. It ends with `end_session` and a handoff.
-- **review** practises concepts whose FSRS card says they are fading, by recall in writing, and records results with `record_practice`.
+- **review** practises today's share of the concepts whose FSRS card says they are fading (at most six a day), two or three per question, by recall in writing, and records results with `record_practice` ([Spaced review](#spaced-review)).
 - **train** gives problems just above their level and moves the topic's training level as they solve them cleanly.
 - **roadmap** plans an ordered path of topics with them (draft, then active), each step a topic.
 - **praxis** designs a mission that puts a finished step to work in their own life, and reviews their debrief.
@@ -70,6 +70,27 @@ These are in [`AGENTS.md`](../AGENTS.md) (which [`CLAUDE.md`](../CLAUDE.md) impo
 - **Fewer turns, sooner steps.** Each model turn costs the learner a second or more, while a tool call costs milliseconds, so the skills send calls that belong together in one message, in order: a step's `show` and then its `quiz` or `ask` (Claude Code runs a call as soon as its part of the message is written, so the step appears while the question is still being written); feedback's `show` and then the `update_map` or `record_practice` it implies; `get_topic` and `start_session` when continuing. Bookkeeping never takes a turn of its own.
 - **In the drawer, the tutor runs as a lesson needs** ([`agents.ts`](../server/agents.ts)): Claude Code never moves `quiz` and `ask` to the background after two minutes (`CLAUDE_CODE_MCP_AUTO_BACKGROUND_MS=0`) and has the core tools loaded up front instead of through tool search (the bridge tells the server it serves the drawer); and starting a new sitting from the interface clears the previous sitting's context first (`/clear`, Codex's and opencode's `/new`, a new conversation for the API tutor), unless one is in progress: open and active in the last 15 minutes. A review can be of everything fading, of one class (`/review <topic>`) or of one concept (`/review <topic>/<concept>`, from the concept's own page); it happens on its own page, Review, like a training set on its own, so Home stays the dashboard.
 - **Sittings are action based**: nothing has to be stopped. Leaving the app is pausing; a sitting left longer than 15 minutes is no longer going on, and the next one to start closes it (with no handoff, since nobody wrote one). Answering a question it left starts it again from what is saved, so coming back is always one action.
+
+## Spaced review
+
+Every concept that becomes solid gets an FSRS card ([`reviews.ts`](../server/reviews.ts), with [ts-fsrs](https://github.com/open-spaced-repetition/ts-fsrs) and its default FSRS-6 weights). When the card's due date passes the concept is fading, and a review asks for it. The rules around the card are there so reviews stay a small part of his time:
+
+- **The algorithm is FSRS**, not a simpler ease-based one like SM-2. It models how stable each memory is and how hard each concept is, so a clean recall grows the interval fast (3, then 14, 57 and 196 days for a run of clean recalls at 0.9) and a lapse brings back only that concept. An ease-based scheduler grows by a fixed factor and gets stuck in "ease hell" after a few hard answers. The weights are FSRS's defaults: his history has a few dozen reviews, and fitting weights needs hundreds.
+- **Retention 0.85, not 0.9.** These are written checks on ideas, and a slip gets repaired on the spot. In the replay below, 0.85 asks for about a quarter fewer reviews than 0.9 (learning two concepts a day, 6.9 reviews a day uncapped down to 5.2), with failed recalls going from about 12% to 16%.
+- **One grade per concept per day, the worst one** (`gradeReview`). A second result on the same day moves the card only when it is worse, and then the day is graded again from the card as it was that morning. Becoming solid again after a repair the same day leaves the card where the lapse put it. Before this, three questions on one concept in a sitting counted as three reviews: a partial, a wrong and a right in a few minutes took a concept from weeks of stability to under two days, and the repair counted once more on top.
+- **At most `DAILY_REVIEWS` (6) concepts a day**, lowest recall first, less what review sessions already practised that day (`reviewsToday` in [`types.ts`](../shared/types.ts), `dueToday` in [`topics.ts`](../server/topics.ts)). The rest wait: FSRS takes a late review in its stride, and one recalled late grows more. `start_session` (review), `due_reviews` without a topic, Home, the ribbon and the Review page all show today's share. A review of one class or one concept asked for by name is not capped. Progress still shows everything fading.
+- **Mastered**: stable for 30 days or more, with a clean last review. The review list marks it, and the skill gives it a one-line check.
+- **The `review` skill keeps it short**: two or three concepts per `ask` (`concept` and `also`), or one quiz for light checks; one question per concept; "right" when the core is there, so a detail left out isn't graded Hard (Hard barely grows the interval: 2, 4, 9, 15 days in a row); feedback a line when right; a repair only for a wrong one. The `teach` skill's opening check only looks at fading concepts the next step rests on.
+
+The numbers come from [`scripts/review-replay.ts`](../scripts/review-replay.ts), which rebuilds every grade in a data folder from the session logs and the practice results (read-only), replays them through the scheduler, then simulates days ahead. In each simulated day he learns new concepts, reviews what the cap allows, recalls each with the chance FSRS gives, gets "partial" half the time he recalls (as in his reviews so far) and repairs a failure on the spot. Measured on a real history of three weeks (17 concepts with cards, 21 graded reviews), "before" being the rules until this change:
+
+| | before | after |
+|---|---|---|
+| Reviews a day, 90 days ahead, 1 new concept a day | 3.6 (worst day 12) | 2.8 (worst day 6) |
+| Reviews a day, 90 days ahead, 2 new concepts a day | 6.6 (worst day 20) | 4.8 (worst day 6) |
+| Due on the history's last day, replayed | 5 | 2 |
+
+Tried and rejected: giving a concept that went to solid with a clean lesson record a longer first interval (an Easy first grade). In his history, clean ones did no better at their first review (2 right, 5 partial) than ones that had been shaky (4 right, 2 partial). Not done: rewriting the cards already stored with the new rules. That would rewrite his history; the old cards follow the new rules from their next review on.
 
 ## Changing the method
 
