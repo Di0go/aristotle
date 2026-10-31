@@ -125,9 +125,10 @@ async function shoot(page: Page, base: string, route: string): Promise<{ png: Bu
     content:
       '*,*::before,*::after{animation:none!important;transition:none!important;caret-color:transparent!important}' +
       '.mobile-search svg{visibility:hidden!important}' +
-      // A live explorable (the beating heart) runs on the clock: its trace and numbers depend on how long it has been
-      // open, on both sides alike. Hidden from the picture and the text; the figure's place and size still count.
-      'figure.explorable{visibility:hidden!important}' +
+      // The one live explorable that runs on the clock (the beating heart, HeartRate.svelte, requestAnimationFrame):
+      // its trace and numbers depend on how long it has been open, on both sides alike. Hidden from the picture; its
+      // place and size still count, and every other explorable is compared whole.
+      'figure.explorable.heart{visibility:hidden!important}' +
       '@media (max-width: 640px){.statusline{gap:10px!important}}',
   });
   await page.mouse.move(0, 0);
@@ -191,6 +192,63 @@ const OPENINGS: [name: string, wide: boolean, open: (page: Page) => Promise<void
       await p.waitForTimeout(1500);
     },
   ],
+  // Hover cards, on the first step of the first class that has each kind (none: nothing is hovered, on both sides).
+  ...(['.concept-link, main [data-concept]', '.term[data-def]', '.gloss[data-gloss]'] as const).map(
+    (selector, i): [string, boolean, (page: Page) => Promise<void>] => [
+      ['a concept, hovered', 'a term, hovered', 'a gloss, hovered'][i] ?? '',
+      true,
+      async (p) => {
+        const origin = new URL(p.url()).origin;
+        const topics = (await (await fetch(`${origin}/api/topics`)).json()) as { slug: string }[];
+        for (const t of topics) {
+          for (const step of [1, 2, 3]) {
+            await p.goto(`${origin}/#/lesson/${encodeURIComponent(t.slug)}/${step}`);
+            await p.waitForTimeout(800);
+            const target = p.locator(selector).first();
+            if (await target.count()) {
+              await target.scrollIntoViewIfNeeded();
+              await target.hover();
+              await p.waitForTimeout(700);
+              return;
+            }
+          }
+        }
+      },
+    ],
+  ),
+  [
+    // The chat beside a lesson, on the bench of the first class's first step: its empty state and its box.
+    'the chat beside a lesson',
+    true,
+    async (p) => {
+      const origin = new URL(p.url()).origin;
+      const [first] = (await (await fetch(`${origin}/api/topics`)).json()) as { slug: string }[];
+      if (!first) return;
+      // From an empty chat each time: a message sent on an earlier look (or in the other scheme) would still be there.
+      await fetch(`${origin}/api/chats/${encodeURIComponent(first.slug)}`, { method: 'DELETE', headers: { Origin: origin } });
+      await p.goto(`${origin}/#/lesson/${encodeURIComponent(first.slug)}/1`);
+      await p.getByRole('tab', { name: 'Chat' }).click();
+      await p.waitForTimeout(800);
+    },
+  ],
+  [
+    // A message in that chat: `cat` answers in Claude Code's place, so the answer is the request itself (where he is,
+    // what is on his screen, the step, his message): the same text on both sides means the same request.
+    'a message in the chat beside a lesson',
+    true,
+    async (p) => {
+      const origin = new URL(p.url()).origin;
+      const [first] = (await (await fetch(`${origin}/api/topics`)).json()) as { slug: string }[];
+      if (!first) return;
+      // From an empty chat each time: a message sent on an earlier look (or in the other scheme) would still be there.
+      await fetch(`${origin}/api/chats/${encodeURIComponent(first.slug)}`, { method: 'DELETE', headers: { Origin: origin } });
+      await p.goto(`${origin}/#/lesson/${encodeURIComponent(first.slug)}/1`);
+      await p.getByRole('tab', { name: 'Chat' }).click();
+      await p.getByRole('textbox', { name: 'Message Aristotle' }).fill('What does this step say?');
+      await p.keyboard.press('Enter');
+      await p.waitForTimeout(2500);
+    },
+  ],
   [
     // The tutor on a model API in the drawer: its introduction and its message box (the API answers nothing: a closed
     // local port; nothing is sent). Settings are put back to Claude Code after, on both sides alike.
@@ -225,9 +283,34 @@ const OPENINGS: [name: string, wide: boolean, open: (page: Page) => Promise<void
 ];
 
 /** What may differ once opened, with why. */
-const OPENED_ALLOWED: Record<string, string> = {
+/** What may differ in its pixels once opened, the text the same, with why. */
+const OPENED_PIXELS: Record<string, string> = {
+  // 29/n: the core's hover card (Galen's, docs/plano.md step 3: what Aristotle gains).
+  'a concept, hovered': "the core's hover card: 300 px wide for a concept, its padding and type",
+  'a term, hovered': "the core's hover card: as wide as its definition up to 320 px, a paragraph per blank line",
+  'a gloss, hovered': "the core's hover card: 300 px wide for a gloss, its padding and type",
+  // 30/n, written after the run that showed it (looked at: two zoomed shots, the same words): the core's chat writes its
+  // empty hint as two text nodes ("…what you're reading" and "; tag…"), so the kerning between "g" and ";" differs.
+  'the chat beside a lesson': 'the empty hint is two text nodes in the core, which shifts the antialiasing of "reading;" (under 50 px)',
+  // Written after the run that showed it, the second of the two written so (looked at: both shots cropped and
+  // enlarged, the same words in the same places): 2-25 pixels of antialiasing scattered over the answer, on the demo,
+  // in one scheme or the other from run to run. Capped at 30 pixels, and the text must be the same.
+  'a message in the chat beside a lesson': 'antialiasing scattered over the answer, the same words in the same places (30 px at most)',
   // 11/n: the core's accents (shared/accents.ts), which Appearance lists.
   appearance: "the core's accents: green, new to Aristotle, first in the row; red's swatch the crimson",
+};
+/** Of OPENED_PIXELS, those whose pixels are capped: more than this many is a difference, whatever the reason says. */
+const PIXEL_CAP: Record<string, number> = { 'the chat beside a lesson': 50, 'a message in the chat beside a lesson': 30 };
+/**
+ * Of OPENED_PIXELS, those whose text may differ, and only so: the new side's text with what was added taken out must
+ * be the reference's. Anything else in the text is a difference.
+ */
+const OPENED_TEXT: Record<string, (ref: string, now: string) => boolean> = {
+  appearance: (ref, now) =>
+    now
+      .split('\n')
+      .filter((l) => l.trim() !== 'Green')
+      .join('\n') === ref,
 };
 
 /** Home, then `open`, settled: its picture and text. Focus mode is left again after, as he would. */
@@ -235,6 +318,10 @@ async function opened(page: Page, base: string, open: (page: Page) => Promise<vo
   const home = await shoot(page, base, '#/');
   void home;
   await open(page);
+  // An opening may load another page, which has its animations and transitions on again: off, as in shoot().
+  await page.addStyleTag({
+    content: '*,*::before,*::after{animation:none!important;transition:none!important;caret-color:transparent!important}',
+  });
   await page.waitForTimeout(400);
   // Settled: what opened may still be filling in (the library loads its list); the same text twice in a row, 300 ms
   // apart, up to 3 s, on both sides alike.
@@ -259,6 +346,7 @@ async function opened(page: Page, base: string, open: (page: Page) => Promise<vo
   await page.evaluate(() => {
     try {
       localStorage.removeItem('aristotle.focus');
+      localStorage.removeItem('aristotle.bench-tab');
     } catch {}
     document.documentElement.classList.remove('focus');
   });
@@ -320,6 +408,8 @@ try {
   let different = 0;
   const glyphs = new Set<string>();
   let glyphAllowed = 0;
+  /** Openings that needed more looks: printed, so many of them are seen. */
+  let looked = 0;
   let glyphDifferent = 0;
   for (const [vw, vh, label] of [
     [1600, 1000, 'wide'],
@@ -401,15 +491,29 @@ try {
           let [ra, rb] = [await opened(pa, a.base, open), await opened(pb, b.base, open)];
           let pixels = await differ(pa, ra.png, rb.png);
           // What opens may still be loading when it is shot (the A/A saw it once on each of two runs, never twice in a
-          // row): one more look on both sides, said in the output. A real difference is there both times.
+          // row): two more looks on both sides, said in the output and counted. They pass only if each side shows the
+          // same thing both times (it had settled) and the two sides agree: a difference that comes and goes is not
+          // hidden, it fails as unsettled.
           let second = '';
           if (pixels !== 0 || ra.text !== rb.text) {
+            const [a2, b2] = [await opened(pa, a.base, open), await opened(pb, b.base, open)];
             [ra, rb] = [await opened(pa, a.base, open), await opened(pb, b.base, open)];
-            pixels = await differ(pa, ra.png, rb.png);
-            second = ' (on a second look)';
+            // Steady: the same text, and the same pixels, or within the opening's cap where it has one (its
+            // antialiasing moves between two looks on one side as it does between the sides).
+            const jitter = PIXEL_CAP[what] ?? 0;
+            const steady =
+              (await differ(pa, a2.png, ra.png)) <= jitter &&
+              a2.text === ra.text &&
+              (await differ(pa, b2.png, rb.png)) <= jitter &&
+              b2.text === rb.text;
+            pixels = steady ? await differ(pa, ra.png, rb.png) : -1;
+            second = steady ? ' (on two more looks, steady)' : ' (UNSETTLED: a side changed between two more looks)';
+            looked++;
           }
           const ok = pixels === 0 && ra.text === rb.text;
-          const why = OPENED_ALLOWED[what];
+          const textOk = ra.text === rb.text || (OPENED_TEXT[what]?.(ra.text, rb.text) ?? false);
+          const capOk = PIXEL_CAP[what] === undefined || pixels <= PIXEL_CAP[what];
+          const why = pixels !== -1 && textOk && capOk ? OPENED_PIXELS[what] : undefined;
           if (ok) same++;
           else if (why) allowed++;
           else different++;
@@ -446,6 +550,7 @@ try {
   if (out.lopsided) different++;
   console.log(`\n${out.line}; browser requests off the servers, refused: a ${blocked.a}, b ${blocked.b}`);
   if (blocked.a !== blocked.b) different++;
+  console.log(`openings that needed two more looks: ${looked}`);
   console.log(`\npages: ${list.length}, in every look on two screens; same ${same}, allowed ${allowed}, different ${different}`);
   code = different ? 1 : 0;
   console.log(code ? 'DIFFERENT' : 'SAME');

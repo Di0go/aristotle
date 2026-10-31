@@ -9,16 +9,18 @@
 //   node scripts/proofs/differential.ts --data <folder>     another copy (the demo library, for data not used to build)
 //   node scripts/proofs/differential.ts --ref <ref>         against another commit than main
 //
-// What may differ, and why, is listed in ALLOWED below, each with its reason, written before the run that needs it:
-// anything else is a failure. Both servers run as live instances (TLS on a throwaway certificate, no backup), on free
-// ports, in a private temp folder deleted at the end; the reference runs from a throwaway git worktree. Hermetic: both
+// What may differ, and why, is listed in CUTS (a field added, cut from both sides and required on the new one) and
+// EXACT (an answer that is now the core's, given exactly) below, each with its reason, written before the run that
+// needs it: anything else is a failure. Times written during the run are blanked; a review card's due date is compared
+// as its interval from the review that set it. Both servers run as live instances (TLS on a throwaway certificate, no
+// backup), on free ports, in a private temp folder deleted at the end; the reference runs from a throwaway git worktree. Hermetic: both
 // reach the outside only through a proxy that refuses every call, and a call made by one side only is a difference.
 // Nothing of the checkout's data/ is read.
 
 import { createHash } from 'node:crypto';
 import { execFileSync, spawn, spawnSync, type ChildProcess } from 'node:child_process';
 import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs';
-import { get as httpGet } from 'node:http';
+import { get as httpGet, request as httpRequest } from 'node:http';
 import net from 'node:net';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -42,53 +44,114 @@ if (source === path.join(ROOT, 'data')) throw new Error('Never the real data/: c
  * Differences that are expected, by step name, each with its reason. A step listed here is reported as "allowed",
  * not "same": the list is what the migration changed on purpose, and docs/plano.md says it.
  */
-const ALLOWED: Record<string, string> = {
-  // 26/n: the server is the core's serve().
-  health: 'the core says which app and which commit it is too (app: "aristotle", commit), so a release can tell a new server from the old',
-  'host own name': '/api/health, reached by the clean name, says app and commit too',
-  state: "/api/state carries the interface's build too, so a page loads a new release on its own",
-  'state in sitting': "/api/state carries the interface's build too",
-  'state after': "/api/state carries the interface's build too",
-  'gloss not json': 'a body that is not JSON is the core\'s 400, "Not JSON", not the route\'s own message',
-  'gloss too big': 'a body over 1 MB is the core\'s 413, "Body too large", not a 400',
-  'chat not json': 'a body that is not JSON is the core\'s 400, "Not JSON", not the route\'s own message',
-  // 13/n: the method tool comes from the core's createMethod, which ends its description in its own words.
-  'mcp tools': "the method tool's description ends 'Without `name`, lists the routines.' (the core's), where main said 'lists them'",
-  // 11/n
-  index: "index.html tells the core's theme-boot.js Aristotle's key, default accent and old key (data-key, data-accent, data-legacy)",
-  route: "index.html tells the core's theme-boot.js Aristotle's key, default accent and old key (data-key, data-accent, data-legacy)",
-  traversal: "index.html tells the core's theme-boot.js Aristotle's key, default accent and old key (data-key, data-accent, data-legacy)",
+// (Nothing is allowed by step any more: what changed on purpose is cut field by field, in CUTS, or given exactly, in
+// EXACT, below. 13/n: the method tool's description ends in the core's words, 'Without `name`, lists the routines.'
+// where main said 'lists them': the 'mcp tools' step sets aside that sentence alone.)
+
+/** This checkout's commit: what the core's /api/health must say it runs. */
+const HEAD = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: ROOT, encoding: 'utf8' }).trim();
+
+/**
+ * Allowed differences scoped to what the migration added, never the whole answer: the fields (JSON keys, or patterns
+ * in a page) are cut from both sides' bodies before the rest is compared, and the new side must have every one of
+ * them, with the value given where there is one. Each with its reason, written before the run that needs it.
+ */
+interface Cut {
+  why: string;
+  keys?: Record<string, (v: unknown) => boolean>;
+  patterns?: RegExp[];
+}
+// normalise() has already written a build's name ([\w-]+, the interface's own) as <build>: anything else stays.
+const isBuild = (v: unknown) => v === '<build>';
+// 26/n: the server is the core's serve().
+const HEALTH: Cut = {
+  why: 'the core says which app and which commit it is too, so a release can tell a new server from the old',
+  keys: { app: (v) => v === 'aristotle', commit: (v) => v === HEAD },
+};
+const STATE: Cut = {
+  why: "/api/state carries the interface's build too, so a page loads a new release on its own",
+  keys: { build: isBuild },
+};
+// 11/n: the page the server hands for any route of the interface.
+const PAGE: Cut = {
+  why: "index.html tells the core's theme-boot.js Aristotle's key, default accent and old key",
+  patterns: [/ data-key="aristotle\.look"/, / data-accent="blue"/, / data-legacy="mind-gym\.look"/],
+};
+const CUTS: Record<string, Cut> = {
+  health: HEALTH,
+  'host own name': HEALTH,
+  state: STATE,
+  'state in sitting': STATE,
+  'state after': STATE,
+  index: PAGE,
+  route: PAGE,
+  traversal: PAGE,
 };
 
 /**
- * Of the allowed steps, those where only what the body says may differ: the status, the security headers, the
- * content type and any redirect must still be the same (a raw-Host step's status too).
+ * Answers that changed on purpose to the core's, by step: the new side must give exactly this (status and body, a
+ * body with no learner data in it), and the reference whatever it gave before, with the same status class.
  */
-const BODY_ONLY = new Set([
-  'index',
-  'route',
-  'traversal',
-  'health',
-  'host own name',
-  'state',
-  'state in sitting',
-  'state after',
-  'gloss not json',
-  'chat not json',
-]);
+const EXACT: Record<string, { why: string; status: number; body: string }> = {
+  // 26/n: the core reads every JSON body (readJson), with its own two errors.
+  'gloss not json': { why: 'a body that is not JSON is the core\'s 400, "Not JSON"', status: 400, body: '{"error":"Not JSON"}' },
+  'gloss too big': {
+    why: 'a body over 1 MB is the core\'s 413, "Body too large", not a 400',
+    status: 413,
+    body: '{"error":"Body too large"}',
+  },
+  'chat not json': { why: 'a body that is not JSON is the core\'s 400, "Not JSON"', status: 400, body: '{"error":"Not JSON"}' },
+};
 
-/** A step's result without its body: what must still match on a BODY_ONLY step. */
-function withoutBody(r: unknown): unknown {
-  if (typeof r === 'string') return r.split(' ')[0];
-  if (r && typeof r === 'object' && 'body' in r) return { ...(r as Record<string, unknown>), body: undefined };
-  return r;
+/** Cuts a step's fields out of a body, both sides alike; which of them were there. */
+function cutFields(text: string, cut: Cut | undefined): { text: string; found: string[] } {
+  if (!cut) return { text, found: [] };
+  const found: string[] = [];
+  if (cut.keys) {
+    try {
+      const obj = JSON.parse(text) as Record<string, unknown>;
+      for (const [k, ok] of Object.entries(cut.keys))
+        if (k in obj) {
+          found.push(ok(obj[k]) ? k : `${k}=wrong`);
+          delete obj[k];
+        }
+      text = JSON.stringify(obj);
+    } catch {}
+  }
+  for (const p of cut.patterns ?? []) {
+    if (p.test(text)) found.push(p.source);
+    text = text.replace(p, '');
+  }
+  return { text, found };
 }
+const expected = (cut: Cut) => [...Object.keys(cut.keys ?? {}), ...(cut.patterns ?? []).map((p) => p.source)];
 
 const hash = (v: unknown) =>
   createHash('sha256')
     .update(typeof v === 'string' ? v : JSON.stringify(v))
     .digest('hex')
     .slice(0, 12);
+
+/** When this run started: a time before it comes from the copied data, the same on both sides, and is compared. */
+const RUN_START = Date.now();
+
+/**
+ * Times in a body: one written during the run (when something was saved) is blanked, one from the copied data is
+ * kept as it is. A review card's due date is compared as what FSRS decided, its distance from the review that set it
+ * (to the millisecond: both are the same instant on one side), so a different schedule is a difference.
+ */
+function times(text: string): string {
+  const ISO = /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})?/;
+  const card = new RegExp(`("due"\\s*:\\s*")(${ISO.source})("[^{}]*?"last"\\s*:\\s*")(${ISO.source})"`, 'g');
+  // Stability and difficulty depend on the time since the last review, and the two sides are asked a few milliseconds
+  // apart (an A/A run differed there, in the 12th digit): compared to 9 significant digits, which any change of rule
+  // shows and a few milliseconds over days does not.
+  const digits = /("(?:stability|difficulty)"\s*:\s*)(-?\d+(?:\.\d+)?(?:e[+-]?\d+)?)/g;
+  return text
+    .replace(digits, (_m, k, n: string) => `${k}${Number(n).toPrecision(9)}`)
+    .replace(card, (_m, a, due: string, b, last: string) => `${a}<last+${Date.parse(due) - Date.parse(last)}ms>${b}${last}"`)
+    .replace(new RegExp(ISO.source, 'g'), (t) => (Date.parse(t) < RUN_START ? t : '<time>'));
+}
 
 /** Today, in Lisbon, as the server names a sitting. */
 const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Lisbon' }).format(new Date());
@@ -188,12 +251,15 @@ function normalise(side: Side, text: string): string {
       .replaceAll(side.root, '<root>')
       .replaceAll(String(side.port), '<port>')
       .replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/g, '<id>')
-      .replace(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})?/g, '<time>')
+      .replace(/[\s\S]*/, (t) => times(t))
       // A sitting started now is named by the moment it started, to the millisecond: one per side.
       .replaceAll(`${today}-`, '<today>-')
       .replace(/<today>-\d{9}/g, '<today>-<ms>')
       .replace(/"pid":\d+/g, '"pid":0')
       // Which build the interface is (its file names) changes with any change to it: what the build says is compared.
+      // Which chunks the page preloads is how Vite splits the code (main's build has one more vendor chunk), not what
+      // the page does: the UI differential compares what it does. The stylesheets and the entry stay compared.
+      .replace(/\s*<link rel="modulepreload"[^>]*>/g, '')
       .replace(/assets\/[\w.-]+/g, 'assets/<file>')
       .replace(/"build":"[\w-]+"/g, '"build":"<build>"')
   );
@@ -205,40 +271,82 @@ interface Req {
   body?: unknown;
   headers?: Record<string, string>;
   raw?: string;
+  /** The step's name, for its cut fields (CUTS) or its exact answer (EXACT). */
+  step?: string;
+  /**
+   * On a connection of its own, closed after: a server that refuses an oversized body may close the connection it
+   * came on, and the next request must not depend on how each side does that.
+   */
+  alone?: boolean;
 }
 
 async function request(side: Side, r: Req) {
   const headers: Record<string, string> = { ...(r.headers ?? {}) };
   if (r.body !== undefined || r.raw !== undefined) headers['Content-Type'] ??= 'application/json';
+  const payload = r.raw ?? (r.body === undefined ? undefined : JSON.stringify(r.body));
   const send = () =>
-    fetch(`${side.base}${r.path}`, {
-      method: r.method ?? 'GET',
-      headers,
-      body: r.raw ?? (r.body === undefined ? undefined : JSON.stringify(r.body)),
-      redirect: 'manual',
-    });
+    r.alone
+      ? alone(side, r.method ?? 'GET', r.path, headers, payload)
+      : fetch(`${side.base}${r.path}`, { method: r.method ?? 'GET', headers, body: payload, redirect: 'manual' });
   // A server that refused an oversized body closes that connection, and fetch may reuse it for the next request: one
   // retry on a new connection. A server that is down fails twice.
+  // Said in the result, so a retry on one side only is a difference, never hidden.
+  let retried = false;
   const res = await send().catch(async () => {
+    retried = true;
     await new Promise((r) => setTimeout(r, 200));
     return send();
   });
   const type = (res.headers.get('content-type') ?? '').replace(/;\s*charset=utf-8/i, '');
-  const body = normalise(side, await res.text());
+  const { text: body, found } = cutFields(normalise(side, await res.text()), CUTS[r.step ?? '']);
   if (args.includes('--show')) shown.set(`${side.name} ${r.method ?? 'GET'} ${r.path}`, body);
   const security = ['content-security-policy', 'x-frame-options', 'x-content-type-options', 'referrer-policy', 'cross-origin-opener-policy']
     .map((h) => `${h}=${res.headers.get(h)}`)
     .join(' ');
-  return { status: res.status, type, body: hash(body), security: hash(normalise(side, security)), location: res.headers.get('location') };
+  const exact = r.step && EXACT[r.step] ? { plain: body } : {};
+  return {
+    status: res.status,
+    type,
+    body: hash(body),
+    security: hash(normalise(side, security)),
+    location: res.headers.get('location'),
+    ...(retried ? { retried } : {}),
+    ...(CUTS[r.step ?? ''] ? { found } : {}),
+    ...exact,
+  };
+}
+
+/** One request on a socket of its own (no keep-alive), answered as a Response, as fetch would. */
+function alone(side: Side, method: string, route: string, headers: Record<string, string>, body?: string): Promise<Response> {
+  return new Promise((resolve, reject) => {
+    const req = httpRequest(
+      { host: '127.0.0.1', port: side.port, path: route, method, agent: false, headers: { ...headers, Host: `localhost:${side.port}` } },
+      (res) => {
+        const chunks: Buffer[] = [];
+        res.on('data', (d: Buffer) => chunks.push(d));
+        res.on('end', () => {
+          const h = new Headers();
+          for (const [k, v] of Object.entries(res.headers)) if (typeof v === 'string') h.set(k, v);
+          resolve(new Response(Buffer.concat(chunks), { status: res.statusCode, headers: h }));
+        });
+      },
+    );
+    // The server may answer before it has read the whole body, and close: the answer is what counts.
+    req.on('error', reject);
+    req.end(body);
+  });
 }
 
 /** A request with a Host of its own choosing, as a rebound DNS name would send (fetch never lets one be set). */
-function rawHost(side: Side, host: string): Promise<string> {
+function rawHost(side: Side, host: string, step?: string): Promise<string> {
   return new Promise((resolve) => {
     httpGet({ host: '127.0.0.1', port: side.port, path: '/api/health', headers: { Host: host } }, (res) => {
       let body = '';
       res.on('data', (d) => (body += d));
-      res.on('end', () => resolve(`${res.statusCode} ${hash(normalise(side, body))}`));
+      res.on('end', () => {
+        const cut = cutFields(normalise(side, body), CUTS[step ?? '']);
+        resolve(`${res.statusCode} ${hash(cut.text)}${CUTS[step ?? ''] ? ` found ${cut.found.join(',')}` : ''}`);
+      });
     }).on('error', (e) => resolve(`error ${e.message}`));
   });
 }
@@ -318,6 +426,30 @@ const tool =
     return { error: Boolean((r as { isError?: boolean }).isError), text: hash(normalise(side, textOf(r))) };
   };
 
+/**
+ * The tools a client is given, hashed. The one sentence the core words its own way (13/n) is set aside, and checked
+ * to be main's words on the reference and the core's on the new side; nothing else of any tool may differ.
+ */
+async function toolsOf(s: Side, client: Client) {
+  const { tools } = await client.listTools();
+  const method = tools.find((t) => t.name === 'method');
+  const ending = /Without `name`, lists (them|the routines)\.$/;
+  const said = method?.description?.match(ending)?.[1];
+  if (method?.description) method.description = method.description.replace(ending, '<lists>');
+  const words = method ? said === (s.name === 'ref' ? 'them' : 'the routines') : 'no method';
+  return { count: tools.length, names: hash(tools.map((t) => t.name)), all: hash(tools), words };
+}
+
+/**
+ * An MCP client as a bridge started before the move to the core connects: X-Aristotle-Agent and X-Aristotle-Client,
+ * as the checkout's .mcp.json of a live session still says. The core's server reads X-Organon-*: the app maps the old.
+ */
+async function oldBridge(s: Side, headers: Record<string, string>) {
+  const client = new Client({ name: 'old-bridge', version: '0' });
+  await client.connect(new StreamableHTTPClientTransport(new URL(`${s.base}/mcp`), { requestInit: { headers } }));
+  return client;
+}
+
 /** The newest item of `type` in the open sitting, from /api/state: what an answer is sent to. */
 async function lastItem(side: Side, type: string): Promise<string | undefined> {
   const state = (await (await fetch(`${side.base}/api/state`)).json()) as { session?: { items?: { id: string; type: string }[] } };
@@ -330,10 +462,20 @@ async function steps(ref: Side): Promise<Step[]> {
   const roadmaps = (await (await fetch(`${ref.base}/api/roadmaps`)).json()) as { slug?: string; id?: string }[];
   const sessions = (await (await fetch(`${ref.base}/api/sessions`)).json()) as { id: string }[];
   const topic = topics[0]?.slug ?? 'nope';
-  const http = (name: string, r: Req): Step => ({ name, run: (s) => request(s, r) });
+  // Solid concepts of the copied data that carry a review card: practised, each moves its card (FSRS), which the files
+  // compared at the end then hold. Their ids only, never what they say.
+  const solid: string[] = [];
+  for (const f of readdirSync(path.join(ref.dataDir, 'topics')).filter((f) => f.endsWith('.json'))) {
+    const t = JSON.parse(readFileSync(path.join(ref.dataDir, 'topics', f), 'utf8')) as {
+      slug: string;
+      concepts?: { id: string; status?: string; review?: unknown }[];
+    };
+    for (const c of t.concepts ?? []) if (c.status === 'solid' && c.review && solid.length < 3) solid.push(`${t.slug}/${c.id}`);
+  }
+  const http = (name: string, r: Req): Step => ({ name, run: (s) => request(s, { ...r, step: name }) });
   const NEW = 'differential-topic';
   return [
-    { name: 'health', run: async (s) => request(s, { path: '/api/health' }) },
+    http('health', { path: '/api/health' }),
     http('state', { path: '/api/state' }),
     http('topics', { path: '/api/topics' }),
     ...topics.slice(0, 3).map((t, i) => http(`topic ${i}`, { path: `/api/topics/${encodeURIComponent(t.slug)}` })),
@@ -365,14 +507,14 @@ async function steps(ref: Side): Promise<Step[]> {
     http('traversal', { path: '/..%2f..%2fetc/passwd' }),
     http('bad escape', { path: '/%E0%A4%A' }),
     { name: 'host other', run: (s) => rawHost(s, 'evil.test') },
-    { name: 'host own name', run: (s) => rawHost(s, 'aristotle.test') },
+    { name: 'host own name', run: (s) => rawHost(s, 'aristotle.test', 'host own name') },
     http('origin other', { path: '/api/health', headers: { Origin: 'http://evil.test' } }),
     http('cross site', { path: '/api/health', headers: { 'Sec-Fetch-Site': 'cross-site' } }),
     http('mcp get', { path: '/mcp' }),
     http('presence', { method: 'POST', path: '/api/presence', body: {} }),
     http('text body', { method: 'POST', path: '/api/glosses', raw: '{}', headers: { 'Content-Type': 'text/plain' } }),
     http('gloss not json', { method: 'POST', path: '/api/glosses', raw: '{"text": 3,' }),
-    http('gloss too big', { method: 'POST', path: '/api/glosses', raw: JSON.stringify({ text: 'x'.repeat(1_100_000) }) }),
+    http('gloss too big', { method: 'POST', path: '/api/glosses', raw: JSON.stringify({ text: 'x'.repeat(1_100_000) }), alone: true }),
     http('gloss empty', { method: 'POST', path: '/api/glosses', body: {} }),
     http('answer no id', { method: 'POST', path: '/api/answer', body: {} }),
     http('answer unknown', { method: 'POST', path: '/api/answer', body: { id: 'nope', text: 'x' } }),
@@ -389,7 +531,7 @@ async function steps(ref: Side): Promise<Step[]> {
     http('settings key', {
       method: 'PUT',
       path: '/api/settings',
-      body: { api: { apiKey: 'sk-test-0123456789', baseUrl: 'http://localhost:11434/v1/' } },
+      body: { api: { apiKey: 'sk-test-0123456789', baseUrl: 'http://127.0.0.1:9/v1/' } },
     }),
     http('settings models', { path: '/api/settings/models' }),
     http('settings back', { method: 'PUT', path: '/api/settings', body: { tutor: 'claude', helpers: 'oneshot' } }),
@@ -399,8 +541,24 @@ async function steps(ref: Side): Promise<Step[]> {
     {
       name: 'mcp tools',
       run: async (s) => {
-        const { tools } = await s.mcp!.listTools();
-        return { count: tools.length, names: hash(tools.map((t) => t.name)), all: hash(tools) };
+        return toolsOf(s, s.mcp!);
+      },
+    },
+    {
+      // An old bridge for the drawer and another agent: the drawer's core tools always loaded, the agent's method and
+      // instructions. Only if X-Aristotle-Client and X-Aristotle-Agent are read.
+      name: 'old bridge: drawer + agent',
+      run: async (s) => {
+        const c = await oldBridge(s, { 'X-Aristotle-Client': 'drawer', 'X-Aristotle-Agent': 'codex' });
+        try {
+          const tools = await toolsOf(s, c);
+          const loaded = (await c.listTools()).tools.filter(
+            (t) => (t._meta as Record<string, unknown> | undefined)?.['anthropic/alwaysLoad'],
+          ).length;
+          return { ...tools, loaded, instructions: hash(normalise(s, c.getInstructions() ?? '')) };
+        } finally {
+          await c.close();
+        }
       },
     },
     {
@@ -461,11 +619,33 @@ async function steps(ref: Side): Promise<Step[]> {
         ),
     },
     { name: 'collect_answers again', run: tool('collect_answers') },
+    {
+      // An old bridge for a client whose calls end after a minute (Cursor): its waits come in pieces, so a question
+      // nobody answers hands back "Still waiting", not "No answer yet". Only if X-Aristotle-Agent is read.
+      name: 'old bridge: agent waits in pieces',
+      run: async (s) => {
+        const c = await oldBridge(s, { 'X-Aristotle-Agent': 'cursor' });
+        try {
+          const r = await c.callTool({ name: 'ask', arguments: { prompt: 'And then?', concept: 'two' } });
+          return { text: hash(normalise(s, textOf(r))), inPieces: textOf(r).startsWith('Still waiting') };
+        } finally {
+          await c.close();
+        }
+      },
+    },
     { name: 'record_practice', run: tool('record_practice', { results: [{ concept: 'one', outcome: 'right', kind: 'recall' }] }) },
+    {
+      // Right, partial and wrong on solid concepts with a card: three schedules, compared by their intervals.
+      name: `record_practice solid (${solid.length})`,
+      run: tool('record_practice', {
+        results: solid.map((concept, i) => ({ concept, outcome: (['right', 'partial', 'wrong'] as const)[i % 3], kind: 'recall' })),
+      }),
+    },
+    { name: 'reviews after', run: (s) => request(s, { path: '/api/reviews' }) },
     { name: 'get_topic new', run: tool('get_topic', { topic: NEW }) },
-    { name: 'state in sitting', run: (s) => request(s, { path: '/api/state' }) },
+    http('state in sitting', { path: '/api/state' }),
     { name: 'end_session', run: tool('end_session', { locked: 'One.', shaky: 'Two.', next: 'Two, because it rests on one.' }) },
-    { name: 'state after', run: (s) => request(s, { path: '/api/state' }) },
+    http('state after', { path: '/api/state' }),
     { name: 'topic after', run: (s) => request(s, { path: `/api/topics/${NEW}` }) },
     { name: 'progress after', run: (s) => request(s, { path: '/api/progress' }) },
     { name: 'leave', run: (s) => request(s, { method: 'POST', path: '/api/leave', body: {} }) },
@@ -488,6 +668,40 @@ async function steps(ref: Side): Promise<Step[]> {
     http('chat stop nothing', { method: 'DELETE', path: `/api/chats/${encodeURIComponent(topic)}/answer` }),
     http('chat clear', { method: 'DELETE', path: `/api/chats/${encodeURIComponent(topic)}` }),
   ];
+}
+
+/** A result without what a cut found, or what an exact answer said: the rest, which must be the same. */
+function rest(r: unknown): unknown {
+  if (typeof r === 'string') return r.replace(/ found .*$/, '');
+  if (r && typeof r === 'object') {
+    const { found: _f, plain: _p, ...others } = r as Record<string, unknown>;
+    return others;
+  }
+  return r;
+}
+const foundOf = (r: unknown): string[] =>
+  typeof r === 'string' ? (r.match(/ found (.*)$/)?.[1] ?? '').split(',').filter(Boolean) : ((r as { found?: string[] })?.found ?? []);
+
+/** Same, allowed (a cut field or an exact answer, with its reason), or different. */
+function verdict(name: string, ra: unknown, rb: unknown): { ok: 'same' | 'allowed' | 'different'; mark: string } {
+  if (JSON.stringify(ra) === JSON.stringify(rb)) return { ok: 'same', mark: 'same' };
+  const cut = CUTS[name];
+  if (cut && JSON.stringify(rest(ra)) === JSON.stringify(rest(rb))) {
+    const want = expected(cut);
+    const got = foundOf(rb);
+    if (want.every((w) => got.includes(w)) && got.length === want.length)
+      return { ok: 'allowed', mark: `allowed, only ${want.length} field(s) (${cut.why})` };
+    return { ok: 'different', mark: `DIFFERENT: the new side's fields are ${JSON.stringify(got)}, not ${JSON.stringify(want)}` };
+  }
+  const exact = EXACT[name];
+  if (exact && ra && rb && typeof ra === 'object' && typeof rb === 'object') {
+    const a = ra as { status: number; type: string; security: string; location: unknown };
+    const b = rb as { status: number; plain?: string; type: string; security: string; location: unknown };
+    const others = a.type === b.type && a.security === b.security && a.location === b.location;
+    if (others && b.status === exact.status && b.plain === exact.body && Math.floor(a.status / 100) === 4)
+      return { ok: 'allowed', mark: `allowed, exactly (${exact.why})` };
+  }
+  return { ok: 'different', mark: 'DIFFERENT' };
 }
 
 let code = 1;
@@ -514,19 +728,18 @@ try {
       await step.run(a).catch((e: Error) => `threw ${e.message}`),
       await step.run(b).catch((e: Error) => `threw ${e.message}`),
     ];
-    const ok = JSON.stringify(ra) === JSON.stringify(rb);
-    const bodyOnly = !BODY_ONLY.has(step.name) || JSON.stringify(withoutBody(ra)) === JSON.stringify(withoutBody(rb));
-    const why = bodyOnly ? ALLOWED[step.name] : undefined;
-    if (ok) same++;
-    else if (why) allowed++;
+    const { ok, mark } = verdict(step.name, ra, rb);
+    if (ok === 'same') same++;
+    else if (ok === 'allowed') allowed++;
     else different++;
-    const mark = ok ? 'same' : why ? `allowed (${why})` : 'DIFFERENT';
-    if (!ok && args.includes('--show'))
+    if (ok !== 'same' && args.includes('--show'))
       for (const [k, v] of shown)
         if (k.startsWith('ref ') && shown.get(`new ${k.slice(4)}`) !== v)
           console.log(`  ${k}\n    ${v.slice(0, 1500)}\n  new\n    ${shown.get(`new ${k.slice(4)}`)?.slice(0, 1500)}`);
     shown.clear();
-    console.log(`${step.name.padEnd(26)} ${mark}${ok ? '' : `\n    ref: ${JSON.stringify(ra)}\n    new: ${JSON.stringify(rb)}`}`);
+    console.log(
+      `${step.name.padEnd(26)} ${mark}${ok === 'different' ? `\n    ref: ${JSON.stringify(ra)}\n    new: ${JSON.stringify(rb)}` : ''}`,
+    );
   }
   await Promise.all([a.mcp?.close(), b.mcp?.close()]);
   for (const s of [a, b]) s.child?.kill('SIGTERM');

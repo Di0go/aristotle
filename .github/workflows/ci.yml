@@ -25,4 +25,9 @@ jobs:
       # rsvg-convert, which preview_svg uses to render drawings (and its test checks).
       - run: sudo apt-get install -y --no-install-recommends librsvg2-bin
       - run: pnpm install --frozen-lockfile
+      # The browser test must run, never skip: GitHub's runner has Google Chrome, and ORGANON_REQUIRE_CHROMIUM makes a
+      # missing browser a failure (the core's findChromium), as in Organon's canary.
       - run: pnpm gates
+        env:
+          ARISTOTLE_TEST_CHROMIUM: /usr/bin/google-chrome
+          ORGANON_REQUIRE_CHROMIUM: '1'

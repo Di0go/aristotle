@@ -18,7 +18,9 @@ if (process.argv[2] === '--run') {
   const [, , , root = '', file = ''] = process.argv;
   const { settings: s } = await import(path.join(root, 'server/settings.ts'));
   // The accent as the server uses it: config.ts's ACCENT (main read settings.json a second time for it).
-  const { ACCENT } = await import(path.join(root, 'server/config.ts'));
+  // (since 3/n there is no ACCENT: the server takes settings.accent, as config-differential.ts compares it).
+  const config = await import(path.join(root, 'server/config.ts'));
+  const ACCENT = 'ACCENT' in config ? config.ACCENT : s.accent;
   const installed = (id: string) => id === 'claude-code';
   const read = () => (existsSync(file) ? hash(readFileSync(file, 'utf8')) : 'none');
   const out = [`view0 ${hash(s.view(installed))}`, `accent0 ${ACCENT ?? 'none'}`, `command0 ${hash(s.agentCommand ?? null)}`];
@@ -51,6 +53,14 @@ if (process.argv[2] === '--run') {
     (e: Error) => `failed ${(e as { code?: string }).code ?? e.constructor.name}`,
   );
   out.push(`concurrent ${all}`, `view-concurrent ${hash(s.view(installed))}`, `file-concurrent ${read()}`);
+  // What the file says after the three changes at once: the new side must hold all three (the values are the
+  // differential's own, not his).
+  let landed = 'unreadable';
+  try {
+    const f = JSON.parse(readFileSync(file, 'utf8')) as { tutor?: string; helpers?: string; api?: { model?: string } };
+    landed = `${f.tutor} ${f.helpers} ${f.api?.model}`;
+  } catch {}
+  out.push(`landed ${landed}`);
   console.log(out.join('\n'));
   process.exit(0);
 }
@@ -105,6 +115,7 @@ try {
       concurrent: 'the core queues writes: three changes at once all land; main shared one .tmp and failed (ENOENT)',
       'view-concurrent': 'the same race: on main, which of the three landed depended on it',
       'file-concurrent': 'the same race',
+      landed: 'the same race (on main, what the file holds afterwards depended on it)',
     };
     const allowed: Record<string, string> =
       name !== 'a stray comma'
@@ -117,7 +128,15 @@ try {
             file2: 'the same',
             'set-aside': 'the core never writes over a settings.json it could not parse: it keeps it beside, renamed; main wrote over it',
           };
-    if (!compare(run(ref.root, 'a'), run(ROOT, 'b'), allowed)) same = false;
+    const a = run(ref.root, 'a');
+    const b = run(ROOT, 'b');
+    if (!compare(a, b, allowed)) same = false;
+    // The race is allowed only because the new side wins it: all three changes saved, and all three in the file.
+    for (const want of ['concurrent all saved', 'landed gemini claude-code llama3'])
+      if (!b.includes(want)) {
+        console.log(`new side: expected "${want}"`);
+        same = false;
+      }
   }
   const out = refused(proxy.calls);
   console.log(`\n${out.line}`);

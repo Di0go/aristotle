@@ -1,60 +1,36 @@
 // In a real browser: what he is writing in an answer box stays there, focused and with the cursor where it was, while
-// the tutor and the page go on around it. A real server on throwaway folders and a free port (as in mcp.test.ts), the
-// built interface, a real MCP client in Claude Code's place, and a headless Chromium. Skipped where there is no
+// the tutor and the page go on around it. A real server on throwaway folders and a free port (the core's startServer),
+// the built interface, a real MCP client in Claude Code's place, and a headless Chromium. Skipped where there is no
 // Chromium (ARISTOTLE_TEST_CHROMIUM, the system's, or Playwright's own).
 //
 //   pnpm test
 
 import { after, before, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { spawn, type ChildProcess } from 'node:child_process';
-import { existsSync } from 'node:fs';
-import { mkdtemp, rm } from 'node:fs/promises';
-import net from 'node:net';
-import { tmpdir } from 'node:os';
+import { rm } from 'node:fs/promises';
 import path from 'node:path';
+import { findChromium, type Running, startServer } from '@organon/core/testing';
+
+const ROOT = path.resolve(import.meta.dirname, '..');
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { chromium, type Browser } from 'playwright-core';
 
-const CHROMIUM = [process.env.ARISTOTLE_TEST_CHROMIUM, '/usr/bin/chromium', '/usr/bin/chromium-browser', chromium.executablePath()].find(
-  (p): p is string => Boolean(p && existsSync(p)),
-);
+// The core's: the Chromium to run in (ARISTOTLE_TEST_CHROMIUM, the system's, or Playwright's own; in Organon's canary
+// a missing one is a failure, not a skip), and a real server on throwaway folders and a free port.
+const CHROMIUM = findChromium(process.env.ARISTOTLE_TEST_CHROMIUM, chromium.executablePath());
 
 let BASE = '';
-let server: ChildProcess;
-let dataDir: string;
-let stateDir: string;
+let server: Running;
 let client: Client;
 let browser: Browser | undefined;
 
 before(async () => {
   if (!CHROMIUM) return;
-  const port = await freePort();
-  BASE = `http://localhost:${port}`;
-  dataDir = await mkdtemp(path.join(tmpdir(), 'aristotle-test-'));
-  stateDir = await mkdtemp(path.join(tmpdir(), 'aristotle-state-'));
-  server = spawn('node', ['server/index.ts'], {
-    env: {
-      ...process.env,
-      ARISTOTLE_PORT: String(port),
-      ARISTOTLE_DATA_DIR: dataDir,
-      ARISTOTLE_STATE_DIR: stateDir,
-      ARISTOTLE_WAIT_MS: '300',
-      ARISTOTLE_BACKUP: 'off',
-      ARISTOTLE_CLAUDE_CMD: 'bash --norc --noprofile',
-      ARISTOTLE_GLOSS_IMAGES: 'off',
-    },
-    stdio: 'inherit',
+  server = await startServer(ROOT, {
+    env: { WAIT_MS: '300', BACKUP: 'off', CLAUDE_CMD: 'bash --norc --noprofile', GLOSS_IMAGES: 'off' },
   });
-  for (let i = 0; ; i++) {
-    try {
-      const health = (await (await fetch(`${BASE}/api/health`)).json()) as { pid?: number };
-      if (health.pid === server.pid) break;
-    } catch {}
-    if (i > 50) throw new Error('Server did not start');
-    await new Promise((r) => setTimeout(r, 100));
-  }
+  BASE = server.base;
   client = new Client({ name: 'test', version: '0' });
   await client.connect(new StreamableHTTPClientTransport(new URL(`${BASE}/mcp`)));
   browser = await chromium.launch({ headless: true, executablePath: CHROMIUM });
@@ -64,9 +40,9 @@ after(async () => {
   if (!CHROMIUM) return;
   await browser?.close();
   await client.close();
-  server.kill();
-  await rm(dataDir, { recursive: true, force: true });
-  await rm(stateDir, { recursive: true, force: true });
+  await server.stop();
+  await rm(server.dataDir, { recursive: true, force: true });
+  await rm(server.stateDir, { recursive: true, force: true });
 });
 
 const call = (name: string, args: Record<string, unknown> = {}) => client.callTool({ name, arguments: args });
@@ -117,14 +93,3 @@ test('an answer being written survives the tutor and the feed: same box, same te
   assert.equal(await page.locator('section.ask .error').count(), 0);
   await page.close();
 });
-
-/** A port nothing listens on right now. */
-function freePort(): Promise<number> {
-  return new Promise((resolve, reject) => {
-    const probe = net.createServer().listen(0, '127.0.0.1', () => {
-      const { port } = probe.address() as net.AddressInfo;
-      probe.close(() => resolve(port));
-    });
-    probe.on('error', reject);
-  });
-}
