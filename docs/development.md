@@ -100,7 +100,7 @@ The server keeps its compiled code in Node's compile cache (`NODE_COMPILE_CACHE`
 | `pnpm app` | `node server/control.ts` |
 | `pnpm serve` | `node server/index.ts` |
 | `pnpm build` | `vite build` |
-| `pnpm check` | `svelte-check --tsconfig ./tsconfig.json --fail-on-warnings --incremental && tsc -p tsconfig.server.json` |
+| `pnpm check` | `svelte-check --tsconfig ./tsconfig.json --fail-on-warnings && tsc -p tsconfig.server.json` |
 | `pnpm lint` | `biome check . && prettier --check --cache "ui/src/**/*.svelte"` |
 | `pnpm format` | `biome check --write . && prettier --write --cache --log-level warn "ui/src/**/*.svelte"` |
 | `pnpm test` | `node --test 'tests/*.test.ts'` |

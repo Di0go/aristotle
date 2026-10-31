@@ -24,8 +24,8 @@ importers:
         specifier: ^1.32.0
         version: 1.32.0(zod@4.6.5)
       '@organon/core':
-        specifier: https://github.com/Di0go/organon/releases/download/v0.7.1/organon-core-0.7.1.tgz
-        version: https://github.com/Di0go/organon/releases/download/v0.7.1/organon-core-0.7.1.tgz(svelte@5.57.1)(vite@8.3.2(@types/node@26.6.4)(esbuild@0.28.2)(tsx@4.23.15))
+        specifier: https://github.com/Di0go/organon/releases/download/v0.8.1/organon-core-0.8.1.tgz
+        version: https://github.com/Di0go/organon/releases/download/v0.8.1/organon-core-0.8.1.tgz(svelte@5.57.1)(vite@8.3.2(@types/node@26.6.4)(esbuild@0.28.2)(tsx@4.23.15))
       '@xterm/addon-fit':
         specifier: ^0.11.0
         version: 0.11.0
@@ -381,9 +381,9 @@ packages:
       '@cfworker/json-schema':
         optional: true
 
-  '@organon/core@https://github.com/Di0go/organon/releases/download/v0.7.1/organon-core-0.7.1.tgz':
-    resolution: {integrity: sha512-gkXI7zkWx0s+rjDow5MUL57+1vwBdsXbMuFw6wB5Uv1Ci1mBVkT9lXF1PtJSm8VKjn6/ylIe/pNuWcTX7WRk6w==, tarball: https://github.com/Di0go/organon/releases/download/v0.7.1/organon-core-0.7.1.tgz}
-    version: 0.7.1
+  '@organon/core@https://github.com/Di0go/organon/releases/download/v0.8.1/organon-core-0.8.1.tgz':
+    resolution: {integrity: sha512-jOQVFH+9DT3htPZg7drpbyJ7hy6pojDlbZ4gAZ+Bn3+08knk269zqSyIcdTRN1kABTiAA76Hu6ATbYNe2OKCmw==, tarball: https://github.com/Di0go/organon/releases/download/v0.8.1/organon-core-0.8.1.tgz}
+    version: 0.8.1
     engines: {node: '>=24.2'}
     peerDependencies:
       svelte: ^5.57.1
@@ -1770,7 +1770,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@organon/core@https://github.com/Di0go/organon/releases/download/v0.7.1/organon-core-0.7.1.tgz(svelte@5.57.1)(vite@8.3.2(@types/node@26.6.4)(esbuild@0.28.2)(tsx@4.23.15))':
+  '@organon/core@https://github.com/Di0go/organon/releases/download/v0.8.1/organon-core-0.8.1.tgz(svelte@5.57.1)(vite@8.3.2(@types/node@26.6.4)(esbuild@0.28.2)(tsx@4.23.15))':
     dependencies:
       '@fontsource-variable/inter': 5.3.0
       '@fontsource-variable/jetbrains-mono': 5.3.0
