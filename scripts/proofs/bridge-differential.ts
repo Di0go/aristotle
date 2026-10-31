@@ -106,7 +106,10 @@ try {
       ['codex-mcp-client', false],
       ['claude-code', true],
     ] as const)
-      lines.push(`session ${client}${drawer ? ' drawer' : ''}`, ...(await session(root, env, client, drawer)));
+      lines.push(
+        `session ${client}${drawer ? ' drawer' : ''}`,
+        ...(await session(root, env, client, drawer)).map((l) => `${client}${drawer ? '+drawer' : ''}:${l}`),
+      );
     lines.push(app('status'), app('stop'), app('status'));
     return lines;
   };
@@ -115,7 +118,9 @@ try {
   const b = await side(ROOT, 'new');
   const out = refused(proxy.calls);
   console.log(out.line);
-  code = compare(a, b) && !out.lopsided ? 0 : 1;
+  // 13/n: another agent gets `method`, whose description the core ends in its own words ("lists the routines").
+  const allowed = { 'codex-mcp-client:id2': "the method tool's description ends in the core's words (13/n)" };
+  code = compare(a, b, allowed) && !out.lopsided ? 0 : 1;
   console.log(code ? 'DIFFERENT' : 'SAME');
 } finally {
   proxy.close();

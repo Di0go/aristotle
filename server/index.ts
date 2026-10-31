@@ -134,40 +134,24 @@ function upgrade(req: http.IncomingMessage, socket: Duplex, head: Buffer) {
   sockets.handleUpgrade(req, socket, head, (ws) => tutor.attach(ws));
 }
 
-/** Claude Code's MCP endpoint (POST only). */
+/**
+ * The MCP endpoint (POST only): the core's handler with Aristotle's tools (mcp.ts), which says when it serves the
+ * tutor in the drawer (whose core tools then load up front) and which client it serves.
+ */
 async function handleMcp(req: http.IncomingMessage, res: http.ServerResponse) {
-  if (req.method !== 'POST') {
-    res.writeHead(405, { Allow: 'POST' }).end();
-    return;
-  }
-  // Stateless: a fresh server per request, so a restart never strands Claude Code's connection. The bridge says when
-  // it serves the tutor in the drawer, whose core tools then load up front, and which client it serves (mcp.ts).
-  const { createMcpServer, StreamableHTTPServerTransport } = await mcpModules();
-  // The core's bridge says X-Organon-*; a bridge started before the move to the core still says X-Aristotle-*.
-  const agent = req.headers['x-organon-agent'] ?? req.headers['x-aristotle-agent'];
-  const mcp = createMcpServer(gym, {
-    drawer: (req.headers['x-organon-client'] ?? req.headers['x-aristotle-client']) === 'drawer',
-    client: typeof agent === 'string' && agent !== 'aristotle' ? agent : '',
-  });
-  const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
-  res.on('close', () => {
-    void transport.close();
-    void mcp.close();
-  });
-  await mcp.connect(transport);
-  await transport.handleRequest(req, res);
+  const { mcpHandler } = await mcpModule();
+  mcpServe ??= mcpHandler(gym);
+  await mcpServe(req, res);
 }
+let mcpServe: ((req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>) | undefined;
 
 /**
- * The MCP SDK and the tools, loaded once on first use rather than at start (a sixth of a second the interface need
- * not wait for); warmed up just after the server starts listening.
+ * The tools, loaded once on first use rather than at start (a sixth of a second the interface need not wait for);
+ * warmed up just after the server starts listening.
  */
-let mcpLoading: Promise<typeof import('./mcp.ts') & typeof import('@modelcontextprotocol/sdk/server/streamableHttp.js')> | undefined;
-function mcpModules() {
-  mcpLoading ??= Promise.all([import('./mcp.ts'), import('@modelcontextprotocol/sdk/server/streamableHttp.js')]).then(([a, b]) => ({
-    ...a,
-    ...b,
-  }));
+let mcpLoading: Promise<typeof import('./mcp.ts')> | undefined;
+function mcpModule() {
+  mcpLoading ??= import('./mcp.ts');
   return mcpLoading;
 }
 
@@ -550,7 +534,7 @@ server.listen(PORT, HOST, () => {
   mkdirSync(path.dirname(PID_FILE), { recursive: true });
   writeFileSync(PID_FILE, String(process.pid));
   setImmediate(() => {
-    void mcpModules();
+    void mcpModule();
     // Every session log read into the index now, a few at a time, rather than on the first Home, Progress or search.
     void gym.warm();
   });

@@ -43,6 +43,8 @@ if (source === path.join(ROOT, 'data')) throw new Error('Never the real data/: c
  * not "same": the list is what the migration changed on purpose, and docs/plano.md says it.
  */
 const ALLOWED: Record<string, string> = {
+  // 13/n: the method tool comes from the core's createMethod, which ends its description in its own words.
+  'mcp tools': "the method tool's description ends 'Without `name`, lists the routines.' (the core's), where main said 'lists them'",
   // 11/n
   index: "index.html tells the core's theme-boot.js Aristotle's key, default accent and old key (data-key, data-accent, data-legacy)",
   route: "index.html tells the core's theme-boot.js Aristotle's key, default accent and old key (data-key, data-accent, data-legacy)",
