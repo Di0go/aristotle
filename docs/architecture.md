@@ -273,7 +273,7 @@ Only for the interface (and the tests); tutors use MCP.
 | [`automatic.svelte.ts`](../ui/src/lib/automatic.svelte.ts) | What Aristotle does on its own, from what he does, so he never presses a button for the app's housekeeping. |
 | [`bench.svelte.ts`](../ui/src/lib/bench.svelte.ts) | The panel beside a step: whether it is folded away (so the step gets the whole width), and which of its tabs is open, This step or Chat. |
 | [`classes.svelte.ts`](../ui/src/lib/classes.svelte.ts) | Each topic's class as pages (steps.ts), for the library tree, the class page and its step pages: past sessions loaded on first use and kept, the session running now read from the live feed as it grows. |
-| [`drafts.ts`](../ui/src/lib/drafts.ts) | What he has typed and not sent yet (an answer, a quiz note, a message), kept in the browser so leaving a step and coming back finds it where he left it. |
+| [`drafts.ts`](../ui/src/lib/drafts.ts) | What is being written and not sent yet (an answer, a note, a message to the chat), kept in this browser so a reload or a closed tab never loses it: the core's drafts (@organon/core/ui/drafts), under Aristotle's keys ("aristotle.draft.<what>"), set before anything reads one. |
 | [`feed.svelte.ts`](../ui/src/lib/feed.svelte.ts) | Live copy of the server's state, kept current over Server-Sent Events. |
 | [`focus.svelte.ts`](../ui/src/lib/focus.svelte.ts) | Focus mode: everything but the page hides (ribbon, library, tabs, status line, the bench beside a lesson), for reading and answering with nothing else in view. |
 | [`format.ts`](../ui/src/lib/format.ts) | Dates, times, durations and plurals, written the way the interface shows them: the core's (@organon/core/ui/format, where a plain "YYYY-MM-DD" is a day at local noon, never the UTC midnight that is the day before west of Greenwich), and Aristotle's own: a day mid-sentence, and a sitting's numbers. |
@@ -281,7 +281,7 @@ Only for the interface (and the tests); tutors use MCP.
 | [`layout.ts`](../ui/src/lib/layout.ts) | Graph layout shared by the topic maps and the map of everything. |
 | [`library.ts`](../ui/src/lib/library.ts) | The hierarchy everything hangs on: roadmaps hold steps, a step is a topic, a topic holds concepts. |
 | [`markdown.ts`](../ui/src/lib/markdown.ts) | Markdown with LaTeX maths, sanitised. |
-| [`maths.svelte.ts`](../ui/src/lib/maths.svelte.ts) | KaTeX, loaded just after the first paint (or when first needed, if sooner) instead of on the startup path. |
+| [`maths.svelte.ts`](../ui/src/lib/maths.svelte.ts) | KaTeX, loaded just after the first paint (or when first needed, if sooner) instead of on the startup path: the core's (@organon/core/ui/maths), one for the whole page, so the core's Markdown and Aristotle's share it. |
 | [`router.svelte.ts`](../ui/src/lib/router.svelte.ts) | Hash routing: #/, #/review, #/train/<slug>, #/progress, #/map, #/roadmaps, #/roadmaps/<slug>, #/lesson/<slug>, #/lesson/<slug>/<step>, #/topics, #/topics/<slug>?c=<concept>, #/log, #/log/<session>, #/praxis, #/praxis/<mission>, #/about, #/settings. |
 | [`search.svelte.ts`](../ui/src/lib/search.svelte.ts) | Whether the search palette is open: Ctrl+K or / anywhere, the ribbon's search button, or "Search" on selected text. |
 | [`steps.ts`](../ui/src/lib/steps.ts) | A class as he reads it: one page per step, in order, whatever sitting each was taught in. |
@@ -290,7 +290,7 @@ Only for the interface (and the tests); tutors use MCP.
 | [`tabs.svelte.ts`](../ui/src/lib/tabs.svelte.ts) | Open pages, as tabs. |
 | [`theme.svelte.ts`](../ui/src/lib/theme.svelte.ts) | Look settings: light or dark, and one accent, remembered in this browser only: the core's look (@organon/core/ui/theme) under Aristotle's key, blue unless this install chose another in .aristotle/settings.json (the server writes it on <html>), and the tab icon drawn from Aristotle's logo. |
 | [`tutor.svelte.ts`](../ui/src/lib/tutor.svelte.ts) | The connection to the tutor running inside Aristotle (server/tutor.ts): an agent CLI in a terminal (Claude Code by default, or Codex, Gemini CLI, opencode), or Aristotle's own tutor on a model API, whose conversation the drawer shows instead. |
-| [`visible.ts`](../ui/src/lib/visible.ts) | Tells animations when they can be seen: in or near the viewport, with the tab showing. |
+| [`visible.ts`](../ui/src/lib/visible.ts) | Tells animations when they can be seen: in or near the viewport, with the tab showing, so a lesson scrolled past (or a tab in the background) costs nothing. |
 
 #### Visual kit (`ui/src/lib/kit/`)
 
