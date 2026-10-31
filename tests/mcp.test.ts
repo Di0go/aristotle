@@ -60,7 +60,13 @@ before(async () => {
   stateDir = await mkdtemp(path.join(tmpdir(), 'aristotle-state-'));
   // A certificate from the real script, marked as trusted the way setup-hostname.sh does.
   tlsDir = await mkdtemp(path.join(tmpdir(), 'aristotle-tls-'));
-  assert.equal(spawnSync('bash', ['scripts/tls.sh'], { env: { ...process.env, ARISTOTLE_TLS_DIR: tlsDir }, stdio: 'ignore' }).status, 0);
+  assert.equal(
+    spawnSync('bash', ['node_modules/@organon/core/scripts/tls.sh', '.'], {
+      env: { ...process.env, ARISTOTLE_TLS_DIR: tlsDir },
+      stdio: 'ignore',
+    }).status,
+    0,
+  );
   await writeFile(path.join(tlsDir, 'installed'), '');
   await startServer();
   client = new Client({ name: 'test', version: '0' });

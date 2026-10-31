@@ -4,7 +4,7 @@
 // at a fixed commit, while its data and state stay in this checkout's data/ and .aristotle/. A release:
 //   1. refuses uncommitted changes, then runs every gate (scripts/gates.ts);
 //   2. checks the commit out in the release copy, installs and builds there;
-//   3. points aristotle.service at it (scripts/install-service.sh) and restarts it;
+//   3. points aristotle.service at it (the core's install-service.sh) and restarts it;
 //   4. checks it answers from the new copy; if not, puts the previous release back.
 // The tag `live` marks what is running; `git log live..` is what is not released yet.
 //
@@ -107,7 +107,7 @@ async function deploy(sha: string): Promise<boolean> {
   if (!existsSync(dataLink) && !isLink(dataLink)) symlinkSync(process.env.ARISTOTLE_DATA_DIR ?? path.join(ROOT, 'data'), dataLink);
   run('pnpm', ['install', '--frozen-lockfile', '--prefer-offline', '--silent'], RELEASE_DIR);
   run('pnpm', ['run', '--silent', 'build'], RELEASE_DIR);
-  run('bash', [path.join(RELEASE_DIR, 'scripts/install-service.sh')], RELEASE_DIR, {
+  run('bash', [path.join(RELEASE_DIR, 'node_modules/@organon/core/scripts/install-service.sh'), RELEASE_DIR], RELEASE_DIR, {
     ...process.env,
     ARISTOTLE_DATA_DIR: process.env.ARISTOTLE_DATA_DIR ?? path.join(ROOT, 'data'),
     ARISTOTLE_STATE_DIR: process.env.ARISTOTLE_STATE_DIR ?? path.join(ROOT, '.aristotle'),

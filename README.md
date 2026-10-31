@@ -155,13 +155,13 @@ Glosses, questions on a passage and the chat beside a lesson can run on the mode
 <br>
 
 ```sh
-bash scripts/install-service.sh         # a systemd user service: always on, no root
-bash scripts/tls.sh                     # a certificate authority that can only sign aristotle.test
-pkexec bash scripts/setup-hostname.sh   # hosts entry, port forwarding, trust store (root, once)
+pnpm service      # a systemd user service: always on, no root
+pnpm tls          # a certificate authority that can only sign aristotle.test
+pkexec bash "$PWD/node_modules/@organon/core/scripts/setup-hostname.sh" "$PWD"   # hosts entry, port forwarding, trust store (root, once)
 pnpm app restart
 ```
 
-Then Aristotle lives at **https://aristotle.test**. The certificate authority is limited to that one name by `nameConstraints`, so trusting it cannot vouch for any other site. Each script explains in its header what it changes and how to undo it.
+Then Aristotle lives at **https://aristotle.test**. The certificate authority is limited to that one name by `nameConstraints`, so trusting it cannot vouch for any other site. Each script (from [Organon](https://github.com/Di0go/organon), the core Aristotle is built on, reading [`app.json`](app.json)) explains in its header what it changes and how to undo it; `setup-hostname.sh … --print` shows what it would write without changing anything. An install that was once the Mind Gym on gym.test runs `scripts/retire-gym-test.sh` first (its header says how).
 
 </details>
 

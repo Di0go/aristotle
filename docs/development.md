@@ -48,7 +48,9 @@ pnpm release --rollback   # back to the release before
 git log live..            # what is committed but not released yet
 ```
 
-`pnpm release` refuses uncommitted changes, runs every gate, checks out HEAD in the release copy, installs and builds there, rewrites `aristotle.service` to run it ([`scripts/install-service.sh`](../scripts/install-service.sh)) and checks that the server answers from the new copy. If it does not, the previous release is put back. The tag `live` marks what is running and `live-previous` what ran before.
+`pnpm release` refuses uncommitted changes, runs every gate, checks out HEAD in the release copy, installs and builds there, rewrites `aristotle.service` to run it (the core's `install-service.sh`, from [`app.json`](../app.json)) and checks that the server answers from the new copy. If it does not, the previous release is put back. The tag `live` marks what is running and `live-previous` what ran before.
+
+The clean name is set up once, by the core's scripts (they read [`app.json`](../app.json)): `pnpm service` installs `aristotle.service` for this checkout (a release reinstalls it for the release copy), `pnpm tls` makes the certificate authority that can only sign `aristotle.test`, and `pkexec bash "$PWD/node_modules/@organon/core/scripts/setup-hostname.sh" "$PWD"` (as root, once; `--print` to see what it would write) maps the name, forwards its ports and trusts the authority. What Aristotle had when it was the Mind Gym on gym.test is taken out by its own [`scripts/retire-gym-test.sh`](../scripts/retire-gym-test.sh), which is history and not the core's.
 
 Without the release copy (a fresh clone, no service) everything runs from this checkout: `pnpm start` builds the interface and restarts the server, and `pnpm app status|start|stop|restart` controls it. Once the live app runs from the release copy, `pnpm start` refuses and points to `pnpm release`.
 
@@ -105,6 +107,8 @@ The server keeps its compiled code in Node's compile cache (`NODE_COMPILE_CACHE`
 | `pnpm docs:gen` | `node scripts/docs.ts` |
 | `pnpm gates` | `node scripts/gates.ts` |
 | `pnpm release` | `node scripts/release.ts` |
+| `pnpm service` | `bash node_modules/@organon/core/scripts/install-service.sh .` |
+| `pnpm tls` | `bash node_modules/@organon/core/scripts/tls.sh .` |
 | `pnpm prepare` | `git config core.hooksPath .githooks \|\| true` |
 <!-- /generated -->
 

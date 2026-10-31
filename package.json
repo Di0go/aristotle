@@ -22,6 +22,8 @@
     "docs:gen": "node scripts/docs.ts",
     "gates": "node scripts/gates.ts",
     "release": "node scripts/release.ts",
+    "service": "bash node_modules/@organon/core/scripts/install-service.sh .",
+    "tls": "bash node_modules/@organon/core/scripts/tls.sh .",
     "prepare": "git config core.hooksPath .githooks || true"
   },
   "packageManager": "pnpm@10.34.5",
