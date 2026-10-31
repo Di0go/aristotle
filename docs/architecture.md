@@ -203,7 +203,7 @@ Only for the interface (and the tests); tutors use MCP.
 
 | File | What it is |
 |---|---|
-| [`App.svelte`](../ui/src/App.svelte) | The shell: ribbon, sidebar, tabs, the current page, the status line and the terminal drawer, plus global shortcuts. |
+| [`App.svelte`](../ui/src/App.svelte) | The shell: the core's frame (@organon/core/ui/Frame.svelte) around Aristotle's ribbon, its library as the frame's rail, the tabs, the current page and the status line; the terminal drawer, plus global shortcuts. |
 | [`main.ts`](../ui/src/main.ts) | The interface's entry point: the core's fonts and styles, Aristotle's own after each, then the app mounted on the page. |
 | [`vite-env.d.ts`](../ui/src/vite-env.d.ts) | / <reference types="svelte" /> / <reference types="vite/client" /> |
 
@@ -238,7 +238,7 @@ Only for the interface (and the tests); tutors use MCP.
 | [`ClassPage.svelte`](../ui/src/lib/ClassPage.svelte) | One page of a class: the intro, or one step with its checks and the feedback on his answers, with Previous and Next. |
 | [`ConceptNode.svelte`](../ui/src/lib/ConceptNode.svelte) | One concept on a map: status by fill and outline, goal by an inner ring, focus by a halo. |
 | [`ConceptPanel.svelte`](../ui/src/lib/ConceptPanel.svelte) | The side panel for one concept on a map: status, what it rests on and leads to, notes, and its check record; a fading one can be reviewed from here. |
-| [`ContextMenu.svelte`](../ui/src/lib/ContextMenu.svelte) | The menu on right-clicking selected text: copy it, search for it in Aristotle, gloss it (Claude Code explains it in a hover card, which then shows wherever the phrase appears), or ask a question about it (answered beside the step, kept with it). |
+| [`ContextMenu.svelte`](../ui/src/lib/ContextMenu.svelte) | The menu on right-clicking selected text: the core's (@organon/core/ui/ContextMenu.svelte: copy it, search for it in Aristotle; Shift, a text box or the terminal keep the browser's own menu), with Aristotle's own two: gloss it (Claude Code explains it in a hover card, which then shows wherever the phrase appears), or ask a question about it (answered beside the step, kept with it). |
 | [`FeedList.svelte`](../ui/src/lib/FeedList.svelte) | A lesson as one long note: each entry a block in the reading column. |
 | [`Grip.svelte`](../ui/src/lib/Grip.svelte) | A drag handle on a pane's edge. |
 | [`Home.svelte`](../ui/src/lib/Home.svelte) | Home: a dashboard that answers what to do now (one card, one button), how he is doing (this week, his courses) and what needs him (reviews coming due, recent answers, words he looked up, missions). |
@@ -253,14 +253,14 @@ Only for the interface (and the tests); tutors use MCP.
 | [`Markdown.svelte`](../ui/src/lib/Markdown.svelte) | Renders lesson Markdown and brings it to life: mermaid diagrams, sequences, explorables and the visual kit's figures. |
 | [`Quiz.svelte`](../ui/src/lib/Quiz.svelte) | A graded multiple-choice check: options, "I don't know", a note per question, and right or wrong once answered. |
 | [`ReviewPanel.svelte`](../ui/src/lib/ReviewPanel.svelte) | During a review session: what has been practised so far, and today's share of what is fading. |
-| [`Ribbon.svelte`](../ui/src/lib/Ribbon.svelte) | The thin strip on the far left: the main places, then Settings (who teaches), focus and the look. |
-| [`Search.svelte`](../ui/src/lib/Search.svelte) | The search palette: everything he has (roadmaps, steps, topics, concepts, missions, and what was said in every session), searched on the server as he types. |
+| [`Ribbon.svelte`](../ui/src/lib/Ribbon.svelte) | The thin strip on the far left: the core's ribbon (@organon/core/ui/Ribbon.svelte: search, focus, the look) with Aristotle's places (Home, Review with today's share of what is fading, Courses, the map), You after search, and Settings (who teaches) at the foot. |
+| [`Search.svelte`](../ui/src/lib/Search.svelte) | The search palette: the core's (@organon/core/ui/Search.svelte: Ctrl+K or / anywhere, arrows, Enter, Escape, the words typed marked) over everything he has (roadmaps, steps, topics, concepts, missions, and what was said in every session), searched on the server as he types. |
 | [`Sequence.svelte`](../ui/src/lib/Sequence.svelte) | A process he steps through, one frame at a time: written as a ```sequence block, frames split by "---". |
 | [`Sidebar.svelte`](../ui/src/lib/Sidebar.svelte) | The library pane: courses as folders, their classes inside, and in each class its pages: the intro and every step taught, with how its checks went. |
 | [`StartPanel.svelte`](../ui/src/lib/StartPanel.svelte) | Start a lesson on anything, without the terminal. |
 | [`StatusBar.svelte`](../ui/src/lib/StatusBar.svelte) | A thin bar of solid, shaky and not-yet counts (and fading), with an optional legend. |
-| [`StatusLine.svelte`](../ui/src/lib/StatusLine.svelte) | The small bar along the bottom: what's going on, in a few words. |
-| [`TabBar.svelte`](../ui/src/lib/TabBar.svelte) | The open pages, as tabs above the page. |
+| [`StatusLine.svelte`](../ui/src/lib/StatusLine.svelte) | The small bar along the bottom: the core's status line (@organon/core/ui/StatusLine.svelte: the dev instance said, the server's warnings in view) with what is going on in Aristotle, in a few words: whose turn it is, how much of the class is solid and where it sits in its course, and the tutor's drawer. |
+| [`TabBar.svelte`](../ui/src/lib/TabBar.svelte) | The open pages, as tabs above the page: the core's tab bar (@organon/core/ui/TabBar.svelte) with Aristotle's titles and icons. |
 | [`actions.ts`](../ui/src/lib/actions.ts) | Starting things from the interface: each action asks the tutor running in Aristotle to run a skill. |
 | [`aside.svelte.ts`](../ui/src/lib/aside.svelte.ts) | "Ask about this": a question on a passage he selected, asked in a small panel by the passage and answered by Claude Code beside the step, without interrupting the class. |
 | [`automatic.svelte.ts`](../ui/src/lib/automatic.svelte.ts) | What Aristotle does on its own, from what he does, so he never presses a button for the app's housekeeping. |
@@ -269,7 +269,7 @@ Only for the interface (and the tests); tutors use MCP.
 | [`concept-piece.ts`](../ui/src/lib/concept-piece.ts) | The one piece of Aristotle's own Markdown that may hold a "\|": a [[concept\|label]] link. |
 | [`drafts.ts`](../ui/src/lib/drafts.ts) | What is being written and not sent yet (an answer, a note, a message to the chat), kept in this browser so a reload or a closed tab never loses it: the core's drafts (@organon/core/ui/drafts), under Aristotle's keys ("aristotle.draft.<what>"), set before anything reads one. |
 | [`feed.svelte.ts`](../ui/src/lib/feed.svelte.ts) | Live copy of the server's state, kept current over Server-Sent Events: the transport is the core's LiveStream (@organon/core/ui/live: reconnecting, reloading everything on each connection, events held while it loads, and a new release loaded once he is not typing); what the state holds and how each event changes it is Aristotle's. |
-| [`focus.svelte.ts`](../ui/src/lib/focus.svelte.ts) | Focus mode: everything but the page hides (ribbon, library, tabs, status line, the bench beside a lesson), for reading and answering with nothing else in view. |
+| [`focus.svelte.ts`](../ui/src/lib/focus.svelte.ts) | Focus mode: everything but the page hides (ribbon, library, tabs, status line, the bench beside a lesson), for reading and answering with nothing else in view: the core's (@organon/core/ui/frame). |
 | [`format.ts`](../ui/src/lib/format.ts) | Dates, times, durations and plurals, written the way the interface shows them: the core's (@organon/core/ui/format, where a plain "YYYY-MM-DD" is a day at local noon, never the UTC midnight that is the day before west of Greenwich), and Aristotle's own: a day mid-sentence, and a sitting's numbers. |
 | [`gloss.svelte.ts`](../ui/src/lib/gloss.svelte.ts) | Glossing a phrase he selected: asks the server (which asks Claude Code), and keeps a card pinned to the selection while the answer is on its way, then with the answer. |
 | [`layout.ts`](../ui/src/lib/layout.ts) | Graph layout shared by the topic maps and the map of everything. |
@@ -277,10 +277,9 @@ Only for the interface (and the tests); tutors use MCP.
 | [`markdown.ts`](../ui/src/lib/markdown.ts) | Markdown as Aristotle writes it: the core's renderer (@organon/core/ui/markdown: LaTeX maths, sanitised, ==highlights==, {{term\|definition}}, callouts, captioned figures, SVG that may animate, tables whose cells keep their own "\|"; mermaid and sequence blocks left as code for Markdown.svelte), with Aristotle's own syntax: [[concept]] links to the map, kept whole inside a table cell. |
 | [`maths.svelte.ts`](../ui/src/lib/maths.svelte.ts) | KaTeX, loaded just after the first paint (or when first needed, if sooner) instead of on the startup path: the core's (@organon/core/ui/maths), one for the whole page, so the core's Markdown and Aristotle's share it. |
 | [`router.svelte.ts`](../ui/src/lib/router.svelte.ts) | Hash routing: #/, #/review, #/train/<slug>, #/progress, #/map, #/roadmaps, #/roadmaps/<slug>, #/lesson/<slug>, #/lesson/<slug>/<step>, #/topics, #/topics/<slug>?c=<concept>, #/log, #/log/<session>, #/praxis, #/praxis/<mission>, #/about, #/settings. |
-| [`search.svelte.ts`](../ui/src/lib/search.svelte.ts) | Whether the search palette is open: Ctrl+K or / anywhere, the ribbon's search button, or "Search" on selected text. |
+| [`search.svelte.ts`](../ui/src/lib/search.svelte.ts) | Whether the search palette is open (Ctrl+K or / anywhere, the ribbon's search button, or "Search" on selected text): the core's (@organon/core/ui/frame), shared with the core's frame, ribbon and palette. |
 | [`steps.ts`](../ui/src/lib/steps.ts) | A class as he reads it: one page per step, in order, whatever sitting each was taught in. |
-| [`storage.ts`](../ui/src/lib/storage.ts) | Browser storage helpers: moving a setting saved under the app's old name (Mind Gym) to its new key. |
-| [`tabs.svelte.ts`](../ui/src/lib/tabs.svelte.ts) | Open pages, as tabs. |
+| [`tabs.svelte.ts`](../ui/src/lib/tabs.svelte.ts) | Open pages, as tabs: the core's (@organon/core/ui/tabs), every page visited gets a tab (one per page, whatever concept is selected on it), except a class, which has one tab whichever of its pages is open (moving between steps moves that tab along); the oldest falls off past eight. |
 | [`theme.svelte.ts`](../ui/src/lib/theme.svelte.ts) | Look settings: light or dark, and one accent, remembered in this browser only: the core's look (@organon/core/ui/theme) under Aristotle's key, blue unless this install chose another in .aristotle/settings.json (the server writes it on <html>), and the tab icon drawn from Aristotle's logo. |
 | [`tutor.svelte.ts`](../ui/src/lib/tutor.svelte.ts) | The drawer's side of whoever teaches: the core's (@organon/core/ui/tutor), one connection to /api/terminal for the whole page: what runs (an agent CLI's terminal, or Aristotle's own tutor on a model API), whether the drawer is open, the conversation, and the requests the app's buttons send it. |
 | [`visible.ts`](../ui/src/lib/visible.ts) | Tells animations when they can be seen: in or near the viewport, with the tab showing, so a lesson scrolled past (or a tab in the background) costs nothing. |

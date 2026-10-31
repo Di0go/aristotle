@@ -244,3 +244,14 @@ html.focus .bench-toggle {
 html.focus .lesson.with-bench {
   grid-template-columns: minmax(0, 1fr);
 }
+
+/* "Your turn" is the accent in Aristotle, not an alarm: on the ribbon's pip (the core's turn pip is the red of a
+   problem) and in the status line (whose links the core draws in its own grey). */
+.app .ribbon-col .ribbon .pip.turn {
+  background: var(--acc);
+}
+
+.status-col .statusline a.turn {
+  color: var(--acc);
+  font-weight: 500;
+}

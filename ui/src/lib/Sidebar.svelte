@@ -5,7 +5,6 @@
   import { feed } from './feed.svelte.ts';
   import { countsOf, looseTopics, placeOf, stepsOf } from './library.ts';
   import { link, router } from './router.svelte.ts';
-  import { migrateKey } from './storage.ts';
   import Grip from './Grip.svelte';
   import Logo from './Logo.svelte';
   import { pageLabel, stepMark, type ClassPage } from './steps.ts';
@@ -37,7 +36,10 @@
 
   function readOpen(): Record<string, boolean> {
     try {
-      migrateKey(OLD_OPEN_KEY, OPEN_KEY);
+      // Moved over from the name it had before the app was renamed (the Mind Gym).
+      const old = localStorage.getItem(OLD_OPEN_KEY);
+      if (old !== null && localStorage.getItem(OPEN_KEY) === null) localStorage.setItem(OPEN_KEY, old);
+      localStorage.removeItem(OLD_OPEN_KEY);
       return JSON.parse(localStorage.getItem(OPEN_KEY) ?? '{}') as Record<string, boolean>;
     } catch {
       return {};

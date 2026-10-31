@@ -22,12 +22,19 @@ import { maths } from './lib/maths.svelte.ts';
 
 // The core's words in English, as Aristotle says them: the tutor, the lesson's record, a question waiting.
 setWords('en', {
+  dev: 'The dev instance: its own port and data (.dev/), never your real library',
+  menu: 'Open the library',
+  leaveFocusHint: 'Show everything again (Esc or F)',
   drawerLabel: 'The tutor',
   drawerApi: (name) => `Tutor · ${name}`,
   newConversationHint: "Start a new conversation (the lesson's record stays)",
   settingsHint: 'Who teaches: Claude Code, another agent, or a model API',
   messageAgent: 'Message the tutor',
   stopAgentHint: 'Stop what it is doing; a question waiting for you stays open',
+  clearHint: "Start this class's chat over",
+  chatEmptyHint: "About this step or not. It sees what you're reading",
+  chatTagHint: 'tag a step or a concept with',
+  tagHint: 'Tag a step, a concept or a class',
   settingsLede:
     'Who teaches. Whichever you choose works through the same tools and follows the same method, and your library stays exactly as it is.',
   settingsWho: 'The tutor',

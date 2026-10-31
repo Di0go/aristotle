@@ -1,14 +1,4 @@
-// Whether the search palette is open: Ctrl+K or / anywhere, the ribbon's search button, or "Search" on selected text.
+// Whether the search palette is open (Ctrl+K or / anywhere, the ribbon's search button, or "Search" on selected text):
+// the core's (@organon/core/ui/frame), shared with the core's frame, ribbon and palette.
 
-class SearchBox {
-  open = $state(false);
-  /** Text to search for on opening (the context menu's "Search"), taken by the palette once. */
-  seed = $state<string | null>(null);
-
-  toggle(value = !this.open, query?: string) {
-    if (query) this.seed = query;
-    this.open = value;
-  }
-}
-
-export const searchBox = new SearchBox();
+export { searchBox } from '@organon/core/ui/frame';

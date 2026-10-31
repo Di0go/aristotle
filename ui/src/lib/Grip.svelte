@@ -1,7 +1,6 @@
 <script lang="ts">
   // A drag handle on a pane's edge. It sets a width (a CSS variable on <html>) and remembers it here.
   import { onMount } from 'svelte';
-  import { migrateKey } from './storage.ts';
 
   let {
     name,
@@ -30,8 +29,10 @@
   onMount(() => {
     let saved = NaN;
     try {
-      // Moved over from the name it had before the app was renamed.
-      migrateKey(`mind-gym.width${name}`, key);
+      // Moved over from the name it had before the app was renamed (the Mind Gym).
+      const old = localStorage.getItem(`mind-gym.width${name}`);
+      if (old !== null && localStorage.getItem(key) === null) localStorage.setItem(key, old);
+      localStorage.removeItem(`mind-gym.width${name}`);
       saved = Number(localStorage.getItem(key));
     } catch {
       // Use the default.
