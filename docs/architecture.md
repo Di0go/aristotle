@@ -289,7 +289,7 @@ Only for the interface (and the tests); tutors use MCP.
 | [`storage.ts`](../ui/src/lib/storage.ts) | Browser storage helpers: moving a setting saved under the app's old name (Mind Gym) to its new key. |
 | [`tables.ts`](../ui/src/lib/tables.ts) | Pipes inside a table row that aren't cell borders: {{term\|definition}}, [[concept\|label]], $\|x\|$ and `a\|b` all hold a "\|", and a GFM table splits its rows on every unescaped one, cutting the term in half ("{{non-polar covalent" in one cell, the rest of the row shifted). |
 | [`tabs.svelte.ts`](../ui/src/lib/tabs.svelte.ts) | Open pages, as tabs. |
-| [`theme.svelte.ts`](../ui/src/lib/theme.svelte.ts) | Look settings: light or dark, and one accent. |
+| [`theme.svelte.ts`](../ui/src/lib/theme.svelte.ts) | Look settings: light or dark, and one accent, remembered in this browser only: the core's look (@organon/core/ui/theme) under Aristotle's key, blue unless this install chose another in .aristotle/settings.json (the server writes it on <html>), and the tab icon drawn from Aristotle's logo. |
 | [`tutor.svelte.ts`](../ui/src/lib/tutor.svelte.ts) | The connection to the tutor running inside Aristotle (server/tutor.ts): an agent CLI in a terminal (Claude Code by default, or Codex, Gemini CLI, opencode), or Aristotle's own tutor on a model API, whose conversation the drawer shows instead. |
 | [`visible.ts`](../ui/src/lib/visible.ts) | Tells animations when they can be seen: in or near the viewport, with the tab showing. |
 

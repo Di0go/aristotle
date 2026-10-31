@@ -43,14 +43,17 @@ if (source === path.join(ROOT, 'data')) throw new Error('Never the real data/: c
  * not "same": the list is what the migration changed on purpose, and docs/plano.md says it.
  */
 const ALLOWED: Record<string, string> = {
-  // (none yet: each one is added with its reason before the commit that needs it)
+  // 11/n
+  index: "index.html tells the core's theme-boot.js Aristotle's key, default accent and old key (data-key, data-accent, data-legacy)",
+  route: "index.html tells the core's theme-boot.js Aristotle's key, default accent and old key (data-key, data-accent, data-legacy)",
+  traversal: "index.html tells the core's theme-boot.js Aristotle's key, default accent and old key (data-key, data-accent, data-legacy)",
 };
 
 /**
  * Of the allowed steps, those where only what the body says may differ: the status, the security headers, the
  * content type and any redirect must still be the same (a raw-Host step's status too).
  */
-const BODY_ONLY = new Set<string>();
+const BODY_ONLY = new Set(['index', 'route', 'traversal']);
 
 /** A step's result without its body: what must still match on a BODY_ONLY step. */
 function withoutBody(r: unknown): unknown {

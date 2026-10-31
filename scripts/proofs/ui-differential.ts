@@ -208,7 +208,10 @@ const OPENINGS: [name: string, wide: boolean, open: (page: Page) => Promise<void
 ];
 
 /** What may differ once opened, with why. */
-const OPENED_ALLOWED: Record<string, string> = {};
+const OPENED_ALLOWED: Record<string, string> = {
+  // 11/n: the core's accents (shared/accents.ts), which Appearance lists.
+  appearance: "the core's accents: green, new to Aristotle, first in the row; red's swatch the crimson",
+};
 
 /** Home, then `open`, settled: its picture and text. Focus mode is left again after, as he would. */
 async function opened(page: Page, base: string, open: (page: Page) => Promise<void>) {
