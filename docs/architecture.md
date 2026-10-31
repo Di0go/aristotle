@@ -234,7 +234,7 @@ Only for the interface (and the tests); tutors use MCP.
 | [`Ask.svelte`](../ui/src/lib/Ask.svelte) | An open question in a lesson: the prompt, a text box with a live maths preview, and the answer once sent. |
 | [`AskPanel.svelte`](../ui/src/lib/AskPanel.svelte) | The "Ask about this" panel: it opens by the passage he selected, takes his question, and shows Claude's answer there, while the class carries on. |
 | [`Block.svelte`](../ui/src/lib/Block.svelte) | One piece of teaching from `show` (orientation, step, plan, summary, feedback or note), labelled and rendered. |
-| [`ChatPanel.svelte`](../ui/src/lib/ChatPanel.svelte) | The chat beside a lesson: talk with Aristotle about anything while reading. |
+| [`ChatPanel.svelte`](../ui/src/lib/ChatPanel.svelte) | The chat beside a lesson: the core's chat (@organon/core/ui/ChatPanel.svelte: talk with Aristotle about anything while reading, the answer streaming in and stoppable, even while a question waits, one conversation per class that stays with it and can be cleared). |
 | [`ClassPage.svelte`](../ui/src/lib/ClassPage.svelte) | One page of a class: the intro, or one step with its checks and the feedback on his answers, with Previous and Next. |
 | [`ConceptNode.svelte`](../ui/src/lib/ConceptNode.svelte) | One concept on a map: status by fill and outline, goal by an inner ring, focus by a halo. |
 | [`ConceptPanel.svelte`](../ui/src/lib/ConceptPanel.svelte) | The side panel for one concept on a map: status, what it rests on and leads to, notes, and its check record; a fading one can be reviewed from here. |

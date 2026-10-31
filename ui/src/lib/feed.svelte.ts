@@ -2,6 +2,7 @@
 // (@organon/core/ui/live: reconnecting, reloading everything on each connection, events held while it loads, and a
 // new release loaded once he is not typing); what the state holds and how each event changes it is Aristotle's.
 
+import { ChatStore } from '@organon/core/ui/chats';
 import { LiveStream } from '@organon/core/ui/live';
 import { untrack } from 'svelte';
 import {
@@ -74,10 +75,8 @@ class LiveFeed {
   notes = $state<StepNote[]>([]);
   /** What he wrote on his About you page. */
   about = $state('');
-  /** The chats beside lessons, by thread (a class's slug, or "home"), loaded when first shown. */
-  chats = $state<Record<string, ChatMessage[]>>({});
-  /** Aristotle's answer being written, by thread: its id and the text so far. */
-  chatDrafts = $state<Record<string, { id: string; text: string }>>({});
+  /** The chats beside lessons, by thread (a class's slug): the core's ChatStore, kept by this feed's events. */
+  readonly chats = new ChatStore();
 
   /** When this page last told the server he was there, working on a question still waiting for him. */
   presentAt = $state(0);
@@ -203,12 +202,6 @@ class LiveFeed {
     return null;
   }
 
-  /** A chat's messages, loaded once; later ones arrive over the live feed. */
-  async loadChat(thread: string) {
-    if (this.chats[thread]) return;
-    this.chats[thread] = await getJson<ChatMessage[]>(`/api/chats/${encodeURIComponent(thread)}`);
-  }
-
   /** Adds an item to the session, or replaces it in place when it is already there (an answered question). */
   upsert(item: PublicItem) {
     const i = this.items.findIndex((x) => x.id === item.id);
@@ -226,8 +219,7 @@ class LiveFeed {
     // Back after a disconnection, anything may have changed; on the first load, a list asked for a moment ago is current.
     if (this.loaded) this.sessionList = null;
     try {
-      const threads = Object.keys(this.chats);
-      const [state, topics, roadmaps, missions, glosses, asides, notes, about, chats] = await Promise.all([
+      const [state, topics, roadmaps, missions, glosses, asides, notes, about] = await Promise.all([
         getJson<FeedState & { build?: string }>('/api/state'),
         getJson<Topic[]>('/api/map'),
         getJson<Roadmap[]>('/api/roadmaps'),
@@ -237,7 +229,7 @@ class LiveFeed {
         getJson<StepNote[]>('/api/notes'),
         getJson<{ text: string }>('/api/about'),
         // Chats already open are read again, so nothing said while disconnected is missed.
-        Promise.all(threads.map((t) => getJson<ChatMessage[]>(`/api/chats/${encodeURIComponent(t)}`))),
+        this.chats.reload(),
       ]);
       this.session = state.session;
       this.items = state.items;
@@ -249,7 +241,6 @@ class LiveFeed {
       this.asides = asides;
       this.notes = notes;
       this.about = about.text;
-      for (const [i, t] of threads.entries()) this.chats[t] = chats[i];
       this.topicVersion++;
       return state.build;
     } finally {
@@ -269,6 +260,8 @@ class LiveFeed {
   }
 
   private apply(event: FeedEvent) {
+    // The chats' own events (chat, chat-delta, chat-cleared) are the core's ChatStore's.
+    if (this.chats.apply(event)) return;
     switch (event.type) {
       case 'session': {
         const changed = event.session.id !== this.session?.id;
@@ -325,23 +318,6 @@ class LiveFeed {
       case 'about':
         this.about = event.about;
         break;
-      case 'chat': {
-        const list = this.chats[event.thread];
-        if (list && !list.some((m) => m.id === event.message.id)) list.push(event.message);
-        if (event.message.role === 'assistant') delete this.chatDrafts[event.thread];
-        break;
-      }
-      case 'chat-cleared':
-        this.chats[event.thread] = [];
-        delete this.chatDrafts[event.thread];
-        break;
-      case 'chat-delta': {
-        // Each delta is appended to the answer it belongs to; a new id starts a new one.
-        const draft = this.chatDrafts[event.thread];
-        const before = draft?.id === event.id ? draft.text : '';
-        this.chatDrafts[event.thread] = { id: event.id, text: before + event.delta };
-        break;
-      }
     }
   }
 }
