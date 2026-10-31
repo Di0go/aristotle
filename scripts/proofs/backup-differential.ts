@@ -79,6 +79,9 @@ try {
         GIT_AUTHOR_EMAIL: 't@t',
         GIT_COMMITTER_NAME: 't',
         GIT_COMMITTER_EMAIL: 't@t',
+        // No global or system Git config (a hooks path, signing): the same bare Git on both sides.
+        GIT_CONFIG_GLOBAL: '/dev/null',
+        GIT_CONFIG_NOSYSTEM: '1',
       }),
       encoding: 'utf8',
     });

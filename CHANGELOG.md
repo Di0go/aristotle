@@ -47,7 +47,10 @@ has to be done. What does change:
 - The server says which app and which commit it is (`/api/health`), and a release waits for the new commit to answer
   from a new process before it counts as live; `pnpm release --rollback` reads the lockfile of the release it goes
   back to.
-- A body that is not JSON gets the core's 400 "Not JSON", one over 1 MB a 413.
+- A body that is not JSON gets the core's 400 "Not JSON" (on every route that reads one), one over 1 MB a 413; a JSON
+  answer says its charset (`application/json; charset=utf-8`).
+- The tutor's `method` tool ends its description in the core's words ("Without `name`, lists the routines."); every
+  other word of every tool is as before.
 - Search folds accents with the core's function (the same one); what a result shows of its text is as before.
 - The scripts that set up `aristotle.test` (`pnpm service`, `pnpm tls`, the core's `setup-hostname.sh`) are the core's,
   from [`app.json`](app.json). What the app had as the Mind Gym on gym.test is cleaned up by its own

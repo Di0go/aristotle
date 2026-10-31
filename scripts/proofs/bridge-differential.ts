@@ -94,6 +94,8 @@ try {
       ARISTOTLE_DATA_DIR: data,
       ARISTOTLE_STATE_DIR: path.join(dir, name, 'state'),
       ARISTOTLE_CLAUDE_CMD: 'bash --norc --noprofile',
+      // The headless agent's folder of its own, never ~/.cache/aristotle (shared with the real instances).
+      ARISTOTLE_CLAUDE_CWD: path.join(dir, name, 'claude'),
     });
     const app = (command: string) => {
       const r = spawnSync(process.execPath, ['server/control.ts', command], { cwd: root, env, encoding: 'utf8' });

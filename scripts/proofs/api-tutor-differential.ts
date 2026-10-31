@@ -8,7 +8,7 @@
 //   node scripts/proofs/api-tutor-differential.ts [--data <folder>] [--ref <ref>]
 
 import { type ChildProcess, spawn } from 'node:child_process';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import http from 'node:http';
 import net from 'node:net';
 import path from 'node:path';
@@ -49,7 +49,12 @@ const model = http.createServer((req, res) => {
     const n = (seen[side]?.length ?? 0) / 3;
     seen[side]?.push(
       `request${n}-system ${hash(plain(String(system?.content ?? '')))}`,
-      `request${n}-tools ${parsed.tools?.length ?? 0} ${hash(plain(JSON.stringify(parsed.tools ?? [])))}`,
+      // The one sentence the core words its own way (13/n), set aside and checked to be each side's: main's on the
+      // reference, the core's on the new side. Every other word of every tool is compared.
+      `request${n}-tools ${parsed.tools?.length ?? 0} ${hash(plain(JSON.stringify(parsed.tools ?? [])).replace(/Without `name`, lists (them|the routines)\./g, '<lists>'))} ${
+        (JSON.stringify(parsed.tools ?? []).match(/Without `name`, lists (them|the routines)\./)?.[1] ?? 'none') ===
+        (side === 'a' ? 'them' : 'the routines')
+      }`,
       `request${n}-messages ${parsed.messages.length} ${hash(plain(JSON.stringify(parsed.messages.filter((m) => m.role !== 'system'))))}`,
     );
     res.writeHead(200, { 'Content-Type': 'text/event-stream' }).end(turn(parsed));
@@ -89,6 +94,8 @@ try {
         ARISTOTLE_TLS_DIR: path.join(state, 'tls'),
         ARISTOTLE_BACKUP: 'off',
         ARISTOTLE_WAIT_MS: '500',
+        // The headless agent's folder of its own, never ~/.cache/aristotle (shared with the real instances).
+        ARISTOTLE_CLAUDE_CWD: path.join(state, 'claude'),
       }),
       stdio: 'ignore',
     });
@@ -125,6 +132,34 @@ try {
       if (m.type === 'entry' && m.entry)
         lines.push(`entry ${m.entry.kind} ${m.entry.tool ?? ''} ${m.entry.state ?? ''} ${hash(plain(m.entry.text ?? ''))}`);
       else if (m.type !== 'delta' && m.type !== 'activity') lines.push(`${m.type} ${hash(plain(JSON.stringify(m)))}`);
+    // The conversation as it is saved (tutor-api.json, what the drawer shows again after a restart): its times of
+    // writing blanked, the rest compared.
+    const saved = path.join(state, 'tutor-api.json');
+    // Saved a moment after the last change: read once it has stopped changing (the same twice, half a second apart).
+    let last = '';
+    for (let i = 0; i < 20; i++) {
+      await new Promise((r) => setTimeout(r, 500));
+      const now = existsSync(saved) ? readFileSync(saved, 'utf8') : '';
+      if (now && now === last) break;
+      last = now;
+    }
+    if (process.env.SHOW_DIR && existsSync(saved))
+      writeFileSync(path.join(process.env.SHOW_DIR, `${name}-saved.json`), readFileSync(saved));
+    lines.push(
+      `saved ${
+        existsSync(saved)
+          ? hash(
+              // Times and ids first: plain() writes today's date as TODAY, which a time would then no longer match.
+              plain(
+                readFileSync(saved, 'utf8')
+                  .replace(/\d{4}-\d\d-\d\dT[\d:.]+Z/g, '<time>')
+                  .replace(/\b1[789]\d{11}\b/g, '<ms>')
+                  .replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/g, '<id>'),
+              ),
+            )
+          : 'none'
+      }`,
+    );
     // What the drawer says it is doing, in order; when it began is a moment, one per side.
     lines.push(`activities ${hash(msgs.filter((m) => m.type === 'activity').map((m) => JSON.stringify({ ...m, since: 0 })))}`);
     if (process.env.SHOW_DIR)
@@ -141,9 +176,7 @@ try {
   const b = await side(ROOT, 'b');
   const out = refused(proxy.calls);
   console.log(out.line);
-  // 13/n: the method tool's description ends in the core's words; nothing else of the tools may change.
-  const method = "the method tool's description ends 'Without `name`, lists the routines.' (the core's, 13/n)";
-  code = compare(a, b, { 'request0-tools': method, 'request1-tools': method, 'request2-tools': method }) && !out.lopsided ? 0 : 1;
+  code = compare(a, b) && !out.lopsided ? 0 : 1;
   console.log(code ? 'DIFFERENT' : 'SAME');
 } finally {
   for (const c of children) c.kill('SIGKILL');

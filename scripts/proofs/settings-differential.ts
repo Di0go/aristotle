@@ -57,8 +57,16 @@ if (process.argv[2] === '--run') {
   // differential's own, not his).
   let landed = 'unreadable';
   try {
-    const f = JSON.parse(readFileSync(file, 'utf8')) as { tutor?: string; helpers?: string; api?: { model?: string } };
+    const f = JSON.parse(readFileSync(file, 'utf8')) as {
+      tutor?: string;
+      helpers?: string;
+      api?: { model?: string };
+      accent?: string;
+      agentCommand?: string;
+    };
     landed = `${f.tutor} ${f.helpers} ${f.api?.model}`;
+    // What the three changes did not touch must still be there: the accent and his own command, if the start had them.
+    out.push(`untouched ${hash([f.accent ?? null, f.agentCommand ?? null])}`);
   } catch {}
   out.push(`landed ${landed}`);
   console.log(out.join('\n'));
@@ -116,6 +124,7 @@ try {
       'view-concurrent': 'the same race: on main, which of the three landed depended on it',
       'file-concurrent': 'the same race',
       landed: 'the same race (on main, what the file holds afterwards depended on it)',
+      untouched: 'the same race',
     };
     const allowed: Record<string, string> =
       name !== 'a stray comma'
@@ -132,7 +141,12 @@ try {
     const b = run(ROOT, 'b');
     if (!compare(a, b, allowed)) same = false;
     // The race is allowed only because the new side wins it: all three changes saved, and all three in the file.
-    for (const want of ['concurrent all saved', 'landed gemini claude-code llama3'])
+    let kept: unknown[] = [null, null];
+    try {
+      const f = JSON.parse(start ?? '') as { accent?: string; agentCommand?: string };
+      kept = [f.accent ?? null, f.agentCommand ?? null];
+    } catch {}
+    for (const want of ['concurrent all saved', 'landed gemini claude-code llama3', `untouched ${hash(kept)}`])
       if (!b.includes(want)) {
         console.log(`new side: expected "${want}"`);
         same = false;

@@ -19,8 +19,9 @@
 
 import { createHash } from 'node:crypto';
 import { execFileSync, spawn, spawnSync, type ChildProcess } from 'node:child_process';
-import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs';
+import { chmodSync, cpSync, writeFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { get as httpGet, request as httpRequest } from 'node:http';
+import { request as httpsRequest } from 'node:https';
 import net from 'node:net';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -75,7 +76,10 @@ const STATE: Cut = {
 // 11/n: the page the server hands for any route of the interface.
 const PAGE: Cut = {
   why: "index.html tells the core's theme-boot.js Aristotle's key, default accent and old key",
-  patterns: [/ data-key="aristotle\.look"/, / data-accent="blue"/, / data-legacy="mind-gym\.look"/],
+  // On the theme-boot script only (a data-accent on <html>, the install's, is compared as it is).
+  patterns: [
+    /(?<=<script src="\/theme-boot\.js") data-key="aristotle\.look" data-accent="blue" data-legacy="mind-gym\.look"(?=><\/script>)/,
+  ],
 };
 const CUTS: Record<string, Cut> = {
   health: HEALTH,
@@ -86,6 +90,9 @@ const CUTS: Record<string, Cut> = {
   index: PAGE,
   route: PAGE,
   traversal: PAGE,
+  'index accented': PAGE,
+  'tls health': HEALTH,
+  'tls page': PAGE,
 };
 
 /**
@@ -147,10 +154,18 @@ function times(text: string): string {
   // apart (an A/A run differed there, in the 12th digit): compared to 9 significant digits, which any change of rule
   // shows and a few milliseconds over days does not.
   const digits = /("(?:stability|difficulty)"\s*:\s*)(-?\d+(?:\.\d+)?(?:e[+-]?\d+)?)/g;
-  return text
-    .replace(digits, (_m, k, n: string) => `${k}${Number(n).toPrecision(9)}`)
-    .replace(card, (_m, a, due: string, b, last: string) => `${a}<last+${Date.parse(due) - Date.parse(last)}ms>${b}${last}"`)
-    .replace(new RegExp(ISO.source, 'g'), (t) => (Date.parse(t) < RUN_START ? t : '<time>'));
+  return (
+    text
+      .replace(digits, (_m, k, n: string) => `${k}${Number(n).toPrecision(9)}`)
+      .replace(card, (_m, a, due: string, b, last: string) => `${a}<last+${Date.parse(due) - Date.parse(last)}ms>${b}${last}"`)
+      // Only a time inside the run (from its start to now, a minute's slack) is blanked: one in the future, the past
+      // before the run, or one that does not parse is compared as it is, so a time written an hour off, or in the wrong
+      // unit, is a difference.
+      .replace(new RegExp(ISO.source, 'g'), (t) => {
+        const at = Date.parse(t);
+        return at >= RUN_START && at <= Date.now() + 60_000 ? '<time>' : t;
+      })
+  );
 }
 
 /** Today, in Lisbon, as the server names a sitting. */
@@ -178,6 +193,7 @@ interface Side {
   stateDir: string;
   port: number;
   base: string;
+  tlsPort?: number;
   child?: ChildProcess;
   mcp?: Client;
 }
@@ -196,13 +212,15 @@ async function prepare(name: Side['name'], root: string): Promise<Side> {
     if (made.status !== 0) throw new Error('tls.sh failed');
   }
   cpSync(path.join(work, 'tls'), path.join(stateDir, 'tls'), { recursive: true });
-  cpSync(path.join(work, 'tls'), path.join(stateDir, 'tls'), { recursive: true });
+  // Trusted, as setup-hostname.sh leaves it once the browsers trust the certificate: the http to https move is on.
+  writeFileSync(path.join(stateDir, 'tls', 'installed'), '');
   const port = await freePort();
   return { name, root, dataDir, stateDir, port, base: `http://localhost:${port}` };
 }
 
 async function start(side: Side) {
   const tlsPort = await freePort();
+  side.tlsPort = tlsPort;
   const env = hermeticEnv(proxy.url(side.name === 'ref' ? 'a' : 'b'), {
     ARISTOTLE_PORT: String(side.port),
     ARISTOTLE_TLS_PORT: String(tlsPort),
@@ -297,6 +315,8 @@ async function request(side: Side, r: Req) {
     await new Promise((r) => setTimeout(r, 200));
     return send();
   });
+  // The core's JSON says its charset (application/json; charset=utf-8, where main sent application/json): JSON is
+  // UTF-8 by definition, so nothing reads it differently. Said in the CHANGELOG; the rest of the type is compared.
   const type = (res.headers.get('content-type') ?? '').replace(/;\s*charset=utf-8/i, '');
   const { text: body, found } = cutFields(normalise(side, await res.text()), CUTS[r.step ?? '']);
   if (args.includes('--show')) shown.set(`${side.name} ${r.method ?? 'GET'} ${r.path}`, body);
@@ -334,6 +354,48 @@ function alone(side: Side, method: string, route: string, headers: Record<string
     // The server may answer before it has read the whole body, and close: the answer is what counts.
     req.on('error', reject);
     req.end(body);
+  });
+}
+
+/**
+ * A request over TLS, as the learner's browser makes them (https://aristotle.test), with the Host and Origin it sends:
+ * the status, the type, where it moves and the body, normalised. The certificate is the run's own: not checked here.
+ */
+function overTls(side: Side, route: string, headers: Record<string, string> = {}, step = ''): Promise<string> {
+  return new Promise((resolve) => {
+    const req = httpsRequest(
+      {
+        host: '127.0.0.1',
+        port: side.tlsPort,
+        path: route,
+        rejectUnauthorized: false,
+        servername: 'aristotle.test',
+        headers: { Host: 'aristotle.test', ...headers },
+      },
+      (res) => {
+        let body = '';
+        res.on('data', (d) => (body += d));
+        res.on('end', () => {
+          const cut = cutFields(normalise(side, body), CUTS[step]);
+          const found = CUTS[step] ? ` found ${cut.found.join(',')}` : '';
+          // The charset, as in request(): said in the CHANGELOG, the rest of the type compared.
+          const type = (res.headers['content-type'] ?? '').replace(/;\s*charset=utf-8/i, '');
+          resolve(`${res.statusCode} ${type} ${res.headers.location ?? ''} ${hash(cut.text)}${found}`);
+        });
+      },
+    );
+    req.on('error', (e) => resolve(`error ${e.message}`));
+    req.end();
+  });
+}
+
+/** A plain-http request to the clean name: where a trusted install sends a page, and where it lets the API be. */
+function cleanName(side: Side, route: string): Promise<string> {
+  return new Promise((resolve) => {
+    httpGet({ host: '127.0.0.1', port: side.port, path: route, headers: { Host: 'aristotle.test' } }, (res) => {
+      res.resume();
+      res.on('end', () => resolve(`${res.statusCode} ${res.headers.location ?? ''}`));
+    }).on('error', (e) => resolve(`error ${e.message}`));
   });
 }
 
@@ -509,6 +571,14 @@ async function steps(ref: Side): Promise<Step[]> {
     { name: 'host other', run: (s) => rawHost(s, 'evil.test') },
     { name: 'host own name', run: (s) => rawHost(s, 'aristotle.test', 'host own name') },
     http('origin other', { path: '/api/health', headers: { Origin: 'http://evil.test' } }),
+    // The path the learner uses: http://aristotle.test moves pages to https, not the API; over TLS, the page, the
+    // health and the API with https://aristotle.test as the Origin, and another Origin refused.
+    { name: 'clean name page', run: (s) => cleanName(s, '/') },
+    { name: 'clean name api', run: (s) => cleanName(s, '/api/health') },
+    { name: 'tls health', run: (s) => overTls(s, '/api/health', {}, 'tls health') },
+    { name: 'tls page', run: (s) => overTls(s, '/', {}, 'tls page') },
+    { name: 'tls api own origin', run: (s) => overTls(s, '/api/topics', { Origin: 'https://aristotle.test' }) },
+    { name: 'tls api other origin', run: (s) => overTls(s, '/api/topics', { Origin: 'https://evil.test' }) },
     http('cross site', { path: '/api/health', headers: { 'Sec-Fetch-Site': 'cross-site' } }),
     http('mcp get', { path: '/mcp' }),
     http('presence', { method: 'POST', path: '/api/presence', body: {} }),
@@ -667,6 +737,94 @@ async function steps(ref: Side): Promise<Step[]> {
     http('chat after', { path: `/api/chats/${encodeURIComponent(topic)}` }),
     http('chat stop nothing', { method: 'DELETE', path: `/api/chats/${encodeURIComponent(topic)}/answer` }),
     http('chat clear', { method: 'DELETE', path: `/api/chats/${encodeURIComponent(topic)}` }),
+    // What he writes himself, through the core's readJson, and what is written for him: each written, read back and
+    // (where it can be) removed; the files compared at the end hold what is left.
+    {
+      name: 'gloss written, removed',
+      run: async (s) => {
+        const made = await request(s, {
+          method: 'POST',
+          path: '/api/glosses',
+          body: { text: 'differential phrase', context: 'A passage.', topic },
+        });
+        const all = await request(s, { path: '/api/glosses' });
+        const list = (await (await fetch(`${s.base}/api/glosses`)).json()) as { id: string; text?: string }[];
+        const id = list.find((g) => g.text === 'differential phrase')?.id ?? 'none';
+        const gone = await request(s, { method: 'DELETE', path: `/api/glosses/${encodeURIComponent(id)}` });
+        return { made, all, gone };
+      },
+    },
+    {
+      name: 'aside written, removed',
+      run: async (s) => {
+        const made = await request(s, { method: 'POST', path: '/api/asides', body: { question: 'Why so?', passage: 'A passage.', topic } });
+        const list = (await (await fetch(`${s.base}/api/asides`)).json()) as { id: string; question?: string }[];
+        const id = list.find((a) => a.question === 'Why so?')?.id ?? 'none';
+        const all = await request(s, { path: '/api/asides' });
+        const gone = await request(s, { method: 'DELETE', path: `/api/asides/${encodeURIComponent(id)}` });
+        return { made, all, gone };
+      },
+    },
+    http('note write', { method: 'PUT', path: '/api/notes', body: { topic, step: '1', text: 'My own note.\n', title: 'Step one' } }),
+    http('notes after', { path: '/api/notes' }),
+    http('note bad', { method: 'PUT', path: '/api/notes', body: { topic, text: 'x' } }),
+    {
+      name: 'roadmap saved, read',
+      run: async (s) => ({
+        saved: await tool('save_roadmap', {
+          title: 'Differential path',
+          goal: 'Check the roadmaps.',
+          status: 'active',
+          steps: [
+            { title: 'First thing', goal: 'Know the first thing.' },
+            { title: 'Differential topic', goal: 'The topic of the sitting.', topic: NEW },
+          ],
+        })(s),
+        read: await tool('get_roadmap', { roadmap: 'Differential path' })(s),
+        list: await request(s, { path: '/api/roadmaps' }),
+      }),
+    },
+    {
+      name: 'mission saved, debriefed, reviewed',
+      run: async (s) => {
+        const saved = await s.mcp!.callTool({
+          name: 'save_mission',
+          arguments: {
+            title: 'Use it once',
+            scope: 'topic',
+            topic: NEW,
+            why: 'To see it work.',
+            brief: 'Do the thing, then say what happened.',
+            criteria: ['It was done'],
+            concepts: [`${NEW}/one`],
+          },
+        });
+        const id = textOf(saved).match(/#\/praxis\/([^)\s]+)/)?.[1] ?? 'none';
+        const debrief = await request(s, {
+          method: 'POST',
+          path: `/api/missions/${encodeURIComponent(id)}`,
+          body: { action: 'debrief', text: 'I did it.' },
+        });
+        const empty = await request(s, {
+          method: 'POST',
+          path: `/api/missions/${encodeURIComponent(id)}`,
+          body: { action: 'debrief', text: ' ' },
+        });
+        const unknown = await request(s, { method: 'POST', path: `/api/missions/${encodeURIComponent(id)}`, body: { action: 'nope' } });
+        const reviewed = await tool('review_mission', {
+          mission: id,
+          verdict: 'achieved',
+          critique: 'Done against the one criterion.',
+          results: [{ concept: `${NEW}/one`, outcome: 'right' }],
+        })(s);
+        return { saved: hash(normalise(s, textOf(saved))), debrief, empty, unknown, reviewed, list: await tool('list_missions')(s) };
+      },
+    },
+    http('missions after', { path: '/api/missions' }),
+    // The install's own accent: written on <html> by the server; the theme-boot script still says the default.
+    http('settings accent', { method: 'PUT', path: '/api/settings', body: { accent: 'violet' } }),
+    http('index accented', { path: '/' }),
+    http('settings accent back', { method: 'PUT', path: '/api/settings', body: { accent: 'blue' } }),
   ];
 }
 
