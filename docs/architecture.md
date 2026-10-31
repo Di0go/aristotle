@@ -340,7 +340,7 @@ Only for the interface (and the tests); tutors use MCP.
 | [`doc-zones.ts`](../scripts/doc-zones.ts) | Which docs describe which code: a change to a zone should come with a change to at least one of its docs. |
 | [`docs.ts`](../scripts/docs.ts) | Keeps the reference parts of the docs true by writing them from the code: the map of files (from each file's header comment), the MCP tools, the API routes, the environment variables, the pnpm scripts, the skills and agents, and the visual kit. |
 | [`gates.ts`](../scripts/gates.ts) | Every check a change must pass, in one command: the same list runs in the pre-push hook, in CI and before a release. |
-| [`release.ts`](../scripts/release.ts) | Ships what is committed here to the app you learn in, without ever running half-finished code. |
+| [`release.ts`](../scripts/release.ts) | Ships what is committed here to the app you learn in, without ever running half-finished code: the core's release (@organon/core/server/release). |
 | [`retire-gym-test.sh`](../scripts/retire-gym-test.sh) | Takes out what Aristotle had when it was the Mind Gym on gym.test: history, not infrastructure, so it stays here while the scripts that set up aristotle.test are the core's (node_modules/@organon/core/scripts, from app.json). |
 | [`review-replay.ts`](../scripts/review-replay.ts) | Replays a learning history through the review scheduler, read-only, to see what it would ask of him: the concepts due each day, then a simulated stretch of days ahead with the daily cap. |
 | [`seed.ts`](../scripts/seed.ts) | Fills the dev instance's data with a fixture (scripts/fixtures/<name>.ts, "demo" by default) by replaying it through a throwaway server's MCP endpoint, exactly as Claude Code would teach it. |
