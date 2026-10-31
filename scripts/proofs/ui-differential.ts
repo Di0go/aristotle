@@ -125,6 +125,9 @@ async function shoot(page: Page, base: string, route: string): Promise<{ png: Bu
     content:
       '*,*::before,*::after{animation:none!important;transition:none!important;caret-color:transparent!important}' +
       '.mobile-search svg{visibility:hidden!important}' +
+      // A live explorable (the beating heart) runs on the clock: its trace and numbers depend on how long it has been
+      // open, on both sides alike. Hidden from the picture and the text; the figure's place and size still count.
+      'figure.explorable{visibility:hidden!important}' +
       '@media (max-width: 640px){.statusline{gap:10px!important}}',
   });
   await page.mouse.move(0, 0);

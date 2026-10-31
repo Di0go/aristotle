@@ -75,7 +75,7 @@ Everything Claude sends is Markdown, so this is also the list of what Claude can
 
 - LaTeX maths, `$…$` and `$$…$$` (KaTeX);
 - ```` ```mermaid ```` diagrams (drawn in the app's colours, again when the theme or accent changes, and kept so a step revisited shows them at once), and inline `<svg>` (which may animate with SMIL; Play/Pause and Replay are added, and it pauses by itself while out of sight unless he paused it);
-- `==highlights==`, `{{term|definition}}` hover terms, `[[concept-id]]` links to the map (all three, and maths and code, work inside table cells: [`tables.ts`](../ui/src/lib/tables.ts) escapes their `|` so the table doesn't split the row on it);
+- `==highlights==`, `{{term|definition}}` hover terms, `[[concept-id]]` links to the map (all three, and maths and code, work inside table cells: the core's `escapeTablePipes`, handed Aristotle's [[concept]] pattern from [`concept-piece.ts`](../ui/src/lib/concept-piece.ts), escapes their `|` so the table doesn't split the row on it);
 - Obsidian callouts: `> [!idea] Title` (idea, key, why, context, example, you, careful, term, note);
 - `![alt](url "caption")` as a captioned figure;
 - ```` ```sequence ```` blocks: frames split by `---`, stepped through with Next and Back;
