@@ -1,47 +1,27 @@
-// The Aristotle server: the interface, its live feed, and the MCP endpoint Claude Code connects to.
-// Listens on loopback only (127.0.0.1, and ::1 so nobody else can): HTTP, and HTTPS for aristotle.test when
-// scripts/tls.sh has made its certificate. Only this user's connections, to our own names, from our own pages.
+// The Aristotle server: the core's serve() (@organon/core/server/http: loopback only, HTTP and HTTPS for
+// aristotle.test, this user's connections only, the exact Host and Origin, the CSP and the other headers, JSON bodies,
+// the built interface with the install's accent, /api/health and /api/state, the pid file, a clean stop) with
+// Aristotle's own: its routes, the live feed, the MCP endpoint Claude Code connects to, and the drawer's WebSocket.
 
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { readFile } from 'node:fs/promises';
-import http from 'node:http';
-import https from 'node:https';
-import type { Socket } from 'node:net';
-import path from 'node:path';
-import type { Duplex } from 'node:stream';
+import type http from 'node:http';
+import { json, type Route, readJson, serve } from '@organon/core/server/http';
+import { settingsRoutes } from '@organon/core/server/settings-routes';
 import { EventHub } from '@organon/core/server/events';
-import {
-  ALLOWED_HOSTS,
-  ALLOWED_ORIGINS,
-  HOST,
-  HOST6,
-  HOSTNAME,
-  INSTANCE,
-  PORT,
-  ROOT,
-  TLS_DIR,
-  TLS_ENABLED,
-  TLS_PORT,
-  TLS_TRUSTED,
-  UI_DIR,
-  URL_CLEAN,
-} from './config.ts';
-import { PID_FILE } from './control.ts';
 import { AnswerError, publicItem } from './feed.ts';
 import { AsideError } from './asides.ts';
-import { ChatError } from './chat.ts';
 import { GlossError } from './glosses.ts';
 import { Gym } from './gym.ts';
 import { MissionError } from './missions.ts';
-import { socketOwner } from './peer.ts';
 import { Search } from './search.ts';
 import { agentLaunch } from './agents.ts';
-import { listModels } from './llm.ts';
-import { onPath, SettingsError, settings } from './settings.ts';
 import { createTutor } from './tutor.ts';
 import { leanTopic } from './topics.ts';
+import { chatRoutes } from './chat.ts';
+import { app } from './config.ts';
+import { IDENTITY } from './llm.ts';
+import { onPath, settings } from './settings.ts';
+import { warnings } from './warnings.ts';
 import type { AskAnswerBody, AsideBody, GlossBody, QuizAnswerBody } from '../shared/types.ts';
-import type { SettingsBody } from '../shared/tutor.ts';
 
 const gym = await Gym.load();
 const feed = gym.feed;
@@ -51,83 +31,10 @@ const tutor = createTutor(gym);
 // retry of 2 s, a ping every 20 s the page can see, and a page that stops reading let go).
 const events = new EventHub();
 feed.events.on('event', (event) => events.send(event));
-/** How many of a chat's messages the interface loads. */
-const CHAT_PAGE = 300;
-/** This user: connections from other accounts on the machine are refused (peer.ts). */
-const UID = process.getuid?.();
-
-/** Content types of the files the interface build is made of. */
-const TYPES: Record<string, string> = {
-  '.html': 'text/html; charset=utf-8',
-  '.js': 'text/javascript; charset=utf-8',
-  '.css': 'text/css; charset=utf-8',
-  '.svg': 'image/svg+xml',
-  '.png': 'image/png',
-  '.ico': 'image/x-icon',
-  '.woff2': 'font/woff2',
-  '.woff': 'font/woff',
-  '.ttf': 'font/ttf',
-  '.json': 'application/json',
-};
-
-/** Every HTTP request: security checks first, then MCP, the API or the interface's files. */
-async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
-  try {
-    // Only answer requests addressed to this machine by name, and only from our own pages:
-    // stops other websites in the browser from reaching the server (DNS rebinding, CSRF).
-    if (!localHost(req.headers.host) || (req.headers.origin && !localOrigin(req.headers.origin))) {
-      return send(res, 403, 'Forbidden');
-    }
-    const url = new URL(req.url ?? '/', 'http://localhost');
-    // The API and MCP are for our own pages and local programs only, never another site's request, even one a
-    // browser sends without an Origin (a GET from an <img>, a link): browsers mark those cross-site.
-    if ((url.pathname.startsWith('/api/') || url.pathname === '/mcp') && !sameSite(req)) return send(res, 403, 'Forbidden');
-    protect(req, res);
-    // Once the browsers trust the certificate, pages on http://aristotle.test move to https. Not /api/: a page
-    // still open over http keeps its live feed and terminal, which a redirect to another origin would break.
-    if (
-      TLS_TRUSTED &&
-      !('encrypted' in req.socket) &&
-      req.headers.host === HOSTNAME &&
-      !url.pathname.startsWith('/api/') &&
-      url.pathname !== '/mcp'
-    ) {
-      res.writeHead(307, { Location: `https://${HOSTNAME}${req.url ?? '/'}` }).end();
-      return;
-    }
-    if (url.pathname === '/mcp') return await handleMcp(req, res);
-    if (url.pathname.startsWith('/api/')) return await handleApi(req, res, url.pathname, url.searchParams);
-    return await serveStatic(res, url.pathname);
-  } catch (err) {
-    // A malformed %-escape in a path is the request's fault.
-    if (err instanceof URIError && !res.headersSent) return send(res, 400, 'Bad request');
-    console.error(err);
-    if (!res.headersSent) send(res, 500, 'Server error');
-    else res.end();
-  }
-}
-
-// The drawer runs the tutor (Claude Code, another agent, or the API tutor), so it is only ever reachable from Aristotle's own pages: a browser always
-// sends an Origin on a WebSocket, and other sites (or a rebound DNS name) fail the Host and Origin checks.
-function upgrade(req: http.IncomingMessage, socket: Duplex, head: Buffer) {
-  const url = new URL(req.url ?? '/', 'http://localhost');
-  if (
-    url.pathname !== '/api/terminal' ||
-    !localHost(req.headers.host) ||
-    !req.headers.origin ||
-    !localOrigin(req.headers.origin) ||
-    !sameSite(req)
-  ) {
-    socket.write('HTTP/1.1 403 Forbidden\r\n\r\n');
-    socket.destroy();
-    return;
-  }
-  // The core's drawer takes it: at most eight at a time, 1 MB frames.
-  if (!tutor.upgrade(req, socket, head, url.pathname)) {
-    socket.write('HTTP/1.1 403 Forbidden\r\n\r\n');
-    socket.destroy();
-  }
-}
+/** Settings (the core's routes): what the interface reads and changes, the models the API offers, asked as Aristotle. */
+const settingsApi = settingsRoutes(settings, { view: settingsView, identity: IDENTITY });
+/** The chat's routes (the core's), each message told where he is and what is on his screen (chatContext). */
+const chats = chatRoutes(gym.chats, { context: (thread, b) => chatContext(thread, b.where, b.page, b.step, b.mentions) });
 
 /**
  * The MCP endpoint (POST only): the core's handler with Aristotle's tools (mcp.ts), which says when it serves the
@@ -151,19 +58,10 @@ function mcpModule() {
 }
 
 /** The interface's JSON API. Every route is listed in docs/architecture.md (generated from the checks below). */
-async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, route: string, params: URLSearchParams) {
+async function routes(...[req, res, route, params]: Parameters<Route>): Promise<boolean> {
   /** The part of the route after `prefix`: a slug or an id. */
   const tail = (prefix: string) => decodeURIComponent(route.slice(prefix.length));
-  // Every body is JSON, and saying so is required: a form or a no-cors fetch from another page can only send
-  // text/plain or form types, so this stands behind the Origin check.
-  if ((req.method === 'POST' || req.method === 'PUT') && !/^application\/json\b/i.test(req.headers['content-type'] ?? '')) {
-    return json(res, 415, { error: 'Send JSON (Content-Type: application/json)' });
-  }
-
   // The live session
-  if (req.method === 'GET' && route === '/api/health')
-    return json(res, 200, { ok: true, instance: INSTANCE, root: ROOT, pid: process.pid });
-  if (req.method === 'GET' && route === '/api/state') return json(res, 200, feed.state());
   if (req.method === 'GET' && route === '/api/events') return events.stream(req, res);
   // He is at the page working on an open question: the page counts the sitting as going on (feed.svelte.ts
   // inProgress), so his answer is handed to the tutor still holding it rather than to a fresh one.
@@ -293,62 +191,10 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ro
   }
 
   // The chat beside a lesson: his message, with where he is; the answer streams over the live feed as it is written.
-  // A chat's newest messages: years of one chat would be megabytes the panel never scrolls back through.
-  if (req.method === 'GET' && route.startsWith('/api/chats/')) return json(res, 200, gym.chats.get(tail('/api/chats/')).slice(-CHAT_PAGE));
-  if (req.method === 'DELETE' && route.startsWith('/api/chats/')) {
-    // DELETE /api/chats/<thread>/answer stops the answer being written; DELETE /api/chats/<thread> clears the chat.
-    const rest = tail('/api/chats/');
-    if (rest.endsWith('/answer')) return json(res, 200, { stopped: gym.chats.cancel(rest.slice(0, -'/answer'.length)) });
-    await gym.chats.clear(rest);
-    return json(res, 200, { ok: true });
-  }
-  if (req.method === 'POST' && route.startsWith('/api/chats/')) {
-    const body = (await readJson(req)) as {
-      text?: unknown;
-      where?: unknown;
-      page?: unknown;
-      step?: unknown;
-      mentions?: unknown;
-      tags?: unknown;
-    } | null;
-    if (typeof body?.text !== 'string') return json(res, 400, { error: 'Missing text' });
-    const thread = tail('/api/chats/');
-    try {
-      const context = chatContext(thread, str(body.where), str(body.page), str(body.step), str(body.mentions));
-      const tags = Array.isArray(body.tags) ? body.tags.filter((t): t is string => typeof t === 'string') : [];
-      const answer = await gym.chats.send(thread, body.text, context, tags);
-      return json(res, 200, answer);
-    } catch (err) {
-      if (err instanceof ChatError) return json(res, 400, { error: err.message });
-      throw err;
-    }
-  }
+  if (await chats(req, res, route, params)) return true;
 
-  // Who teaches (settings.ts): the interface reads and changes it; the API key only ever goes in, never out.
-  if (req.method === 'GET' && route === '/api/settings') return json(res, 200, settingsView());
-  if (req.method === 'PUT' && route === '/api/settings') {
-    const body = (await readJson(req)) as SettingsBody | null;
-    if (!body || typeof body !== 'object' || Array.isArray(body)) return json(res, 400, { error: 'Send the settings as an object' });
-    try {
-      await settings.update(body);
-      return json(res, 200, settingsView());
-    } catch (err) {
-      if (err instanceof SettingsError) return json(res, 400, { error: err.message });
-      throw err;
-    }
-  }
-  // The models the API offers, asked of it with the saved address and key.
-  if (req.method === 'GET' && route === '/api/settings/models') {
-    const { baseUrl, apiKey } = settings.api;
-    if (!baseUrl) return json(res, 400, { error: 'Set the address of the API first' });
-    try {
-      const models = await listModels({ baseUrl, apiKey }, AbortSignal.timeout(20_000));
-      settings.rememberModels(models);
-      return json(res, 200, models);
-    } catch (err) {
-      return json(res, 502, { error: (err as Error).message });
-    }
-  }
+  // Who teaches (the core's settings routes): the interface reads and changes it; the API key only ever goes in.
+  if (await settingsApi(req, res, route, params)) return true;
 
   // History, progress and search
   if (req.method === 'GET' && route === '/api/sessions') return json(res, 200, await gym.listSessions(params.get('topic') ?? undefined));
@@ -362,7 +208,7 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ro
   if (req.method === 'GET' && route === '/api/search') return json(res, 200, await search.query(params.get('q') ?? ''));
   if (req.method === 'GET' && route === '/api/backup') return json(res, 200, gym.backup.state());
 
-  return json(res, 404, { error: 'Not found' });
+  return false;
 }
 
 /** The settings as the interface sees them, with whether each agent's command is on this machine. */
@@ -393,76 +239,6 @@ function chatContext(thread: string, where?: string, page?: string, step?: strin
   return parts.join('\n\n');
 }
 
-/** The built interface from dist/ui; unknown paths get index.html so the app can route them. */
-async function serveStatic(res: http.ServerResponse, pathname: string) {
-  const rel = path.normalize(decodeURIComponent(pathname)).replace(/^(\.\.[/\\])+/, '');
-  let file = path.join(UI_DIR, rel);
-  if (!file.startsWith(UI_DIR)) return send(res, 403, 'Forbidden');
-  let body: Buffer;
-  try {
-    body = await readFile(file);
-  } catch {
-    // A missing build file is a real 404 (a tab from before a rebuild asking for an old chunk): answering it with
-    // the app would hand a script import an HTML page. Every other unknown path gets the app (single-page routing).
-    if (rel.startsWith(`${path.sep}assets${path.sep}`) || rel.startsWith('/assets/')) return send(res, 404, 'Not found');
-    file = path.join(UI_DIR, 'index.html');
-    try {
-      body = await readFile(file);
-    } catch {
-      return send(res, 503, 'The interface is not built yet. Run: pnpm build');
-    }
-  }
-  // The accent this install chose (settings.json), on <html> until a browser picks its own.
-  const accent = settings.accent;
-  if (accent && file.endsWith(`${path.sep}index.html`))
-    body = Buffer.from(body.toString('utf8').replace('<html lang="en">', `<html lang="en" data-accent="${accent}">`));
-  const type = TYPES[path.extname(file)] ?? 'application/octet-stream';
-  const cache = file.includes(`${path.sep}assets${path.sep}`) ? 'public, max-age=31536000, immutable' : 'no-cache';
-  res.writeHead(200, { 'Content-Type': type, 'Cache-Control': cache }).end(body);
-}
-
-/** A Host header naming this server exactly (config.ts ALLOWED_HOSTS). */
-function localHost(host: string | undefined): boolean {
-  return host !== undefined && ALLOWED_HOSTS.has(host.toLowerCase());
-}
-
-/** An Origin header for one of our own pages, exactly (config.ts ALLOWED_ORIGINS). */
-function localOrigin(origin: string): boolean {
-  return ALLOWED_ORIGINS.has(origin.toLowerCase());
-}
-
-/** Not sent by another site: browsers say where a request comes from in Sec-Fetch-Site; other programs send none. */
-function sameSite(req: http.IncomingMessage): boolean {
-  const site = req.headers['sec-fetch-site'];
-  return site === undefined || site === 'same-origin' || site === 'none';
-}
-
-/**
- * Headers on every answer. The policy lets the interface run only its own scripts, talk only to this server and show
- * only its own images and Wikimedia's, and no other page may frame it (the terminal drawer could be clickjacked).
- */
-function protect(req: http.IncomingMessage, res: http.ServerResponse) {
-  const host = req.headers.host ?? '';
-  res.setHeader(
-    'Content-Security-Policy',
-    "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; " +
-      "img-src 'self' data: blob: https://upload.wikimedia.org; font-src 'self' data:; " +
-      `connect-src 'self' ws://${host} wss://${host}; object-src 'none'; base-uri 'none'; form-action 'none'; ` +
-      "frame-ancestors 'none'; frame-src 'none'",
-  );
-  res.setHeader('X-Frame-Options', 'DENY');
-  res.setHeader('X-Content-Type-Options', 'nosniff');
-  res.setHeader('Referrer-Policy', 'no-referrer');
-  res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
-}
-
-/** Drops a connection from another account on this machine before it is read (peer.ts); undecidable ones go on. */
-function refuseOtherUsers(socket: Socket) {
-  if (UID === undefined) return;
-  const owner = socketOwner(socket.remoteAddress, socket.remotePort);
-  if (owner !== undefined && owner !== UID) socket.destroy();
-}
-
 /** A body field that should be a string: itself, or undefined when it is anything else. */
 function str(v: unknown): string | undefined {
   return typeof v === 'string' ? v : undefined;
@@ -475,86 +251,27 @@ function isPick(p: unknown): p is { choice: number | null; note?: string } {
   return (choice === null || typeof choice === 'number') && (note === undefined || typeof note === 'string');
 }
 
-/** The request body as JSON; null when it is malformed or over 1 MB. */
-async function readJson(req: http.IncomingMessage): Promise<unknown> {
-  let size = 0;
-  const chunks: Buffer[] = [];
-  for await (const chunk of req) {
-    size += chunk.length;
-    if (size > 1_000_000) return null;
-    chunks.push(chunk);
-  }
-  try {
-    return JSON.parse(Buffer.concat(chunks).toString('utf8'));
-  } catch {
-    return null;
-  }
-}
-
-function json(res: http.ServerResponse, status: number, body: unknown) {
-  res.writeHead(status, { 'Content-Type': 'application/json' }).end(JSON.stringify(body));
-}
-
-function send(res: http.ServerResponse, status: number, message: string) {
-  res.writeHead(status, { 'Content-Type': 'text/plain; charset=utf-8' }).end(message);
-}
-
-// Start: HTTP always (on 127.0.0.1, and on ::1 when the machine has it), HTTPS too when there is a certificate.
-const server = http.createServer(handle).on('upgrade', upgrade).on('connection', refuseOtherUsers);
-const server6 = http.createServer(handle).on('upgrade', upgrade).on('connection', refuseOtherUsers);
-const tls = TLS_ENABLED
-  ? https
-      .createServer({ key: readFileSync(path.join(TLS_DIR, 'server.key')), cert: readFileSync(path.join(TLS_DIR, 'server.crt')) }, handle)
-      .on('upgrade', upgrade)
-      .on('connection', refuseOtherUsers)
-  : undefined;
-
-const portInUse = (port: number) => (err: NodeJS.ErrnoException) => {
-  if (err.code === 'EADDRINUSE') {
-    console.error(`Port ${port} is already in use: Aristotle is probably already running.`);
-    process.exit(1);
-  }
-  throw err;
-};
-server.on('error', portInUse(PORT));
-tls?.on('error', portInUse(TLS_PORT));
-server6.on('error', (err: NodeJS.ErrnoException) => {
-  // No IPv6 here: nothing to hold. Taken: say so, since that program answers "localhost" before we do.
-  if (err.code === 'EADDRINUSE')
-    console.error(`Another program listens on [::1]:${PORT}; open http://127.0.0.1:${PORT} rather than localhost.`);
-  else if (err.code !== 'EADDRNOTAVAIL' && err.code !== 'EAFNOSUPPORT') console.error(err);
+await serve(app, {
+  warnings,
+  state: () => ({ ...feed.state() }),
+  accent: () => settings.accent,
+  // Figures from Wikimedia Commons (find_images, glosses): the one host besides its own the pages show images from.
+  images: ['https://upload.wikimedia.org'],
+  mcp: handleMcp,
+  api: routes,
+  // The drawer runs the tutor (Claude Code, another agent, or the API tutor), so it is only ever reachable from
+  // Aristotle's own pages: the core lets an upgrade through only with this server's Host, one of its own Origins and
+  // not cross-site, and the drawer takes /api/terminal (at most eight at once, 1 MB frames).
+  upgrade: tutor.upgrade,
+  // A release restarts the server mid-lesson: the streams close, the tutor stops, the stores finish writing.
+  stop: async () => {
+    events.close();
+    tutor.stop();
+    await gym.idle();
+  },
 });
-
-server.listen(PORT, HOST, () => {
-  mkdirSync(path.dirname(PID_FILE), { recursive: true });
-  writeFileSync(PID_FILE, String(process.pid));
-  setImmediate(() => {
-    void mcpModule();
-    // Every session log read into the index now, a few at a time, rather than on the first Home, Progress or search.
-    void gym.warm();
-  });
-  console.log(`${new Date().toISOString()} Aristotle (${INSTANCE}) running at ${URL_CLEAN} (http://localhost:${PORT})`);
+setImmediate(() => {
+  void mcpModule();
+  // Every session log read into the index now, a few at a time, rather than on the first Home, Progress or search.
+  void gym.warm();
 });
-tls?.listen(TLS_PORT, HOST);
-server6.listen(PORT, HOST6);
-
-/**
- * Stops taking requests, lets the stores finish writing (a release restarts the server mid-lesson), then exits and
- * removes the pid file, so a later `pnpm app stop` never signals a stale pid.
- */
-let stopping = false;
-async function shutdown() {
-  if (stopping) return;
-  stopping = true;
-  events.close();
-  for (const s of [server, server6, tls]) {
-    s?.close();
-    s?.closeAllConnections();
-  }
-  await Promise.race([gym.idle(), new Promise((r) => setTimeout(r, 3000))]);
-  rmSync(PID_FILE, { force: true });
-  tutor.stop();
-  process.exit(0);
-}
-process.on('SIGTERM', () => void shutdown());
-process.on('SIGINT', () => void shutdown());

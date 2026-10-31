@@ -93,7 +93,16 @@ function routes(): string {
   const rows = [...src.matchAll(/req\.method === '(\w+)' && route(?: === |\.startsWith\()'([^']+)'/g)].map(
     ([, method, route]) => `| \`${method}\` | \`${route}${src.includes(`route.startsWith('${route}')`) ? '…' : ''}\` |`,
   );
-  return `| Method | Route |\n|---|---|\n${rows.join('\n')}\n| \`GET\` (WebSocket) | \`/api/terminal\` |\n| \`POST\` | \`/mcp\` |`;
+  // The core's own routes come first (@organon/core/server/http: the server's health and the state every page loads),
+  // then the chat's and Settings' (the core's chatRoutes and settingsRoutes), then Aristotle's.
+  const core = [
+    '| `GET` | `/api/health` (the core) |',
+    '| `GET` | `/api/state` (the core, with the live session) |',
+    "| `GET` `POST` `DELETE` | `/api/chats/…` (the core's chat) |",
+    "| `GET` `PUT` | `/api/settings` (the core's Settings) |",
+    "| `GET` | `/api/settings/models` (the core's Settings) |",
+  ];
+  return `| Method | Route |\n|---|---|\n${[...core, ...rows].join('\n')}\n| \`GET\` (WebSocket) | \`/api/terminal\` |\n| \`POST\` | \`/mcp\` |`;
 }
 
 /**

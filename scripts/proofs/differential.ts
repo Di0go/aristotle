@@ -43,6 +43,15 @@ if (source === path.join(ROOT, 'data')) throw new Error('Never the real data/: c
  * not "same": the list is what the migration changed on purpose, and docs/plano.md says it.
  */
 const ALLOWED: Record<string, string> = {
+  // 26/n: the server is the core's serve().
+  health: 'the core says which app and which commit it is too (app: "aristotle", commit), so a release can tell a new server from the old',
+  'host own name': '/api/health, reached by the clean name, says app and commit too',
+  state: "/api/state carries the interface's build too, so a page loads a new release on its own",
+  'state in sitting': "/api/state carries the interface's build too",
+  'state after': "/api/state carries the interface's build too",
+  'gloss not json': 'a body that is not JSON is the core\'s 400, "Not JSON", not the route\'s own message',
+  'gloss too big': 'a body over 1 MB is the core\'s 413, "Body too large", not a 400',
+  'chat not json': 'a body that is not JSON is the core\'s 400, "Not JSON", not the route\'s own message',
   // 13/n: the method tool comes from the core's createMethod, which ends its description in its own words.
   'mcp tools': "the method tool's description ends 'Without `name`, lists the routines.' (the core's), where main said 'lists them'",
   // 11/n
@@ -55,7 +64,18 @@ const ALLOWED: Record<string, string> = {
  * Of the allowed steps, those where only what the body says may differ: the status, the security headers, the
  * content type and any redirect must still be the same (a raw-Host step's status too).
  */
-const BODY_ONLY = new Set(['index', 'route', 'traversal']);
+const BODY_ONLY = new Set([
+  'index',
+  'route',
+  'traversal',
+  'health',
+  'host own name',
+  'state',
+  'state in sitting',
+  'state after',
+  'gloss not json',
+  'chat not json',
+]);
 
 /** A step's result without its body: what must still match on a BODY_ONLY step. */
 function withoutBody(r: unknown): unknown {
