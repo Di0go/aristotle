@@ -9,11 +9,11 @@ All colours, type and spacing are **tokens** on `:root`, the core's ([`@organon/
 | Stylesheet | Covers |
 |---|---|
 | [`base.css`](../ui/src/styles/base.css) | after the core's: the library's width, the status dots and bar, the rows of a list of sessions |
-| [`shell.css`](../ui/src/styles/shell.css) | the frame: ribbon, sidebar, tabs, status line, drawer |
+| [`shell.css`](../ui/src/styles/shell.css) | after the core's frame (`shell.css`: ribbon, stage, tabs, status line, mobile bar): the library pane beside the ribbon, the drawer that leaves room for it, what focus mode hides |
 | [`prose.css`](../ui/src/styles/prose.css) | rendered Markdown: text, maths, code, callouts, figures, and the containment that keeps it in its box |
 | [`lesson.css`](../ui/src/styles/lesson.css) | lessons: blocks, quizzes, asks, the composer, the bench beside a lesson |
 | [`map.css`](../ui/src/styles/map.css) | knowledge maps and roadmaps |
-| [`charts.css`](../ui/src/styles/charts.css) | the Progress page's charts |
+| [`charts.css`](../ui/src/styles/charts.css) | after the core's charts (`charts.css`: cards, axes, bars and their tables): the training levels |
 
 Styles for one component live in its `<style>` block; the files above are for what many share.
 

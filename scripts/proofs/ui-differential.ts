@@ -347,8 +347,13 @@ try {
         // glyph (any gap) to the core's stroked one with its 10 px gap, the same stroke; anything else is a difference.
         if (ra.glyph !== rb.glyph) {
           glyphs.add(`${ra.glyph} -> ${rb.glyph}`);
+          // Aristotle's status line is its own until the frame moves (15/n): its gap may stay what it was.
           const from = /^fill rgb\(0, 0, 0\), stroke (rgb\([^)]*\)), gap (16|10)px$/.exec(ra.glyph);
-          if (from && rb.glyph === `fill none, stroke ${from[1]}, gap 10px`) glyphAllowed++;
+          if (
+            from &&
+            (rb.glyph === `fill none, stroke ${from[1]}, gap 10px` || rb.glyph === `fill none, stroke ${from[1]}, gap ${from[2]}px`)
+          )
+            glyphAllowed++;
           else glyphDifferent++;
         }
         if (ok) same++;
@@ -369,8 +374,16 @@ try {
       if (accent === 'blue')
         for (const [what, wideOnly, open] of OPENINGS) {
           if (wideOnly !== (label === 'wide')) continue;
-          const [ra, rb] = [await opened(pa, a.base, open), await opened(pb, b.base, open)];
-          const pixels = await differ(pa, ra.png, rb.png);
+          let [ra, rb] = [await opened(pa, a.base, open), await opened(pb, b.base, open)];
+          let pixels = await differ(pa, ra.png, rb.png);
+          // What opens may still be loading when it is shot (the A/A saw it once on each of two runs, never twice in a
+          // row): one more look on both sides, said in the output. A real difference is there both times.
+          let second = '';
+          if (pixels !== 0 || ra.text !== rb.text) {
+            [ra, rb] = [await opened(pa, a.base, open), await opened(pb, b.base, open)];
+            pixels = await differ(pa, ra.png, rb.png);
+            second = ' (on a second look)';
+          }
           const ok = pixels === 0 && ra.text === rb.text;
           const why = OPENED_ALLOWED[what];
           if (ok) same++;
@@ -378,7 +391,7 @@ try {
           else different++;
           const name = `${label} ${scheme} opened: ${what}`;
           console.log(
-            `${name.padEnd(60)} ${ok ? 'same' : why ? `allowed (${why})` : `DIFFERENT pixels ${pixels}, text ${ra.text === rb.text ? 'same' : 'different'}`}`,
+            `${name.padEnd(60)} ${ok ? 'same' : why ? `allowed (${why})` : `DIFFERENT pixels ${pixels}, text ${ra.text === rb.text ? 'same' : 'different'}`}${second}`,
           );
           if (!ok && keep) {
             mkdirSync(keep, { recursive: true });

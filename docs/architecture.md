@@ -208,7 +208,7 @@ Only for the interface (and the tests); tutors use MCP.
 | File | What it is |
 |---|---|
 | [`App.svelte`](../ui/src/App.svelte) | The shell: ribbon, sidebar, tabs, the current page, the status line and the terminal drawer, plus global shortcuts. |
-| [`main.ts`](../ui/src/main.ts) | The interface's entry point: fonts and stylesheets, then the app mounted on the page. |
+| [`main.ts`](../ui/src/main.ts) | The interface's entry point: the core's fonts and styles, Aristotle's own after each, then the app mounted on the page. |
 | [`vite-env.d.ts`](../ui/src/vite-env.d.ts) | / <reference types="svelte" /> / <reference types="vite/client" /> |
 
 #### Pages (`ui/src/pages/`)
@@ -325,11 +325,11 @@ Only for the interface (and the tests); tutors use MCP.
 | File | What it is |
 |---|---|
 | [`base.css`](../ui/src/styles/base.css) | Aristotle's own, after the core's tokens and base styles (@organon/core/ui/tokens.css and base.css, loaded first by main.ts): the library pane's width, the status dots and bar a topic's concepts are drawn with, and the rows of a list of sessions. |
-| [`charts.css`](../ui/src/styles/charts.css) | Charts on the Progress page: cards, axes, bars and their tables (ui/src/lib/charts). |
+| [`charts.css`](../ui/src/styles/charts.css) | Charts on the Progress page, after the core's (@organon/core/ui/charts.css: cards, axes, bars and their tables): Aristotle's own training levels. |
 | [`lesson.css`](../ui/src/styles/lesson.css) | A lesson as a calm note: a centred reading column, quiet labels, checks as simple cards, and a right sidebar with where you are. |
 | [`map.css`](../ui/src/styles/map.css) | Knowledge maps: concepts as labelled specimens, prerequisites as arrows. |
 | [`prose.css`](../ui/src/styles/prose.css) | What he reads: lesson text set for long, calm reading, plus callouts, figures, step-through sequences, and the hover terms and concept links. |
-| [`shell.css`](../ui/src/styles/shell.css) | The frame: icon ribbon, library pane (resizable), then the stage with its tabs; a status line along the bottom. |
+| [`shell.css`](../ui/src/styles/shell.css) | The frame, after the core's (@organon/core/ui/shell.css: the ribbon, the stage, tabs, the status line, the mobile bar): what is Aristotle's own. |
 
 #### Scripts (`scripts/`)
 

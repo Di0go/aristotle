@@ -1,4 +1,4 @@
-// The interface's entry point: fonts and stylesheets, then the app mounted on the page.
+// The interface's entry point: the core's fonts and styles, Aristotle's own after each, then the app mounted on the page.
 
 import 'katex/dist/katex.min.css';
 import '@organon/core/ui/fonts.css';
@@ -6,9 +6,11 @@ import '@organon/core/ui/tokens.css';
 import '@organon/core/ui/base.css';
 import './styles/base.css';
 import './styles/prose.css';
+import '@organon/core/ui/shell.css';
 import './styles/shell.css';
 import './styles/lesson.css';
 import './styles/map.css';
+import '@organon/core/ui/charts.css';
 import './styles/charts.css';
 import { mount } from 'svelte';
 import App from './App.svelte';

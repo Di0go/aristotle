@@ -1,12 +1,7 @@
-/* The frame: icon ribbon, library pane (resizable), then the stage with its tabs; a status line along the
-   bottom. The page scrolls with the window; the panes and the tab bar stay put. */
-
-/* Tokens: heights the frame's sticky parts leave for each other */
-:root {
-  --drawer-space: 0px;
-  --status-h: 26px;
-  --tabs-h: 39px;
-}
+/* The frame, after the core's (@organon/core/ui/shell.css: the ribbon, the stage, tabs, the status line, the
+   mobile bar): what is Aristotle's own. The library pane (.rail, resizable) as a third column beside the ribbon and
+   the drawer that leaves room for it, the ribbon hidden on a small screen (the library slides in instead), and what
+   focus mode hides. */
 
 /* Layout */
 .app {
@@ -31,59 +26,6 @@
   z-index: 30;
 }
 
-.stage {
-  min-width: 0;
-  padding-bottom: calc(var(--status-h) + var(--drawer-space));
-  background: var(--b0);
-}
-
-.stage > .tabbar {
-  position: sticky;
-  top: 0;
-  z-index: 20;
-}
-
-/* Text scrolling up fades out under the tab bar instead of being cut at its edge. */
-.stage > .tabbar::after {
-  content: '';
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 100%;
-  height: 22px;
-  background: linear-gradient(var(--b0), transparent);
-  pointer-events: none;
-}
-
-.status-col {
-  position: fixed;
-  z-index: 25;
-  left: 0;
-  right: 0;
-  bottom: 0;
-}
-
-body.resizing {
-  cursor: col-resize;
-  user-select: none;
-}
-
-.mobile-bar,
-.scrim {
-  display: none;
-}
-
-/* Pages: left-aligned, generous, never cramped. They take the width there is, up to --page-w; a panel opened beside
-   them takes its column from that, so the page narrows rather than the panel covering it. */
-.page {
-  max-width: var(--page-w);
-  padding: 44px clamp(24px, 4vw, 56px) 96px;
-}
-
-.page-head {
-  margin-bottom: 36px;
-}
-
 .crumbs {
   display: flex;
   flex-wrap: wrap;
@@ -91,42 +33,6 @@ body.resizing {
   gap: 4px 6px;
   margin-bottom: 12px;
   font-size: 0.82rem;
-  color: var(--faint);
-}
-
-.crumbs a {
-  color: var(--faint);
-}
-
-.crumbs a:hover {
-  color: var(--fg);
-  text-decoration: none;
-}
-
-.crumbs .sep {
-  color: var(--rule-strong);
-}
-
-.head-actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  margin-top: 22px;
-}
-
-/* Properties, as Obsidian shows them under a title: quiet label, plain value. */
-.props {
-  display: grid;
-  grid-template-columns: 120px minmax(0, 1fr);
-  gap: 5px 14px;
-  margin: 16px 0 0;
-  padding-bottom: 18px;
-  border-bottom: 1px solid var(--rule);
-  font-size: 0.88rem;
-}
-
-.props dt {
   color: var(--faint);
 }
 
@@ -163,83 +69,12 @@ body.resizing {
     transform: none;
   }
 
-  .scrim.open {
-    display: block;
-    position: fixed;
-    inset: 0;
-    z-index: 35;
-    background: rgb(0 0 0 / 0.35);
-  }
-
-  .mobile-bar {
-    position: sticky;
-    top: 0;
-    z-index: 20;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    height: 50px;
-    padding: 0 14px;
-    background: var(--b1);
-    border-bottom: 1px solid var(--rule);
-    font-weight: 600;
-  }
-
-  .mobile-bar button {
-    display: grid;
-    place-items: center;
-    width: 34px;
-    height: 34px;
-    padding: 0;
-    border: 1px solid var(--rule-strong);
-    border-radius: var(--radius);
-    background: var(--b0);
-    cursor: pointer;
-  }
-
   .mobile-bar svg {
     width: 18px;
     height: 18px;
     stroke: currentColor;
     stroke-width: 1.6;
     stroke-linecap: round;
-  }
-
-  .mobile-brand {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    color: var(--fg);
-  }
-
-  .mobile-mark {
-    width: 20px;
-    height: 20px;
-  }
-
-  .mobile-bar .mobile-search {
-    margin-left: auto;
-  }
-
-  .mobile-bar .turn + .mobile-search {
-    margin-left: 0;
-  }
-
-  .mobile-bar .turn {
-    margin-left: auto;
-    padding: 2px 8px;
-    font-size: 0.78rem;
-    background: var(--acc);
-    color: var(--on-acc);
-    border-radius: 999px;
-  }
-
-  .page {
-    padding: 28px 16px 80px;
-  }
-
-  .props {
-    grid-template-columns: 96px minmax(0, 1fr);
   }
 }
 
@@ -395,11 +230,6 @@ body.resizing {
   cursor: pointer;
 }
 
-/* Focus mode (focus.svelte.ts): only the page, nothing around it. */
-html.focus .app {
-  grid-template-columns: minmax(0, 1fr);
-}
-
 html.focus .ribbon-col,
 html.focus .rail,
 html.focus .scrim,
@@ -411,24 +241,6 @@ html.focus .bench-toggle {
   display: none;
 }
 
-html.focus .stage {
-  padding-bottom: var(--drawer-space);
-}
-
 html.focus .lesson.with-bench {
   grid-template-columns: minmax(0, 1fr);
-}
-
-.focus-exit {
-  position: fixed;
-  z-index: 40;
-  top: 12px;
-  right: 16px;
-  opacity: 0.55;
-  transition: opacity 0.15s;
-}
-
-.focus-exit:hover,
-.focus-exit:focus-visible {
-  opacity: 1;
 }
