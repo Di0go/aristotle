@@ -167,10 +167,10 @@ Only for the interface (and the tests); tutors use MCP.
 | [`agents.ts`](../server/agents.ts) | The agent CLIs the terminal drawer can run as the tutor, and how to drive each: its command, how to start it with a first message or carry on its last conversation, how it starts over, and how it reaches Aristotle's tools. |
 | [`asides.ts`](../server/asides.ts) | His questions on a passage ("Ask about this"): asked beside a step, answered by Claude Code on his own login (oneshot.ts) without interrupting the class, and kept with the step. |
 | [`backup.ts`](../server/backup.ts) | Versions data/ in its own Git repository, kept apart from the code so his learning history never lands in the app's repo. |
-| [`bridge.ts`](../server/bridge.ts) | Claude Code starts this over stdio (see .mcp.json). |
+| [`bridge.ts`](../server/bridge.ts) | Claude Code starts this over stdio (see .mcp.json): the core's bridge (@organon/core/server/bridge), which makes sure the Aristotle server is running, then relays MCP messages to its /mcp, one POST per message. |
 | [`chat.ts`](../server/chat.ts) | The chat beside a lesson: the learner talks with Aristotle (a second Claude Code on their own login, beside the tutor, or the model API when Settings say so) while they read, about anything. |
 | [`config.ts`](../server/config.ts) | Every setting the server reads, in one place. |
-| [`control.ts`](../server/control.ts) | Start, stop and check the Aristotle server. |
+| [`control.ts`](../server/control.ts) | Start, stop and check the Aristotle server: the core's control (@organon/core/server/control) for this app. |
 | [`feed.ts`](../server/feed.ts) | The live session: what the interface shows under "Now", and the session log on disk. |
 | [`glosses.ts`](../server/glosses.ts) | Glosses: phrases he selected because he didn't know them, each with a short explanation written by Claude Code on his own login (oneshot.ts). |
 | [`gym.ts`](../server/gym.ts) | Ties the live feed to the knowledge maps: answers become evidence on concepts, map changes show up in the feed, practice moves review schedules and training levels, and data/ is backed up. |

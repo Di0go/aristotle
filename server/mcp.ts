@@ -1063,7 +1063,8 @@ const SHORT_WAIT = /cursor/i;
  * The answered item, null when they are away, or "later" when a client that waits in pieces should ask again.
  */
 async function waitForLearner(gym: Gym, ids: string | string[], extra: Extra): Promise<InteractiveItem | Moved | null | 'later'> {
-  const agent = extra.requestInfo?.headers?.['x-aristotle-agent'];
+  // The core's bridge says X-Organon-Agent; one started before the move to the core still says X-Aristotle-Agent.
+  const agent = extra.requestInfo?.headers?.['x-organon-agent'] ?? extra.requestInfo?.headers?.['x-aristotle-agent'];
   const sliced = typeof agent === 'string' && SHORT_WAIT.test(agent);
   const list = [ids].flat();
   // A piece of a wait: whatever is left of it since the question was asked, counted the same way as one long wait.

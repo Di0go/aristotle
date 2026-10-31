@@ -143,9 +143,10 @@ async function handleMcp(req: http.IncomingMessage, res: http.ServerResponse) {
   // Stateless: a fresh server per request, so a restart never strands Claude Code's connection. The bridge says when
   // it serves the tutor in the drawer, whose core tools then load up front, and which client it serves (mcp.ts).
   const { createMcpServer, StreamableHTTPServerTransport } = await mcpModules();
-  const agent = req.headers['x-aristotle-agent'];
+  // The core's bridge says X-Organon-*; a bridge started before the move to the core still says X-Aristotle-*.
+  const agent = req.headers['x-organon-agent'] ?? req.headers['x-aristotle-agent'];
   const mcp = createMcpServer(gym, {
-    drawer: req.headers['x-aristotle-client'] === 'drawer',
+    drawer: (req.headers['x-organon-client'] ?? req.headers['x-aristotle-client']) === 'drawer',
     client: typeof agent === 'string' && agent !== 'aristotle' ? agent : '',
   });
   const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
