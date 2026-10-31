@@ -9,6 +9,7 @@ import https from 'node:https';
 import type { Socket } from 'node:net';
 import path from 'node:path';
 import type { Duplex } from 'node:stream';
+import { EventHub } from '@organon/core/server/events';
 import { WebSocketServer } from 'ws';
 import {
   ALLOWED_HOSTS,
@@ -40,13 +41,17 @@ import { listModels } from './llm.ts';
 import { onPath, SettingsError, settings } from './settings.ts';
 import { Tutor } from './tutor.ts';
 import { leanTopic } from './topics.ts';
-import type { AskAnswerBody, AsideBody, FeedEvent, GlossBody, QuizAnswerBody } from '../shared/types.ts';
+import type { AskAnswerBody, AsideBody, GlossBody, QuizAnswerBody } from '../shared/types.ts';
 import type { SettingsBody } from '../shared/tutor.ts';
 
 const gym = await Gym.load();
 const feed = gym.feed;
 const search = new Search(gym);
 const tutor = new Tutor(gym);
+// The live feed: every change of the sitting, sent to every open page as a server-sent event (the core's EventHub: a
+// retry of 2 s, a ping every 20 s the page can see, and a page that stops reading let go).
+const events = new EventHub();
+feed.events.on('event', (event) => events.send(event));
 // A drawer's messages are keystrokes, resizes and messages to the tutor: a megabyte is plenty. A handful of tabs at once, no more.
 const sockets = new WebSocketServer({ noServer: true, maxPayload: 1024 * 1024 });
 const MAX_TERMINAL_CLIENTS = 8;
@@ -179,7 +184,7 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ro
   if (req.method === 'GET' && route === '/api/health')
     return json(res, 200, { ok: true, instance: INSTANCE, root: ROOT, pid: process.pid });
   if (req.method === 'GET' && route === '/api/state') return json(res, 200, feed.state());
-  if (req.method === 'GET' && route === '/api/events') return streamEvents(req, res);
+  if (req.method === 'GET' && route === '/api/events') return events.stream(req, res);
   // He is at the page working on an open question: the page counts the sitting as going on (feed.svelte.ts
   // inProgress), so his answer is handed to the tutor still holding it rather than to a fresh one.
   if (req.method === 'POST' && route === '/api/presence') return json(res, 200, { ok: true });
@@ -408,26 +413,6 @@ function chatContext(thread: string, where?: string, page?: string, step?: strin
   return parts.join('\n\n');
 }
 
-/**
- * The live feed as server-sent events, with a ping every 20 seconds while nothing happens: an event the page can see
- * (a comment it could not), so it can tell a stream that went silent from a quiet one and connect again.
- */
-function streamEvents(req: http.IncomingMessage, res: http.ServerResponse) {
-  res.writeHead(200, {
-    'Content-Type': 'text/event-stream',
-    'Cache-Control': 'no-cache',
-    Connection: 'keep-alive',
-  });
-  res.write('retry: 2000\n\n');
-  const onEvent = (event: FeedEvent) => res.write(`data: ${JSON.stringify(event)}\n\n`);
-  const ping = setInterval(() => res.write('event: ping\ndata: .\n\n'), 20_000);
-  feed.events.on('event', onEvent);
-  req.on('close', () => {
-    clearInterval(ping);
-    feed.events.off('event', onEvent);
-  });
-}
-
 /** The built interface from dist/ui; unknown paths get index.html so the app can route them. */
 async function serveStatic(res: http.ServerResponse, pathname: string) {
   const rel = path.normalize(decodeURIComponent(pathname)).replace(/^(\.\.[/\\])+/, '');
@@ -581,6 +566,7 @@ let stopping = false;
 async function shutdown() {
   if (stopping) return;
   stopping = true;
+  events.close();
   for (const s of [server, server6, tls]) {
     s?.close();
     s?.closeAllConnections();
