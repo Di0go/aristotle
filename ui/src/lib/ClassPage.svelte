@@ -15,7 +15,7 @@
   import { renderMarkdown } from './markdown.ts';
   import { link } from './router.svelte.ts';
   import { pageLabel, type ClassPage } from './steps.ts';
-  import Composer from './Composer.svelte';
+  import Composer from '@organon/core/ui/Composer.svelte';
   import FeedList from './FeedList.svelte';
   import Grip from './Grip.svelte';
   import LessonActivity from './LessonActivity.svelte';

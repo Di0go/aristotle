@@ -7,14 +7,28 @@ import '@organon/core/ui/base.css';
 import './styles/base.css';
 import './styles/prose.css';
 import '@organon/core/ui/shell.css';
+import '@organon/core/ui/agent.css';
 import './styles/shell.css';
 import './styles/lesson.css';
 import './styles/map.css';
 import '@organon/core/ui/charts.css';
 import './styles/charts.css';
+import { setWords } from '@organon/core/ui/words';
 import { mount } from 'svelte';
 import App from './App.svelte';
+// Drafts under Aristotle's keys before anything reads one (the core's Composer among them).
+import './lib/drafts.ts';
 import { maths } from './lib/maths.svelte.ts';
+
+// The core's words in English, as Aristotle says them: the tutor, the lesson's record, a question waiting.
+setWords('en', {
+  drawerLabel: 'The tutor',
+  drawerApi: (name) => `Tutor · ${name}`,
+  newConversationHint: "Start a new conversation (the lesson's record stays)",
+  settingsHint: 'Who teaches: Claude Code, another agent, or a model API',
+  messageAgent: 'Message the tutor',
+  stopAgentHint: 'Stop what it is doing; a question waiting for you stays open',
+});
 
 // After a rebuild, an open tab may ask for page chunks that no longer exist. Reload once to get the new build;
 // the flag stops a reload loop if the chunk is still missing, and clears after ten seconds so a later rebuild can reload again.

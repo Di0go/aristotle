@@ -188,6 +188,21 @@ const OPENINGS: [name: string, wide: boolean, open: (page: Page) => Promise<void
       await p.waitForTimeout(1500);
     },
   ],
+  [
+    // The tutor on a model API in the drawer: its introduction and its message box (the API answers nothing: a closed
+    // local port; nothing is sent). Settings are put back to Claude Code after, on both sides alike.
+    'the drawer, on a model API',
+    true,
+    async (p) => {
+      await p.evaluate(async () => {
+        const put = (body: unknown) =>
+          fetch('/api/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        await put({ tutor: 'api', api: { provider: 'custom', baseUrl: 'http://127.0.0.1:9/v1', model: 'some-model', apiKey: 'k' } });
+      });
+      await p.keyboard.press('Control+`');
+      await p.waitForTimeout(1500);
+    },
+  ],
   // Last, since it writes (the same on both sides): what they wrote about themselves reaches the open page over the
   // live feed.
   [
@@ -234,6 +249,10 @@ async function opened(page: Page, base: string, open: (page: Page) => Promise<vo
   );
   // The drawer and the chat beside the page stay open across pages: closed again, so the next opening starts alike.
   if (await page.locator('.drawer.open').count()) await page.keyboard.press('Control+`');
+  // Whoever teaches back to Claude Code, if an opening changed it.
+  await page.evaluate(() =>
+    fetch('/api/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: '{"tutor":"claude-code"}' }),
+  );
   await page.evaluate(() => {
     try {
       localStorage.removeItem('aristotle.focus');

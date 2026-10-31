@@ -239,7 +239,6 @@ Only for the interface (and the tests); tutors use MCP.
 | [`Block.svelte`](../ui/src/lib/Block.svelte) | One piece of teaching from `show` (orientation, step, plan, summary, feedback or note), labelled and rendered. |
 | [`ChatPanel.svelte`](../ui/src/lib/ChatPanel.svelte) | The chat beside a lesson: talk with Aristotle about anything while reading. |
 | [`ClassPage.svelte`](../ui/src/lib/ClassPage.svelte) | One page of a class: the intro, or one step with its checks and the feedback on his answers, with Previous and Next. |
-| [`Composer.svelte`](../ui/src/lib/Composer.svelte) | Talk to the tutor from Aristotle: the message goes to the agent running in the drawer (typed in), or to the API tutor. |
 | [`ConceptNode.svelte`](../ui/src/lib/ConceptNode.svelte) | One concept on a map: status by fill and outline, goal by an inner ring, focus by a halo. |
 | [`ConceptPanel.svelte`](../ui/src/lib/ConceptPanel.svelte) | The side panel for one concept on a map: status, what it rests on and leads to, notes, and its check record; a fading one can be reviewed from here. |
 | [`ContextMenu.svelte`](../ui/src/lib/ContextMenu.svelte) | The menu on right-clicking selected text: copy it, search for it in Aristotle, gloss it (Claude Code explains it in a hover card, which then shows wherever the phrase appears), or ask a question about it (answered beside the step, kept with it). |
@@ -265,9 +264,6 @@ Only for the interface (and the tests); tutors use MCP.
 | [`StatusBar.svelte`](../ui/src/lib/StatusBar.svelte) | A thin bar of solid, shaky and not-yet counts (and fading), with an optional legend. |
 | [`StatusLine.svelte`](../ui/src/lib/StatusLine.svelte) | The small bar along the bottom: what's going on, in a few words. |
 | [`TabBar.svelte`](../ui/src/lib/TabBar.svelte) | The open pages, as tabs above the page. |
-| [`TerminalDrawer.svelte`](../ui/src/lib/TerminalDrawer.svelte) | The tutor's drawer, docked at the bottom of every page: an agent's terminal (TerminalView), or the API tutor's conversation (TutorConversation), with what runs there and the controls that go with it. |
-| [`TerminalView.svelte`](../ui/src/lib/TerminalView.svelte) | An agent's terminal inside the drawer (Claude Code, or Codex, Gemini CLI, opencode): xterm.js, loaded on first open. |
-| [`TutorConversation.svelte`](../ui/src/lib/TutorConversation.svelte) | The API tutor's side of the drawer: its conversation (what was asked of it, what it said, a line per tool it called) and a box to talk to it. |
 | [`actions.ts`](../ui/src/lib/actions.ts) | Starting things from the interface: each action asks the tutor running in Aristotle to run a skill. |
 | [`aside.svelte.ts`](../ui/src/lib/aside.svelte.ts) | "Ask about this": a question on a passage he selected, asked in a small panel by the passage and answered by Claude Code beside the step, without interrupting the class. |
 | [`automatic.svelte.ts`](../ui/src/lib/automatic.svelte.ts) | What Aristotle does on its own, from what he does, so he never presses a button for the app's housekeeping. |
@@ -289,7 +285,7 @@ Only for the interface (and the tests); tutors use MCP.
 | [`tables.ts`](../ui/src/lib/tables.ts) | Pipes inside a table row that aren't cell borders: {{term\|definition}}, [[concept\|label]], $\|x\|$ and `a\|b` all hold a "\|", and a GFM table splits its rows on every unescaped one, cutting the term in half ("{{non-polar covalent" in one cell, the rest of the row shifted). |
 | [`tabs.svelte.ts`](../ui/src/lib/tabs.svelte.ts) | Open pages, as tabs. |
 | [`theme.svelte.ts`](../ui/src/lib/theme.svelte.ts) | Look settings: light or dark, and one accent, remembered in this browser only: the core's look (@organon/core/ui/theme) under Aristotle's key, blue unless this install chose another in .aristotle/settings.json (the server writes it on <html>), and the tab icon drawn from Aristotle's logo. |
-| [`tutor.svelte.ts`](../ui/src/lib/tutor.svelte.ts) | The connection to the tutor running inside Aristotle (server/tutor.ts): an agent CLI in a terminal (Claude Code by default, or Codex, Gemini CLI, opencode), or Aristotle's own tutor on a model API, whose conversation the drawer shows instead. |
+| [`tutor.svelte.ts`](../ui/src/lib/tutor.svelte.ts) | The drawer's side of whoever teaches: the core's (@organon/core/ui/tutor), one connection to /api/terminal for the whole page: what runs (an agent CLI's terminal, or Aristotle's own tutor on a model API), whether the drawer is open, the conversation, and the requests the app's buttons send it. |
 | [`visible.ts`](../ui/src/lib/visible.ts) | Tells animations when they can be seen: in or near the viewport, with the tab showing, so a lesson scrolled past (or a tab in the background) costs nothing. |
 
 #### Visual kit (`ui/src/lib/kit/`)

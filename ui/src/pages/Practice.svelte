@@ -13,7 +13,7 @@
   import { ago, formatDay, formatTime, onDay, sessionStats } from '../lib/format.ts';
   import { countsOf } from '../lib/library.ts';
   import { link } from '../lib/router.svelte.ts';
-  import Composer from '../lib/Composer.svelte';
+  import Composer from '@organon/core/ui/Composer.svelte';
   import FeedList from '../lib/FeedList.svelte';
   import Grip from '../lib/Grip.svelte';
   import LessonActivity from '../lib/LessonActivity.svelte';

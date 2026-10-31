@@ -9,7 +9,6 @@
   import { searchBox } from './lib/search.svelte.ts';
   import './lib/automatic.svelte.ts';
   import './lib/tabs.svelte.ts';
-  import './lib/theme.svelte.ts';
   import AskPanel from './lib/AskPanel.svelte';
   import ContextMenu from './lib/ContextMenu.svelte';
   import HoverCard from './lib/HoverCard.svelte';
@@ -20,7 +19,9 @@
   import Sidebar from './lib/Sidebar.svelte';
   import StatusLine from './lib/StatusLine.svelte';
   import TabBar from './lib/TabBar.svelte';
-  import TerminalDrawer from './lib/TerminalDrawer.svelte';
+  import TerminalDrawer from '@organon/core/ui/TerminalDrawer.svelte';
+  import { renderMarkdown } from './lib/markdown.ts';
+  import { theme } from './lib/theme.svelte.ts';
   import Now from './pages/Now.svelte';
 
   // Pages other than Now load on first visit (the map pages bring the graph layout engine with them).
@@ -167,5 +168,12 @@
 <Lightbox />
 
 {#if tutor.mounted}
-  <TerminalDrawer />
+  <TerminalDrawer app="aristotle" title="Aristotle" look={theme} markdown={renderMarkdown} legacyKeys={['mind-gym.drawer-height']}>
+    {#snippet intro()}
+      <p>
+        Aristotle's tutor, on <strong>{tutor.command || 'a model API'}</strong>. Start a lesson, a review or a course from the app, or write
+        to it here. What it teaches appears on the page; this is what goes on behind it.
+      </p>
+    {/snippet}
+  </TerminalDrawer>
 {/if}

@@ -64,7 +64,7 @@ An agent CLI that speaks MCP can be the tutor in the drawer.
 1. Add it to `AGENTS` in [`shared/tutor.ts`](../shared/tutor.ts) (id, name, the short name the interface calls it, its site) and give it a line in `ABOUT` in [`Settings.svelte`](../ui/src/pages/Settings.svelte).
 2. Add its preset to `PRESETS` in [`server/agents.ts`](../server/agents.ts): its command; the arguments to start it with a first message and to carry on its last conversation; its command for a new conversation; whether it runs the skills as slash commands (only Claude Code does: the others are asked in words and read the skill with `method`).
 3. Give it the MCP server, with a tool timeout longer than `ARISTOTLE_WAIT_MS` unless it keeps a call alive while progress arrives: in its project config in this folder, or on its command line in the preset (as Codex's). Approve the server's tools there, so the tutor never stops to ask.
-4. If it says it is working in its own words, add them to `WORKING` in [`tutor.svelte.ts`](../ui/src/lib/tutor.svelte.ts), and its permission prompt to `ASKING`, so the drawer opens when it needs the learner.
+4. If it says it is working in its own words, add them to `WORKING` in the core's `ui/tutor.svelte.ts` (Organon, upstream first), and its permission prompt to `ASKING`, so the drawer opens when it needs the learner.
 5. If it ends tool calls after a short fixed time, add its MCP client name to `SHORT_WAIT` in [`server/mcp.ts`](../server/mcp.ts): its waits then come in pieces.
 6. Try it on the dev instance from a folder of its own whose MCP config runs the bridge with `ARISTOTLE_INSTANCE=dev` (the drawer's agent teaches through the live app's server).
 
