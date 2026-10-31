@@ -30,6 +30,8 @@ Styles for one component live in its `<style>` block; the files above are for wh
                                    the tutor's drawer (Ctrl+`): a terminal, or the API tutor's conversation
 ```
 
+The frame is the core's ([`@organon/core`](https://github.com/Di0go/organon): `Frame`, `Ribbon`, `TabBar`, `StatusLine`, `Search`, `ContextMenu`, `HoverCard`, `Markdown`, `Lightbox`, `ChatPanel`, the drawer and `AgentSettings`), the same in every app of the saga; [`App.svelte`](../ui/src/App.svelte) fills it with Aristotle's own, and each of Aristotle's files of those names is that component given Aristotle's places, titles, words and figures. The library tree is the frame's rail (on a phone, the menu button slides it in in place of the ribbon); a class and its steps share one tab; Escape closes the question panel or a pinned gloss before it leaves focus mode; the cards of concepts and glosses are Aristotle's, drawn in the core's hover card, and a gloss just asked for is pinned by [`PinnedGloss.svelte`](../ui/src/lib/PinnedGloss.svelte). The core's words are said Aristotle's way in [`main.ts`](../ui/src/main.ts) (`setWords`).
+
 ### Three words
 
 Everything he opens is one of three things, and each word means only that:

@@ -65,7 +65,7 @@ Claude Code in the drawer runs in the release copy, so lessons use the released 
 
 ## Gates
 
-`pnpm gates` runs every check: generated docs current, lint and format (Biome, and Prettier for `.svelte`), types, the build, and the tests (which serve the built pages). The ones that don't depend on each other run side by side, the tests start as soon as the build is done, each one's output is shown only if it fails, and the first failure stops the rest ([`scripts/gates.ts`](../scripts/gates.ts)). Types and Prettier keep caches (`svelte-check --incremental` in `.svelte-check/`, Prettier's in `node_modules/.cache`), so a second run is much quicker than the first. The same list runs:
+`pnpm gates` runs every check: generated docs current, lint and format (Biome, and Prettier for `.svelte`), types, the build, and the tests (which serve the built pages). The ones that don't depend on each other run side by side, the tests start as soon as the build is done, each one's output is shown only if it fails, and the first failure stops the rest ([`scripts/gates.ts`](../scripts/gates.ts)). Prettier keeps a cache (in `node_modules/.cache`), so a second run is quicker than the first; the types are checked whole each time, since `svelte-check --incremental` does not type the core's components in `node_modules` (an import of their types fails there). The same list runs:
 
 - on **commit**, quick ones only (`pnpm gates --quick`, [`.githooks/pre-commit`](../.githooks/pre-commit));
 - on **push** ([`.githooks/pre-push`](../.githooks/pre-push));

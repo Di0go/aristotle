@@ -240,10 +240,12 @@ server/      Node HTTP server, run directly as TypeScript: MCP tools, feed, maps
 ui/          Svelte 5 + Vite interface: pages, the visual kit, explorables, charts
 shared/      types shared by both
 .claude/     the skills and subagents that make up the method (AGENTS.md: the rules every tutor keeps)
-scripts/     dev instance, seed data, gates, release, docs, the login service and hostname setup
+scripts/     dev instance, seed data, gates, release, docs, and the proofs of the move to the core
 tests/       end-to-end tests, and the tests that keep the docs true
 docs/        how it is built and how to change it
 ```
+
+What every app of the saga shares (the server, the agent's drawer and the chat, MCP, Settings, the frame, the Markdown, the release) is [Organon](https://github.com/Di0go/organon) (`@organon/core`, pinned by its release in `package.json`), shared with Galen and Argus: a fix to it is made there once and reaches Aristotle when the pin moves. What changed for you, release by release, is in [CHANGELOG.md](CHANGELOG.md).
 
 Start at [docs/README.md](docs/README.md) and [CONTRIBUTING.md](CONTRIBUTING.md).
 
