@@ -2,6 +2,9 @@
 // and the text of every session (steps, questions and his answers). Words match anywhere, in any order,
 // ignoring case and accents; matches in a title rank above matches in the body.
 
+// Folding (lower case without accents, so "Café" matches "cafe") is the core's; the snippet stays Aristotle's own: its
+// window (50 before, 110 after the first of several words) is what the palette shows him.
+import { fold } from '@organon/core/shared/entities';
 import type { SessionRecord } from './feed.ts';
 import type { Gym } from './gym.ts';
 import type { SearchHit } from '../shared/types.ts';
@@ -18,9 +21,6 @@ export interface Doc {
   /** Ties: newer first. */
   at: string;
 }
-
-/** Lower case without accents, so "Café" matches "cafe". */
-const fold = (s: string) => s.normalize('NFKD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
 /** A document, with its folded text worked out now. */
 function doc(hit: SearchHit, title: string, body: string, at: string): Doc {
