@@ -74,7 +74,7 @@ Any OpenAI-compatible API already works as "Another OpenAI-compatible API". To g
 
 ## Add a setting
 
-1. Read it in [`server/config.ts`](../server/config.ts) from an `ARISTOTLE_*` variable with a default, and put a `/** comment */` above it: that comment is its documentation ([development.md](development.md#settings) is generated from it).
+1. Read it in [`server/config.ts`](../server/config.ts) with `app.env('<KEY>')` (the `ARISTOTLE_<KEY>` variable) and a default, and put a `/** comment */` above it: that comment is its documentation ([development.md](development.md#settings) is generated from it). What every app of the saga reads (the instance, ports, folders, the clean name, TLS, the exact Hosts and Origins) is the core's `defineApp` over [`app.json`](../app.json), not Aristotle's.
 2. A per-install choice that the learner makes once (like the accent) belongs in `.aristotle/settings.json` instead, read in `readSettings`; one the interface changes (like who teaches) goes through [`server/settings.ts`](../server/settings.ts), which checks every field `PUT /api/settings` sends and keeps the file readable by this user only.
 
 ## Change the look

@@ -115,20 +115,21 @@ Every setting is an environment variable with a default. `.env` is not read: set
 <!-- generated: env -->
 | Variable | What it sets | Read in |
 |---|---|---|
-| `ARISTOTLE_INSTANCE` | Which instance this is. | [`config.ts`](../server/config.ts) |
-| `ARISTOTLE_DATA_DIR` | Where this instance keeps its learning history: plain files, its own Git repository (server/backup.ts). | [`config.ts`](../server/config.ts) |
-| `ARISTOTLE_STATE_DIR` | Where this install keeps what isn't learning: certificate, settings, pid files, log. | [`config.ts`](../server/config.ts) |
-| `ARISTOTLE_PORT` | The HTTP port: 4747 live, 4757 dev. | [`config.ts`](../server/config.ts) |
-| `ARISTOTLE_HOSTNAME` | The clean name (the address it shows and tls.sh's certificate). | [`config.ts`](../server/config.ts) |
-| `ARISTOTLE_TLS_DIR` | HTTPS for the clean name: a certificate from scripts/tls.sh, served on its own port that 443 is forwarded to. | [`config.ts`](../server/config.ts) |
-| `ARISTOTLE_TLS_PORT` | The HTTPS port, which the clean name's port 443 is forwarded to. | [`config.ts`](../server/config.ts) |
-| `ARISTOTLE_SETTINGS` | This install's own choices, kept out of git: settings.json in the state directory (for example {"accent": "red"}), and which tutor teaches (server/settings.ts). | [`config.ts`](../server/config.ts) |
-| `ARISTOTLE_VITE_PORT` | The Vite dev server's port (vite.config.ts), which proxies to this server in dev. | [`config.ts`](../server/config.ts) |
+| `ARISTOTLE_INSTANCE` | Which instance this is: `live` (the one you learn in) unless set to `dev`. | [`@organon/core`](https://github.com/Di0go/organon) |
+| `ARISTOTLE_DATA_DIR` | Where this instance keeps its learning history: `data/` live, `.dev/data` in dev. | [`@organon/core`](https://github.com/Di0go/organon) |
+| `ARISTOTLE_STATE_DIR` | Where this install keeps what isn't learning (certificate, settings, pid files, log): `.aristotle/` live, `.dev/state` in dev. | [`@organon/core`](https://github.com/Di0go/organon) |
+| `ARISTOTLE_PORT` | The HTTP port: `ports.live` (4747) or `ports.dev` (4757) in app.json. | [`@organon/core`](https://github.com/Di0go/organon) |
+| `ARISTOTLE_HOSTNAME` | The clean name (the address it shows and tls.sh's certificate): `aristotle.test`. | [`@organon/core`](https://github.com/Di0go/organon) |
+| `ARISTOTLE_TLS_DIR` | Where tls.sh keeps the certificate for the clean name: `tls/` in the state folder. | [`@organon/core`](https://github.com/Di0go/organon) |
+| `ARISTOTLE_TLS_PORT` | The HTTPS port, which the clean name's port 443 is forwarded to: `ports.tls` (4748). | [`@organon/core`](https://github.com/Di0go/organon) |
+| `ARISTOTLE_SETTINGS` | This install's own choices, kept out of git: `settings.json` in the state folder (server/settings.ts). | [`@organon/core`](https://github.com/Di0go/organon) |
+| `ARISTOTLE_VITE_PORT` | The Vite dev server's port, which proxies to this server in dev: `ports.vite` (5173). | [`@organon/core`](https://github.com/Di0go/organon) |
+| `ARISTOTLE_API_KEY` | A key for the model API, for anyone who would rather not keep it in settings.json; a key saved there comes first. | [`@organon/core`](https://github.com/Di0go/organon) |
+| `ARISTOTLE_RELEASE_DIR` | Where the release copy lives: a Git worktree of this repository that the live service runs. | [`@organon/core`](https://github.com/Di0go/organon) |
 | `ARISTOTLE_BACKUP` | Commit data/ after quiet periods (server/backup.ts). | [`config.ts`](../server/config.ts) |
 | `ARISTOTLE_TERMINAL_QUIET_MS` | How long a just-started Claude Code must be quiet before messages are typed into it (terminal.ts); short in tests. | [`config.ts`](../server/config.ts) |
 | `ARISTOTLE_CLAUDE_CMD` | The command the terminal drawer runs (server/terminal.ts); tests swap in a shell. | [`config.ts`](../server/config.ts) |
 | `ARISTOTLE_ONESHOT_MODEL` | The model for glosses and his questions on a passage (server/oneshot.ts): an alias Claude Code knows, on his own login. | [`config.ts`](../server/config.ts) |
-| `ARISTOTLE_API_KEY` | A key for the model API (server/settings.ts), for anyone who would rather not keep it in settings.json; a key saved there comes first. | [`config.ts`](../server/config.ts) |
 | `ARISTOTLE_COMMONS_API` | Wikimedia Commons' API, which find_images and glosses search; tests point it at a local stand-in. | [`config.ts`](../server/config.ts) |
 | `ARISTOTLE_GLOSS_IMAGES` | Whether a gloss may carry a picture from Wikimedia Commons, when one would help (off in the tests: no network). | [`config.ts`](../server/config.ts) |
 | `ARISTOTLE_ONESHOT_CMD` | A command that reads a question on stdin and prints the answer, in place of Claude Code (oneshot.ts); tests swap one in. | [`config.ts`](../server/config.ts) |
@@ -136,7 +137,6 @@ Every setting is an environment variable with a default. `.env` is not read: set
 | `ARISTOTLE_WAIT_SLICE_MS` | How long one piece of a wait lasts for a client that ends tool calls after a minute whatever they report (Cursor's CLI, mcp.ts): the wait comes in pieces, each ending in "still waiting"; short in tests. | [`config.ts`](../server/config.ts) |
 | `ARISTOTLE_CLAUDE_CWD` |  | [`config.ts`](../server/config.ts) |
 | `ARISTOTLE_DRAWER` | The tutor in Aristotle's terminal drawer (server/terminal.ts sets this): a lesson, where commits released meanwhile must never send it off to write docs. | [`claude-stop-hook.ts`](../scripts/claude-stop-hook.ts) |
-| `ARISTOTLE_RELEASE_DIR` | Where the release copy lives: a Git worktree of this repository that the live service runs. | [`release.ts`](../scripts/release.ts) |
 <!-- /generated -->
 
 This install's own choices (not in Git) go in `.aristotle/settings.json`, e.g. `{"accent": "red"}` (blue, red, violet or graphite). Who teaches is kept there too, set from Settings in the app ([`server/settings.ts`](../server/settings.ts)):

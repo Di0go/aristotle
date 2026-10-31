@@ -1,0 +1,8 @@
+{
+  "name": "aristotle",
+  "title": "Aristotle",
+  "hostname": "aristotle.test",
+  "loopback": "127.0.0.82",
+  "ports": { "live": 4747, "dev": 4757, "tls": 4748, "vite": 5173 },
+  "defaultAccent": "blue"
+}

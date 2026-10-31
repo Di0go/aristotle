@@ -96,12 +96,35 @@ function routes(): string {
   return `| Method | Route |\n|---|---|\n${rows.join('\n')}\n| \`GET\` (WebSocket) | \`/api/terminal\` |\n| \`POST\` | \`/mcp\` |`;
 }
 
+/**
+ * The variables every app of the saga reads, from the core's defineApp over app.json (@organon/core/server/app):
+ * ARISTOTLE_<key>, documented once here since their code is the core's.
+ */
+const CORE_ENV: [string, string][] = [
+  ['INSTANCE', 'Which instance this is: `live` (the one you learn in) unless set to `dev`.'],
+  ['DATA_DIR', 'Where this instance keeps its learning history: `data/` live, `.dev/data` in dev.'],
+  [
+    'STATE_DIR',
+    "Where this install keeps what isn't learning (certificate, settings, pid files, log): `.aristotle/` live, `.dev/state` in dev.",
+  ],
+  ['PORT', 'The HTTP port: `ports.live` (4747) or `ports.dev` (4757) in app.json.'],
+  ['HOSTNAME', "The clean name (the address it shows and tls.sh's certificate): `aristotle.test`."],
+  ['TLS_DIR', 'Where tls.sh keeps the certificate for the clean name: `tls/` in the state folder.'],
+  ['TLS_PORT', "The HTTPS port, which the clean name's port 443 is forwarded to: `ports.tls` (4748)."],
+  ['SETTINGS', "This install's own choices, kept out of git: `settings.json` in the state folder (server/settings.ts)."],
+  ['VITE_PORT', "The Vite dev server's port, which proxies to this server in dev: `ports.vite` (5173)."],
+  ['API_KEY', 'A key for the model API, for anyone who would rather not keep it in settings.json; a key saved there comes first.'],
+  ['RELEASE_DIR', 'Where the release copy lives: a Git worktree of this repository that the live service runs.'],
+];
+
 function env(): string {
   const seen = new Map<string, { where: string; what: string }>();
+  for (const [key, what] of CORE_ENV) seen.set(`ARISTOTLE_${key}`, { where: '@organon/core', what });
   for (const f of ['server/config.ts', ...list('scripts', /\.ts$/)]) {
     const lines = read(f).split('\n');
     lines.forEach((line, i) => {
-      for (const [, name] of line.matchAll(/process\.env\.(ARISTOTLE_[A-Z_]+)/g)) {
+      for (const [, envName, key] of line.matchAll(/process\.env\.(ARISTOTLE_[A-Z_]+)|app\.env\('([A-Z_]+)'\)/g)) {
+        const name = envName ?? `ARISTOTLE_${key}`;
         if (seen.has(name)) continue;
         // The comment just above the declaration that reads it.
         let j = i - 1;
@@ -112,7 +135,11 @@ function env(): string {
       }
     });
   }
-  const rows = [...seen].map(([name, { where, what }]) => `| \`${name}\` | ${cell(what)} | [\`${path.basename(where)}\`](../${where}) |`);
+  const rows = [...seen].map(([name, { where, what }]) =>
+    where === '@organon/core'
+      ? `| \`${name}\` | ${cell(what)} | [\`@organon/core\`](https://github.com/Di0go/organon) |`
+      : `| \`${name}\` | ${cell(what)} | [\`${path.basename(where)}\`](../${where}) |`,
+  );
   return `| Variable | What it sets | Read in |\n|---|---|---|\n${rows.join('\n')}`;
 }
 

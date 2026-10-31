@@ -11,7 +11,6 @@ import path from 'node:path';
 import type { Duplex } from 'node:stream';
 import { WebSocketServer } from 'ws';
 import {
-  ACCENT,
   ALLOWED_HOSTS,
   ALLOWED_ORIGINS,
   HOST,
@@ -448,8 +447,10 @@ async function serveStatic(res: http.ServerResponse, pathname: string) {
       return send(res, 503, 'The interface is not built yet. Run: pnpm build');
     }
   }
-  if (ACCENT && file.endsWith(`${path.sep}index.html`))
-    body = Buffer.from(body.toString('utf8').replace('<html lang="en">', `<html lang="en" data-accent="${ACCENT}">`));
+  // The accent this install chose (settings.json), on <html> until a browser picks its own.
+  const accent = settings.accent;
+  if (accent && file.endsWith(`${path.sep}index.html`))
+    body = Buffer.from(body.toString('utf8').replace('<html lang="en">', `<html lang="en" data-accent="${accent}">`));
   const type = TYPES[path.extname(file)] ?? 'application/octet-stream';
   const cache = file.includes(`${path.sep}assets${path.sep}`) ? 'public, max-age=31536000, immutable' : 'no-cache';
   res.writeHead(200, { 'Content-Type': type, 'Cache-Control': cache }).end(body);
