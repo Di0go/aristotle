@@ -168,7 +168,7 @@ Only for the interface (and the tests); tutors use MCP.
 | [`asides.ts`](../server/asides.ts) | His questions on a passage ("Ask about this"): asked beside a step, answered by Claude Code on his own login (oneshot.ts) without interrupting the class, and kept with the step. |
 | [`backup.ts`](../server/backup.ts) | Versions data/ in its own Git repository, kept apart from the code so the learning history never lands in the app's repo: the core's backup (@organon/core/server/backup). |
 | [`bridge.ts`](../server/bridge.ts) | Claude Code starts this over stdio (see .mcp.json): the core's bridge (@organon/core/server/bridge), which makes sure the Aristotle server is running, then relays MCP messages to its /mcp, one POST per message. |
-| [`chat.ts`](../server/chat.ts) | The chat beside a lesson: the learner talks with Aristotle (a second Claude Code on their own login, beside the tutor, or the model API when Settings say so) while they read, about anything. |
+| [`chat.ts`](../server/chat.ts) | The chat beside a lesson: talk with Aristotle about anything while reading, the core's chat (@organon/core/server/chat). |
 | [`config.ts`](../server/config.ts) | Every setting the server reads, in one place. |
 | [`control.ts`](../server/control.ts) | Start, stop and check the Aristotle server: the core's control (@organon/core/server/control) for this app. |
 | [`feed.ts`](../server/feed.ts) | The live session: what the interface shows under "Now", and the session log on disk. |

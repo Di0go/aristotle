@@ -9,7 +9,8 @@ import { Glosses } from './glosses.ts';
 import { Feed, readSession, SessionCache, summarizeSession, type SessionRecord } from './feed.ts';
 import { Missions } from './missions.ts';
 import { Notes } from './notes.ts';
-import { Chats } from './chat.ts';
+import type { Chats } from '@organon/core/server/chat';
+import { loadChats } from './chat.ts';
 import type { Outcome } from './reviews.ts';
 import { Roadmaps } from './roadmaps.ts';
 import { type Doc, indexSession } from './search.ts';
@@ -102,9 +103,8 @@ export class Gym {
     notes.events.on('removed', ({ topic, step }) => feed.events.emit('event', { type: 'note-removed', topic, step }));
     notes.events.on('about', (about) => feed.events.emit('event', { type: 'about', about }));
     warnings.events.on('change', (list) => feed.events.emit('event', { type: 'warnings', warnings: list }));
-    chats.events.on('message', (thread, message) => feed.events.emit('event', { type: 'chat', thread, message }));
-    chats.events.on('delta', (d) => feed.events.emit('event', { type: 'chat-delta', ...d }));
-    chats.events.on('cleared', (thread) => feed.events.emit('event', { type: 'chat-cleared', thread }));
+    // The chats' events (chat, chat-delta, chat-cleared: the core's ChatEvent) go out on the feed as they are.
+    chats.onEvent((event) => feed.events.emit('event', event));
     feed.events.on('event', () => this.backup.schedule());
     this.backup.schedule(30_000);
   }
@@ -119,7 +119,7 @@ export class Gym {
       Glosses.load(),
       Asides.load(),
       Notes.load(),
-      Chats.load(),
+      loadChats(),
     ]);
     return new Gym(feed, topics, roadmaps, missions, glosses, asides, notes, chats);
   }

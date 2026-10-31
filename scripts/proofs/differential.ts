@@ -449,6 +449,23 @@ async function steps(ref: Side): Promise<Step[]> {
     { name: 'topic after', run: (s) => request(s, { path: `/api/topics/${NEW}` }) },
     { name: 'progress after', run: (s) => request(s, { path: '/api/progress' }) },
     { name: 'leave', run: (s) => request(s, { method: 'POST', path: '/api/leave', body: {} }) },
+    {
+      // ARISTOTLE_ONESHOT_CMD is `cat`: the answer is what the chat was sent (the context and the message), streamed over
+      // the feed; then the chat as the interface loads it, and stopping an answer that is not being written.
+      name: 'chat send + feed',
+      run: (s) =>
+        feed(s, async () => {
+          const sent = await request(s, {
+            method: 'POST',
+            path: `/api/chats/${encodeURIComponent(topic)}`,
+            body: { text: 'differential', where: 'The class · Step 1', page: 'What is on screen', step: '1', tags: ['x'] },
+          });
+          await new Promise((r) => setTimeout(r, 1500));
+          return sent;
+        }),
+    },
+    http('chat after', { path: `/api/chats/${encodeURIComponent(topic)}` }),
+    http('chat stop nothing', { method: 'DELETE', path: `/api/chats/${encodeURIComponent(topic)}/answer` }),
     http('chat clear', { method: 'DELETE', path: `/api/chats/${encodeURIComponent(topic)}` }),
   ];
 }
