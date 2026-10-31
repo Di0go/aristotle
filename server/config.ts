@@ -63,7 +63,7 @@ export const ALLOWED_ORIGINS = app.allowedOrigins;
 export const BACKUP = !app.dev && app.env('BACKUP') !== 'off';
 /** How long a just-started Claude Code must be quiet before messages are typed into it (terminal.ts); short in tests. */
 export const TERMINAL_QUIET_MS = Number(app.env('TERMINAL_QUIET_MS') ?? 1200);
-/** The command the terminal drawer runs (server/terminal.ts); tests swap in a shell. */
+/** The command the terminal drawer runs (the core's terminal, server/tutor.ts); tests swap in a shell. */
 export const CLAUDE_CMD = app.env('CLAUDE_CMD') ?? 'claude';
 
 /** The model for glosses and his questions on a passage (server/oneshot.ts): an alias Claude Code knows, on his own login. */

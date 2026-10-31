@@ -10,7 +10,6 @@ import type { Socket } from 'node:net';
 import path from 'node:path';
 import type { Duplex } from 'node:stream';
 import { EventHub } from '@organon/core/server/events';
-import { WebSocketServer } from 'ws';
 import {
   ALLOWED_HOSTS,
   ALLOWED_ORIGINS,
@@ -39,7 +38,7 @@ import { Search } from './search.ts';
 import { agentLaunch } from './agents.ts';
 import { listModels } from './llm.ts';
 import { onPath, SettingsError, settings } from './settings.ts';
-import { Tutor } from './tutor.ts';
+import { createTutor } from './tutor.ts';
 import { leanTopic } from './topics.ts';
 import type { AskAnswerBody, AsideBody, GlossBody, QuizAnswerBody } from '../shared/types.ts';
 import type { SettingsBody } from '../shared/tutor.ts';
@@ -47,14 +46,11 @@ import type { SettingsBody } from '../shared/tutor.ts';
 const gym = await Gym.load();
 const feed = gym.feed;
 const search = new Search(gym);
-const tutor = new Tutor(gym);
+const tutor = createTutor(gym);
 // The live feed: every change of the sitting, sent to every open page as a server-sent event (the core's EventHub: a
 // retry of 2 s, a ping every 20 s the page can see, and a page that stops reading let go).
 const events = new EventHub();
 feed.events.on('event', (event) => events.send(event));
-// A drawer's messages are keystrokes, resizes and messages to the tutor: a megabyte is plenty. A handful of tabs at once, no more.
-const sockets = new WebSocketServer({ noServer: true, maxPayload: 1024 * 1024 });
-const MAX_TERMINAL_CLIENTS = 8;
 /** How many of a chat's messages the interface loads. */
 const CHAT_PAGE = 300;
 /** This user: connections from other accounts on the machine are refused (peer.ts). */
@@ -126,12 +122,11 @@ function upgrade(req: http.IncomingMessage, socket: Duplex, head: Buffer) {
     socket.destroy();
     return;
   }
-  if (sockets.clients.size >= MAX_TERMINAL_CLIENTS) {
-    socket.write('HTTP/1.1 503 Service Unavailable\r\n\r\n');
+  // The core's drawer takes it: at most eight at a time, 1 MB frames.
+  if (!tutor.upgrade(req, socket, head, url.pathname)) {
+    socket.write('HTTP/1.1 403 Forbidden\r\n\r\n');
     socket.destroy();
-    return;
   }
-  sockets.handleUpgrade(req, socket, head, (ws) => tutor.attach(ws));
 }
 
 /**

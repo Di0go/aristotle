@@ -132,7 +132,7 @@ Every setting is an environment variable with a default. `.env` is not read: set
 | `ARISTOTLE_RELEASE_DIR` | Where the release copy lives: a Git worktree of this repository that the live service runs. | [`@organon/core`](https://github.com/Di0go/organon) |
 | `ARISTOTLE_BACKUP` | Commit data/ after quiet periods (server/backup.ts). | [`config.ts`](../server/config.ts) |
 | `ARISTOTLE_TERMINAL_QUIET_MS` | How long a just-started Claude Code must be quiet before messages are typed into it (terminal.ts); short in tests. | [`config.ts`](../server/config.ts) |
-| `ARISTOTLE_CLAUDE_CMD` | The command the terminal drawer runs (server/terminal.ts); tests swap in a shell. | [`config.ts`](../server/config.ts) |
+| `ARISTOTLE_CLAUDE_CMD` | The command the terminal drawer runs (the core's terminal, server/tutor.ts); tests swap in a shell. | [`config.ts`](../server/config.ts) |
 | `ARISTOTLE_ONESHOT_MODEL` | The model for glosses and his questions on a passage (server/oneshot.ts): an alias Claude Code knows, on his own login. | [`config.ts`](../server/config.ts) |
 | `ARISTOTLE_COMMONS_API` | Wikimedia Commons' API, which find_images and glosses search; tests point it at a local stand-in. | [`config.ts`](../server/config.ts) |
 | `ARISTOTLE_GLOSS_IMAGES` | Whether a gloss may carry a picture from Wikimedia Commons, when one would help (off in the tests: no network). | [`config.ts`](../server/config.ts) |
