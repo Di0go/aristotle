@@ -186,7 +186,7 @@ Only for the interface (and the tests); tutors use MCP.
 | [`reviews.ts`](../server/reviews.ts) | Spaced review of concepts with FSRS: every solid concept carries a review card; when its due date passes, the concept is "fading" until he practises it again. |
 | [`roadmaps.ts`](../server/roadmaps.ts) | Roadmaps: one JSON file per roadmap in data/roadmaps/. |
 | [`search.ts`](../server/search.ts) | Search across everything he has: roadmaps and their steps, topics and their concepts, Praxis missions, and the text of every session (steps, questions and his answers). |
-| [`settings.ts`](../server/settings.ts) | Who teaches, as this install chose: Claude Code (the default), another agent CLI in the terminal drawer, or Aristotle's own tutor on a model behind an OpenAI-compatible API (OpenAI, OpenRouter, Ollama, LM Studio, llama.cpp…), and what writes glosses and chat answers. |
+| [`settings.ts`](../server/settings.ts) | Who teaches, as this install chose (Claude Code by default, another agent CLI in the terminal drawer, or Aristotle's own tutor on a model API), and what writes glosses and chat answers: the core's settings (@organon/core/server/settings), kept with the accent in settings.json in the state folder, readable by this user only, changed from the interface (GET/PUT /api/settings) and applied at once. |
 | [`slug.ts`](../server/slug.ts) | Turns titles into the stable kebab-case ids used for topics, roadmaps, missions, glosses, chats and file names. |
 | [`store.ts`](../server/store.ts) | How the stores read and write their files in data/: the core's store (@organon/core/server/store) bound to this instance's data folder and warnings. |
 | [`terminal.ts`](../server/terminal.ts) | An agent CLI inside Aristotle: one interactive Claude Code (or Codex, Gemini CLI, opencode: agents.ts) running in a pseudo-terminal, its screen streamed to the drawer (tutor.ts). |
@@ -200,7 +200,7 @@ Only for the interface (and the tests); tutors use MCP.
 
 | File | What it is |
 |---|---|
-| [`tutor.ts`](../shared/tutor.ts) | Who teaches, as the server and the interface both see it: the engines a tutor runs on (Claude Code or another agent CLI in the terminal drawer, or a model behind an OpenAI-compatible API), the API providers with their usual addresses, the settings the interface reads and changes (GET/PUT /api/settings), and what the drawer's WebSocket carries (server/tutor.ts). |
+| [`tutor.ts`](../shared/tutor.ts) | Who teaches, as the server and the interface both see it: the core's engines (Claude Code or another agent CLI in the terminal drawer, or a model behind an OpenAI-compatible API), the API providers with their usual addresses, the settings the interface reads and changes (GET/PUT /api/settings), and what the drawer's WebSocket carries (@organon/core/shared/agents). |
 | [`types.ts`](../shared/types.ts) | Types shared by the server and the interface: the records kept in data/ and what the API sends and accepts. |
 
 #### Interface entry (`ui/src/`)
