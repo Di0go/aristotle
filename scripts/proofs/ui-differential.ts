@@ -16,7 +16,6 @@
 import { createHash } from 'node:crypto';
 import { type ChildProcess, spawn, spawnSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import http from 'node:http';
 import net from 'node:net';
 import path from 'node:path';
 import { type Browser, chromium, type Page } from 'playwright-core';

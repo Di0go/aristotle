@@ -166,7 +166,7 @@ Only for the interface (and the tests); tutors use MCP.
 |---|---|
 | [`agents.ts`](../server/agents.ts) | The agent CLIs the terminal drawer can run as the tutor, and how to drive each: its command, how to start it with a first message or carry on its last conversation, how it starts over, and how it reaches Aristotle's tools. |
 | [`asides.ts`](../server/asides.ts) | His questions on a passage ("Ask about this"): asked beside a step, answered by Claude Code on his own login (oneshot.ts) without interrupting the class, and kept with the step. |
-| [`backup.ts`](../server/backup.ts) | Versions data/ in its own Git repository, kept apart from the code so his learning history never lands in the app's repo. |
+| [`backup.ts`](../server/backup.ts) | Versions data/ in its own Git repository, kept apart from the code so the learning history never lands in the app's repo: the core's backup (@organon/core/server/backup). |
 | [`bridge.ts`](../server/bridge.ts) | Claude Code starts this over stdio (see .mcp.json): the core's bridge (@organon/core/server/bridge), which makes sure the Aristotle server is running, then relays MCP messages to its /mcp, one POST per message. |
 | [`chat.ts`](../server/chat.ts) | The chat beside a lesson: the learner talks with Aristotle (a second Claude Code on their own login, beside the tutor, or the model API when Settings say so) while they read, about anything. |
 | [`config.ts`](../server/config.ts) | Every setting the server reads, in one place. |
@@ -176,7 +176,7 @@ Only for the interface (and the tests); tutors use MCP.
 | [`gym.ts`](../server/gym.ts) | Ties the live feed to the knowledge maps: answers become evidence on concepts, map changes show up in the feed, practice moves review schedules and training levels, and data/ is backed up. |
 | [`images.ts`](../server/images.ts) | Real images for lessons, from Wikimedia Commons, with their licences checked before Claude may use them. |
 | [`index.ts`](../server/index.ts) | The Aristotle server: the interface, its live feed, and the MCP endpoint Claude Code connects to. |
-| [`llm.ts`](../server/llm.ts) | Talking to a model behind an OpenAI-compatible API: Chat Completions, streamed, with tools. |
+| [`llm.ts`](../server/llm.ts) | Talking to a model behind an OpenAI-compatible API: the core's (@organon/core/server/llm): Chat Completions, streamed, with tools, spoken by OpenRouter, Ollama, LM Studio, llama.cpp's server, vLLM and most others, so any model, hosted or local, can teach (tutor-api.ts) and write glosses, answers on a passage (oneshot.ts) and the chat (chat.ts); OpenAI's own API through its Responses API. |
 | [`mcp.ts`](../server/mcp.ts) | The tools a tutor uses to teach through the interface, over the stores in Gym: defined once, and served by the core's MCP server (@organon/core/server/mcp: one server per request, the drawer's core tools always loaded), with the method (`method` and the prompts, server/method.ts) for the clients that don't load skills themselves. |
 | [`method.ts`](../server/method.ts) | The method, for every tutor: the core's (@organon/core/server/method) on Aristotle's skills (.claude/skills/<name>/SKILL.md), its helpers' instructions (.claude/agents/<name>.md) and the rules every sitting keeps (the "When teaching" part of AGENTS.md). |
 | [`missions.ts`](../server/missions.ts) | Praxis missions: one JSON file per mission in data/missions/. |
@@ -187,14 +187,14 @@ Only for the interface (and the tests); tutors use MCP.
 | [`roadmaps.ts`](../server/roadmaps.ts) | Roadmaps: one JSON file per roadmap in data/roadmaps/. |
 | [`search.ts`](../server/search.ts) | Search across everything he has: roadmaps and their steps, topics and their concepts, Praxis missions, and the text of every session (steps, questions and his answers). |
 | [`settings.ts`](../server/settings.ts) | Who teaches, as this install chose (Claude Code by default, another agent CLI in the terminal drawer, or Aristotle's own tutor on a model API), and what writes glosses and chat answers: the core's settings (@organon/core/server/settings), kept with the accent in settings.json in the state folder, readable by this user only, changed from the interface (GET/PUT /api/settings) and applied at once. |
-| [`slug.ts`](../server/slug.ts) | Turns titles into the stable kebab-case ids used for topics, roadmaps, missions, glosses, chats and file names. |
+| [`slug.ts`](../server/slug.ts) | Turns titles into the stable kebab-case ids used for topics, roadmaps, missions, glosses, chats and file names: the core's (@organon/core/server/slug). |
 | [`store.ts`](../server/store.ts) | How the stores read and write their files in data/: the core's store (@organon/core/server/store) bound to this instance's data folder and warnings. |
 | [`terminal.ts`](../server/terminal.ts) | An agent CLI inside Aristotle: one interactive Claude Code (or Codex, Gemini CLI, opencode: agents.ts) running in a pseudo-terminal, its screen streamed to the drawer (tutor.ts). |
 | [`topics.ts`](../server/topics.ts) | Knowledge maps: one JSON file per topic in data/topics/. |
 | [`tutor-api.ts`](../server/tutor-api.ts) | Aristotle's own tutor, on a model behind an OpenAI-compatible API (llm.ts), for anyone who would rather teach with another model than Claude, a local one included. |
 | [`tutor.ts`](../server/tutor.ts) | The tutor in Aristotle's drawer, whichever it is (Settings, settings.ts): an agent CLI in a pseudo-terminal (terminal.ts: Claude Code by default, or Codex, Gemini CLI, opencode) or Aristotle's own tutor on a model API (tutor-api.ts). |
 | [`warnings.ts`](../server/warnings.ts) | What the learner should know is wrong with their data: a backup that keeps failing, a file set aside as unreadable. |
-| [`web.ts`](../server/web.ts) | The web, for Aristotle's own tutor on a model API (tutor-api.ts), which has no search of its own: `web_search` (DuckDuckGo's plain HTML results, or Wikipedia's search when that fails) and `read_page` (a page as plain text). |
+| [`web.ts`](../server/web.ts) | The web, for Aristotle's own tutor on a model API (tutor-api.ts), which has no search of its own: the core's (@organon/core/server/web), reading as "Aristotle-tutor". |
 
 #### Shared types (`shared/`)
 
