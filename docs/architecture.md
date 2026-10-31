@@ -188,7 +188,7 @@ Only for the interface (and the tests); tutors use MCP.
 | [`search.ts`](../server/search.ts) | Search across everything he has: roadmaps and their steps, topics and their concepts, Praxis missions, and the text of every session (steps, questions and his answers). |
 | [`settings.ts`](../server/settings.ts) | Who teaches, as this install chose: Claude Code (the default), another agent CLI in the terminal drawer, or Aristotle's own tutor on a model behind an OpenAI-compatible API (OpenAI, OpenRouter, Ollama, LM Studio, llama.cpp…), and what writes glosses and chat answers. |
 | [`slug.ts`](../server/slug.ts) | Turns titles into the stable kebab-case ids used for topics, roadmaps, missions, glosses, chats and file names. |
-| [`store.ts`](../server/store.ts) | How the stores read and write their files in data/. |
+| [`store.ts`](../server/store.ts) | How the stores read and write their files in data/: the core's store (@organon/core/server/store) bound to this instance's data folder and warnings. |
 | [`terminal.ts`](../server/terminal.ts) | An agent CLI inside Aristotle: one interactive Claude Code (or Codex, Gemini CLI, opencode: agents.ts) running in a pseudo-terminal, its screen streamed to the drawer (tutor.ts). |
 | [`topics.ts`](../server/topics.ts) | Knowledge maps: one JSON file per topic in data/topics/. |
 | [`tutor-api.ts`](../server/tutor-api.ts) | Aristotle's own tutor, on a model behind an OpenAI-compatible API (llm.ts), for anyone who would rather teach with another model than Claude, a local one included. |
