@@ -1,5 +1,7 @@
 // Hash routing: #/, #/review, #/train/<slug>, #/progress, #/map, #/roadmaps, #/roadmaps/<slug>, #/lesson/<slug>, #/lesson/<slug>/<step>, #/topics, #/topics/<slug>?c=<concept>, #/log, #/log/<session>, #/praxis, #/praxis/<mission>, #/about, #/settings.
 
+import { createRouter } from '@organon/core/ui/router';
+
 export type Route =
   | { page: 'now' }
   /** Spaced review: what is fading, and the review going on, if any. */
@@ -23,19 +25,7 @@ export type Route =
   /** Who teaches: Claude Code, another agent, or a model API. */
   | { page: 'settings' };
 
-class Router {
-  route = $state<Route>(parse(location.hash));
-  readonly parse = parse;
-
-  constructor() {
-    addEventListener('hashchange', () => {
-      this.route = parse(location.hash);
-      scrollTo({ top: 0 });
-    });
-  }
-}
-
-export const router = new Router();
+export const router = createRouter(parse);
 
 export const link = {
   now: () => '#/',

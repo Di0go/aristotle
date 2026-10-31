@@ -5,9 +5,9 @@
   import { refetching } from '../lib/feed.svelte.ts';
   import { ago, dayKey, plural } from '../lib/format.ts';
   import { link } from '../lib/router.svelte.ts';
-  import StackedColumns from '../lib/charts/StackedColumns.svelte';
+  import StackedColumns from '@organon/core/ui/charts/StackedColumns.svelte';
   import StepChart from '../lib/charts/StepChart.svelte';
-  import TableView from '../lib/charts/TableView.svelte';
+  import TableView from '@organon/core/ui/charts/TableView.svelte';
   import type { FadingConcept, Progress } from '../../../shared/types.ts';
 
   const RESULT_SERIES = [

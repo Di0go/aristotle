@@ -276,7 +276,7 @@ Only for the interface (and the tests); tutors use MCP.
 | [`drafts.ts`](../ui/src/lib/drafts.ts) | What he has typed and not sent yet (an answer, a quiz note, a message), kept in the browser so leaving a step and coming back finds it where he left it. |
 | [`feed.svelte.ts`](../ui/src/lib/feed.svelte.ts) | Live copy of the server's state, kept current over Server-Sent Events. |
 | [`focus.svelte.ts`](../ui/src/lib/focus.svelte.ts) | Focus mode: everything but the page hides (ribbon, library, tabs, status line, the bench beside a lesson), for reading and answering with nothing else in view. |
-| [`format.ts`](../ui/src/lib/format.ts) | Dates, times, durations and plurals, written the way the interface shows them. |
+| [`format.ts`](../ui/src/lib/format.ts) | Dates, times, durations and plurals, written the way the interface shows them: the core's (@organon/core/ui/format, where a plain "YYYY-MM-DD" is a day at local noon, never the UTC midnight that is the day before west of Greenwich), and Aristotle's own: a day mid-sentence, and a sitting's numbers. |
 | [`gloss.svelte.ts`](../ui/src/lib/gloss.svelte.ts) | Glossing a phrase he selected: asks the server (which asks Claude Code), and keeps a card pinned to the selection while the answer is on its way, then with the answer. |
 | [`layout.ts`](../ui/src/lib/layout.ts) | Graph layout shared by the topic maps and the map of everything. |
 | [`library.ts`](../ui/src/lib/library.ts) | The hierarchy everything hangs on: roadmaps hold steps, a step is a topic, a topic holds concepts. |
@@ -306,10 +306,8 @@ Only for the interface (and the tests); tutors use MCP.
 
 | File | What it is |
 |---|---|
-| [`StackedColumns.svelte`](../ui/src/lib/charts/StackedColumns.svelte) | Columns stacked by series, one per row (e.g. |
 | [`StepChart.svelte`](../ui/src/lib/charts/StepChart.svelte) | One series over time as a step line with a light wash: the value holds until the next change. |
-| [`TableView.svelte`](../ui/src/lib/charts/TableView.svelte) | Every chart's values, readable without hovering. |
-| [`scale.ts`](../ui/src/lib/charts/scale.ts) | A rounded maximum and evenly spaced ticks from 0, e.g. |
+| [`scale.ts`](../ui/src/lib/charts/scale.ts) | Scales for the Progress page's charts: the core's niceTicks (@organon/core/ui/charts/scale), and Aristotle's days and weeks as its charts label them. |
 
 #### Explorables (`ui/src/lib/explorables/`)
 
