@@ -1,10 +1,9 @@
 // The interface's entry point: fonts and stylesheets, then the app mounted on the page.
 
 import 'katex/dist/katex.min.css';
-import '@fontsource-variable/jetbrains-mono/wght.css';
-import '@fontsource-variable/jetbrains-mono/wght-italic.css';
-import '@fontsource-variable/inter/wght.css';
-import '@fontsource-variable/inter/wght-italic.css';
+import '@organon/core/ui/fonts.css';
+import '@organon/core/ui/tokens.css';
+import '@organon/core/ui/base.css';
 import './styles/base.css';
 import './styles/prose.css';
 import './styles/shell.css';

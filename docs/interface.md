@@ -4,11 +4,11 @@
 
 Quiet and dense, like a notes vault: soft greys stepping from the page to the panes, one accent colour, Inter for everything read and JetBrains Mono only for code and keys (both self-hosted through Fontsource). Dark by default, light on a switch. No mascots, no marketing, no onboarding. The look is set on `<html>` before the first paint by [`public/theme-boot.js`](../ui/public/theme-boot.js) (a file of its own, since the CSP allows no inline script), from what [`theme.svelte.ts`](../ui/src/lib/theme.svelte.ts) remembers, so a dark page never flashes white while the app loads.
 
-All colours, type and spacing are **tokens** on `:root` in [`base.css`](../ui/src/styles/base.css), redefined for `[data-theme='dark']`, and the accent per `[data-accent]` (blue, red, violet, graphite). Components read tokens, never raw colours; the few status colours (`--solid`, `--shaky`, `--wrong`, `--heart`) are tokens too. Some older names (`--paper`, `--link`, `--serif`…) are kept as aliases.
+All colours, type and spacing are **tokens** on `:root`, the core's ([`@organon/core/ui/tokens.css`](https://github.com/Di0go/organon), the same in every app of the saga), redefined for `[data-theme='dark']`, and the accent per `[data-accent]` (blue, Aristotle's default, green, red, violet, graphite). Components read tokens, never raw colours; the few status colours (`--solid`, `--shaky`, `--wrong`, `--heart`) are tokens too, and so are a chart's series (`--series-1` to `--series-3`), fixed colours checked for colour blindness that do not follow the accent. Some older names (`--paper`, `--link`, `--serif`…) are kept as aliases. The fonts and the base styles (resets, type, buttons, keys and inputs, cards, motion, scrollbars, skeletons) are the core's too (`fonts.css`, `base.css`), loaded first by [`main.ts`](../ui/src/main.ts); Aristotle's own stylesheets come after them.
 
 | Stylesheet | Covers |
 |---|---|
-| [`base.css`](../ui/src/styles/base.css) | tokens, both themes, resets, buttons and inputs, loading skeletons |
+| [`base.css`](../ui/src/styles/base.css) | after the core's: the library's width, the status dots and bar, the rows of a list of sessions |
 | [`shell.css`](../ui/src/styles/shell.css) | the frame: ribbon, sidebar, tabs, status line, drawer |
 | [`prose.css`](../ui/src/styles/prose.css) | rendered Markdown: text, maths, code, callouts, figures, and the containment that keeps it in its box |
 | [`lesson.css`](../ui/src/styles/lesson.css) | lessons: blocks, quizzes, asks, the composer, the bench beside a lesson |

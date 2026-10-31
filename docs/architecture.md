@@ -324,7 +324,7 @@ Only for the interface (and the tests); tutors use MCP.
 
 | File | What it is |
 |---|---|
-| [`base.css`](../ui/src/styles/base.css) | Zen: a quiet vault. |
+| [`base.css`](../ui/src/styles/base.css) | Aristotle's own, after the core's tokens and base styles (@organon/core/ui/tokens.css and base.css, loaded first by main.ts): the library pane's width, the status dots and bar a topic's concepts are drawn with, and the rows of a list of sessions. |
 | [`charts.css`](../ui/src/styles/charts.css) | Charts on the Progress page: cards, axes, bars and their tables (ui/src/lib/charts). |
 | [`lesson.css`](../ui/src/styles/lesson.css) | A lesson as a calm note: a centred reading column, quiet labels, checks as simple cards, and a right sidebar with where you are. |
 | [`map.css`](../ui/src/styles/map.css) | Knowledge maps: concepts as labelled specimens, prerequisites as arrows. |
