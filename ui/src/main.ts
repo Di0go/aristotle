@@ -1,10 +1,11 @@
 // The interface's entry point: the core's fonts and styles, Aristotle's own after each, then the app mounted on the page.
 
-import 'katex/dist/katex.min.css';
+import '@organon/core/ui/katex.css';
 import '@organon/core/ui/fonts.css';
 import '@organon/core/ui/tokens.css';
 import '@organon/core/ui/base.css';
 import './styles/base.css';
+import '@organon/core/ui/prose.css';
 import './styles/prose.css';
 import '@organon/core/ui/shell.css';
 import '@organon/core/ui/agent.css';

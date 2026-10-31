@@ -245,12 +245,12 @@ Only for the interface (and the tests); tutors use MCP.
 | [`HoverCard.svelte`](../ui/src/lib/HoverCard.svelte) | One hover card for the whole app. |
 | [`LessonActivity.svelte`](../ui/src/lib/LessonActivity.svelte) | The foot of a running lesson: what is happening right now, so he never has to guess whether to wait. |
 | [`LessonBench.svelte`](../ui/src/lib/LessonBench.svelte) | The panel beside a step, two tabs. |
-| [`Lightbox.svelte`](../ui/src/lib/Lightbox.svelte) | Click an image or a drawing in a lesson to see it large: images in Markdown, the plate of a ```plate (with its numbered markers), inline SVG drawings and Mermaid diagrams. |
+| [`Lightbox.svelte`](../ui/src/lib/Lightbox.svelte) | A figure, larger: the core's lightbox (@organon/core/ui/Lightbox.svelte: a click on an image or a drawing opens it over the page, Escape or a click closes it), told Aristotle's own first: a plate opens whole, with its markers and its title as the caption; the visual kit's other figures and the explorables never open (they are live). |
 | [`LocalGraph.svelte`](../ui/src/lib/LocalGraph.svelte) | The neighbourhood of one concept: it in the middle, what it builds on above, what builds on it below. |
 | [`Logo.svelte`](../ui/src/lib/Logo.svelte) | The mark: the peripatos, the covered walk of the Lyceum where Aristotle's school taught (and, the story goes, walked as it talked). |
 | [`MapGraph.svelte`](../ui/src/lib/MapGraph.svelte) | A topic's knowledge map as a graph: concepts are nodes, arrows run from a prerequisite to what builds on it. |
 | [`MapUpdate.svelte`](../ui/src/lib/MapUpdate.svelte) | A map change, set as a small stamp in the notebook: what moved, and to where. |
-| [`Markdown.svelte`](../ui/src/lib/Markdown.svelte) | Renders lesson Markdown and brings it to life: mermaid diagrams, sequences, explorables and the visual kit's figures. |
+| [`Markdown.svelte`](../ui/src/lib/Markdown.svelte) | Renders lesson Markdown and brings it to life: the core's Markdown (@organon/core/ui/Markdown.svelte: mermaid diagrams in the look's colours, animated drawings with Play/Pause, the lightbox's figures) with Aristotle's renderer and three enhancers of its own, each in an effect of its own so that one following the learner's data re-runs alone: [[concept]] links pointed at the map (again when the map changes), glossed phrases marked (again when a gloss comes or goes), and sequences, explorables and the visual kit's figures mounted (never again mid-read). |
 | [`Quiz.svelte`](../ui/src/lib/Quiz.svelte) | A graded multiple-choice check: options, "I don't know", a note per question, and right or wrong once answered. |
 | [`ReviewPanel.svelte`](../ui/src/lib/ReviewPanel.svelte) | During a review session: what has been practised so far, and today's share of what is fading. |
 | [`Ribbon.svelte`](../ui/src/lib/Ribbon.svelte) | The thin strip on the far left: the core's ribbon (@organon/core/ui/Ribbon.svelte: search, focus, the look) with Aristotle's places (Home, Review with today's share of what is fading, Courses, the map), You after search, and Settings (who teaches) at the foot. |
@@ -317,7 +317,7 @@ Only for the interface (and the tests); tutors use MCP.
 | [`charts.css`](../ui/src/styles/charts.css) | Charts on the Progress page, after the core's (@organon/core/ui/charts.css: cards, axes, bars and their tables): Aristotle's own training levels. |
 | [`lesson.css`](../ui/src/styles/lesson.css) | A lesson as a calm note: a centred reading column, quiet labels, checks as simple cards, and a right sidebar with where you are. |
 | [`map.css`](../ui/src/styles/map.css) | Knowledge maps: concepts as labelled specimens, prerequisites as arrows. |
-| [`prose.css`](../ui/src/styles/prose.css) | What he reads: lesson text set for long, calm reading, plus callouts, figures, step-through sequences, and the hover terms and concept links. |
+| [`prose.css`](../ui/src/styles/prose.css) | What he reads, after the core's prose (@organon/core/ui/prose.css: lesson text set for long, calm reading, callouts, figures, tables, maths, the containment that keeps it in its box): what is Aristotle's own. |
 | [`shell.css`](../ui/src/styles/shell.css) | The frame, after the core's (@organon/core/ui/shell.css: the ribbon, the stage, tabs, the status line, the mobile bar): what is Aristotle's own. |
 
 #### Scripts (`scripts/`)
