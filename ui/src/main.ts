@@ -28,6 +28,17 @@ setWords('en', {
   settingsHint: 'Who teaches: Claude Code, another agent, or a model API',
   messageAgent: 'Message the tutor',
   stopAgentHint: 'Stop what it is doing; a question waiting for you stays open',
+  settingsLede:
+    'Who teaches. Whichever you choose works through the same tools and follows the same method, and your library stays exactly as it is.',
+  settingsWho: 'The tutor',
+  settingsAgent: 'tutor',
+  settingsSwitch: (running) =>
+    `Saving stops ${running}, running in the drawer now. A question waiting for you stays open for the next tutor.`,
+  settingsHelper: 'For glosses and chat',
+  settingsHelperHint: 'A smaller, quicker model is enough for glosses, questions on a passage and the chat.',
+  settingsVision: 'The model can see images (it then checks its drawings and reads real images)',
+  settingsChatTitle: 'Glosses, questions and the chat',
+  settingsChatHint: 'What explains a phrase you select, answers a question on a passage, and talks with you beside a lesson.',
 });
 
 // After a rebuild, an open tab may ask for page chunks that no longer exist. Reload once to get the new build;

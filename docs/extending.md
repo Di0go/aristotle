@@ -59,10 +59,10 @@ An explorable is a hand-built interactive figure for one topic, placed in a less
 
 ## Add an agent
 
-An agent CLI that speaks MCP can be the tutor in the drawer.
+An agent CLI that speaks MCP can be the tutor in the drawer. The agents, their presets and Settings' words about them are the core's ([Organon](https://github.com/Di0go/organon), upstream first: every app of the saga gets the new agent):
 
-1. Add it to `AGENTS` in [`shared/tutor.ts`](../shared/tutor.ts) (id, name, the short name the interface calls it, its site) and give it a line in `ABOUT` in [`Settings.svelte`](../ui/src/pages/Settings.svelte).
-2. Add its preset to `PRESETS` in [`server/agents.ts`](../server/agents.ts): its command; the arguments to start it with a first message and to carry on its last conversation; its command for a new conversation; whether it runs the skills as slash commands (only Claude Code does: the others are asked in words and read the skill with `method`).
+1. Add it to `AGENTS` in the core's `shared/agents.ts` (id, name, the short name the interface calls it, its site) and give it a line in `settingsAbout` in the core's `ui/words.ts`.
+2. Add its preset to `PRESETS` in the core's `server/agents.ts`: its command; the arguments to start it with a first message and to carry on its last conversation; its command for a new conversation; whether it runs the skills as slash commands (only Claude Code does: the others are asked in words and read the skill with `method`).
 3. Give it the MCP server, with a tool timeout longer than `ARISTOTLE_WAIT_MS` unless it keeps a call alive while progress arrives: in its project config in this folder, or on its command line in the preset (as Codex's). Approve the server's tools there, so the tutor never stops to ask.
 4. If it says it is working in its own words, add them to `WORKING` in the core's `ui/tutor.svelte.ts` (Organon, upstream first), and its permission prompt to `ASKING`, so the drawer opens when it needs the learner.
 5. If it ends tool calls after a short fixed time, add its MCP client name to `SHORT_WAIT` in [`server/mcp.ts`](../server/mcp.ts): its waits then come in pieces.
@@ -70,7 +70,7 @@ An agent CLI that speaks MCP can be the tutor in the drawer.
 
 ## Add a model API provider
 
-Any OpenAI-compatible API already works as "Another OpenAI-compatible API". To give one its own entry, add it to `PROVIDERS` in [`shared/tutor.ts`](../shared/tutor.ts) (its usual address, whether it needs a key, whether it runs locally) and a line in `HINT` in [`Settings.svelte`](../ui/src/pages/Settings.svelte) saying what to know before using it. If it speaks something other than Chat Completions, give it a `protocol` in `endpoint()` in [`server/settings.ts`](../server/settings.ts) and a reader in [`server/llm.ts`](../server/llm.ts), as OpenAI's Responses API has, keeping the conversation in the Chat Completions shape.
+Any OpenAI-compatible API already works as "Another OpenAI-compatible API". To give one its own entry, add it to `PROVIDERS` in the core's `shared/agents.ts` (its usual address, whether it needs a key, whether it runs locally) and a line in `settingsProviderHint` in the core's `ui/words.ts` saying what to know before using it. If it speaks something other than Chat Completions, give it a `protocol` in `endpoint()` in [`server/settings.ts`](../server/settings.ts) and a reader in [`server/llm.ts`](../server/llm.ts), as OpenAI's Responses API has, keeping the conversation in the Chat Completions shape.
 
 ## Add a setting
 

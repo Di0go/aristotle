@@ -226,7 +226,7 @@ Only for the interface (and the tests); tutors use MCP.
 | [`Roadmap.svelte`](../ui/src/pages/Roadmap.svelte) | One course (a roadmap, in the data) as a route: its classes in order down a line, each with its goal, why it sits there, and its progress. |
 | [`Roadmaps.svelte`](../ui/src/pages/Roadmaps.svelte) | The library: what you have, at a glance. |
 | [`SessionView.svelte`](../ui/src/pages/SessionView.svelte) | One past session, read back in full: every step, check and answer, and its handoff. |
-| [`Settings.svelte`](../ui/src/pages/Settings.svelte) | Settings (#/settings): who teaches. |
+| [`Settings.svelte`](../ui/src/pages/Settings.svelte) | Settings (#/settings): who teaches, the core's (@organon/core/ui/AgentSettings.svelte): Claude Code by default, another agent CLI in the drawer (Codex, Gemini CLI, opencode) reaching Aristotle over MCP, or Aristotle's own tutor on any OpenAI-compatible model API, hosted or local; and what writes glosses, answers on a passage and the chat. |
 | [`Step.svelte`](../ui/src/pages/Step.svelte) | One page of a class, as linked from the library tree and from Previous / Next: #/lesson/<slug>/<number>. |
 | [`Topic.svelte`](../ui/src/pages/Topic.svelte) | A class's concepts: what it teaches, as an outline and a graph, with the panel for one concept. |
 
