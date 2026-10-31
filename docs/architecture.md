@@ -334,11 +334,11 @@ Only for the interface (and the tests); tutors use MCP.
 
 | File | What it is |
 |---|---|
-| [`claude-stop-hook.ts`](../scripts/claude-stop-hook.ts) | Claude Code's Stop hook (.claude/settings.json): before Claude finishes a turn in which it changed code, the generated docs are rewritten, and if a changed zone's prose docs were not touched, Claude is sent back to update them (or to say why nothing needs to change). |
+| [`claude-stop-hook.ts`](../scripts/claude-stop-hook.ts) | Claude Code's Stop hook (.claude/settings.json): the core's (@organon/core/server/stop-hook). |
 | [`dev.ts`](../scripts/dev.ts) | The dev instance: the core's runDev (@organon/core/server/dev): the server on its own port with its own data, restarted on every server change, and Vite serving the interface with hot reload in front of it. |
 | [`doc-zones.ts`](../scripts/doc-zones.ts) | Which docs describe which code: a change to a zone should come with a change to at least one of its docs. |
 | [`docs.ts`](../scripts/docs.ts) | Keeps the reference parts of the docs true by writing them from the code: the map of files (from each file's header comment), the MCP tools, the API routes, the environment variables, the pnpm scripts, the skills and agents, and the visual kit. |
-| [`gates.ts`](../scripts/gates.ts) | Every check a change must pass, in one command: the same list runs in the pre-push hook, in CI and before a release. |
+| [`gates.ts`](../scripts/gates.ts) | Every check a change must pass, in one command: the core's runGates (@organon/core/server/gates) with Aristotle's gates. |
 | [`release.ts`](../scripts/release.ts) | Ships what is committed here to the app you learn in, without ever running half-finished code: the core's release (@organon/core/server/release). |
 | [`retire-gym-test.sh`](../scripts/retire-gym-test.sh) | Takes out what Aristotle had when it was the Mind Gym on gym.test: history, not infrastructure, so it stays here while the scripts that set up aristotle.test are the core's (node_modules/@organon/core/scripts, from app.json). |
 | [`review-replay.ts`](../scripts/review-replay.ts) | Replays a learning history through the review scheduler, read-only, to see what it would ask of him: the concepts due each day, then a simulated stretch of days ahead with the daily cap. |

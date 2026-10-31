@@ -2,7 +2,11 @@
 // Read by tests/docs.test.ts (for commits not yet released) and by the Claude Code Stop hook (for the work
 // in progress), so the prose moves with the code without anyone having to remember.
 
-export const ZONES: { name: string; code: RegExp; docs: string[] }[] = [
+// The mechanism is the core's (@organon/core/server/stop-hook); which docs describe which code is Aristotle's.
+
+import { type DocZone, undocumented as coreUndocumented } from '@organon/core/server/stop-hook';
+
+export const ZONES: DocZone[] = [
   {
     name: 'data format',
     code: /^(shared\/types\.ts|server\/(topics|feed|roadmaps|missions|reviews|backup)\.ts)$/,
@@ -18,18 +22,9 @@ export const ZONES: { name: string; code: RegExp; docs: string[] }[] = [
   { name: 'teaching', code: /^\.claude\/(skills|agents)\//, docs: ['docs/teaching.md', 'AGENTS.md', 'CLAUDE.md'] },
 ];
 
-/** The exception, written in a commit message: "Docs: none -- <why>". */
-export const NO_DOCS = /^Docs: none\b/m;
-
-/** Commits that need no docs whatever they touch: Dependabot's, which only move a pinned version. */
-export const NO_DOCS_AUTHOR = /dependabot\[bot\]/;
+export { NO_DOCS, NO_DOCS_AUTHOR } from '@organon/core/server/stop-hook';
 
 /** The zones that changed without any of their docs changing. */
 export function undocumented(changed: string[]): { name: string; files: string[]; docs: string[] }[] {
-  const out = [];
-  for (const zone of ZONES) {
-    const files = changed.filter((f) => zone.code.test(f));
-    if (files.length && !zone.docs.some((d) => changed.includes(d))) out.push({ name: zone.name, files, docs: zone.docs });
-  }
-  return out;
+  return coreUndocumented(ZONES, changed);
 }

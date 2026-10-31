@@ -140,7 +140,6 @@ Every setting is an environment variable with a default. `.env` is not read: set
 | `ARISTOTLE_WAIT_MS` | How long quiz and ask hold the tutor's call waiting for his answer, from when the question was asked. | [`config.ts`](../server/config.ts) |
 | `ARISTOTLE_WAIT_SLICE_MS` | How long one piece of a wait lasts for a client that ends tool calls after a minute whatever they report (Cursor's CLI, mcp.ts): the wait comes in pieces, each ending in "still waiting"; short in tests. | [`config.ts`](../server/config.ts) |
 | `ARISTOTLE_CLAUDE_CWD` |  | [`config.ts`](../server/config.ts) |
-| `ARISTOTLE_DRAWER` | The tutor in Aristotle's terminal drawer (server/terminal.ts sets this): a lesson, where commits released meanwhile must never send it off to write docs. | [`claude-stop-hook.ts`](../scripts/claude-stop-hook.ts) |
 <!-- /generated -->
 
 This install's own choices (not in Git) go in `.aristotle/settings.json`, e.g. `{"accent": "red"}` (blue, red, violet or graphite). Who teaches is kept there too, set from Settings in the app ([`server/settings.ts`](../server/settings.ts)):
