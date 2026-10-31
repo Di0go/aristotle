@@ -336,7 +336,7 @@ Only for the interface (and the tests); tutors use MCP.
 | File | What it is |
 |---|---|
 | [`claude-stop-hook.ts`](../scripts/claude-stop-hook.ts) | Claude Code's Stop hook (.claude/settings.json): before Claude finishes a turn in which it changed code, the generated docs are rewritten, and if a changed zone's prose docs were not touched, Claude is sent back to update them (or to say why nothing needs to change). |
-| [`dev.ts`](../scripts/dev.ts) | The dev instance: the server on its own port with its own data, restarted on every server change, and Vite serving the interface with hot reload in front of it. |
+| [`dev.ts`](../scripts/dev.ts) | The dev instance: the core's runDev (@organon/core/server/dev): the server on its own port with its own data, restarted on every server change, and Vite serving the interface with hot reload in front of it. |
 | [`doc-zones.ts`](../scripts/doc-zones.ts) | Which docs describe which code: a change to a zone should come with a change to at least one of its docs. |
 | [`docs.ts`](../scripts/docs.ts) | Keeps the reference parts of the docs true by writing them from the code: the map of files (from each file's header comment), the MCP tools, the API routes, the environment variables, the pnpm scripts, the skills and agents, and the visual kit. |
 | [`gates.ts`](../scripts/gates.ts) | Every check a change must pass, in one command: the same list runs in the pre-push hook, in CI and before a release. |
@@ -351,6 +351,7 @@ Only for the interface (and the tests); tutors use MCP.
 |---|---|
 | [`backup.test.ts`](../tests/backup.test.ts) | The backup (server/backup.ts) against a throwaway data repository: it commits what changed with a message naming it, pushes when there is a remote, and when that keeps failing the interface is told (warnings.ts). |
 | [`browser.test.ts`](../tests/browser.test.ts) | In a real browser: what he is writing in an answer box stays there, focused and with the cursor where it was, while the tutor and the page go on around it. |
+| [`dev.test.ts`](../tests/dev.test.ts) | The dev instance starts and draws its pages: Vite serving the interface from source, with the core in node_modules, in front of a dev server, as `pnpm dev` does. |
 | [`docs.test.ts`](../tests/docs.test.ts) | The docs stay true: every doc is in the index, every link resolves, every command and setting is documented, and code that changed since the last release came with a change to the docs that describe it. |
 | [`mcp.test.ts`](../tests/mcp.test.ts) | End-to-end: a real server, a real MCP client in Claude Code's place, and HTTP calls in the interface's place. |
 | [`tutor.test.ts`](../tests/tutor.test.ts) | End-to-end: the tutor on a model API, and the method for any agent. |
