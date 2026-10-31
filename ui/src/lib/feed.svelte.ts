@@ -1,5 +1,8 @@
-// Live copy of the server's state, kept current over Server-Sent Events.
+// Live copy of the server's state, kept current over Server-Sent Events: the transport is the core's LiveStream
+// (@organon/core/ui/live: reconnecting, reloading everything on each connection, events held while it loads, and a
+// new release loaded once he is not typing); what the state holds and how each event changes it is Aristotle's.
 
+import { LiveStream } from '@organon/core/ui/live';
 import { untrack } from 'svelte';
 import {
   isInteractive,
@@ -23,9 +26,6 @@ const SETTLE_MS = 300;
 /** Longer than this with nothing happening, an open session is no longer going on (as long as quiz and ask wait). */
 const IDLE_MS = 15 * 60_000;
 
-/** Nothing from the live stream for this long (it pings every 20 s) and it is taken for dead, and opened again. */
-const STALE_MS = 50_000;
-
 /** How often the page tells the server he is there while a question waits for him (POST /api/presence). */
 const PRESENCE_MS = 60_000;
 /** He counts as there while he has typed, clicked, scrolled or moved the pointer on the page this recently. */
@@ -34,11 +34,17 @@ const ACTIVE_MS = 5 * 60_000;
 class LiveFeed {
   session = $state<Session | null>(null);
   items = $state<PublicItem[]>([]);
-  connected = $state(false);
+  /** The live stream: reconnected and reloaded by the core, each event applied here. */
+  private readonly live = new LiveStream<FeedEvent>({ reload: () => this.reload(), apply: (event) => this.apply(event) });
+  get connected(): boolean {
+    return this.live.connected;
+  }
   /** Every topic, by slug, updated live (each concept with only its newest evidence; see Concept.evidenceTotal). */
   topics = $state<Record<string, Topic>>({});
   /** False until the first full load, so pages can tell "loading" from "none". */
-  loaded = $state(false);
+  get loaded(): boolean {
+    return this.live.loaded;
+  }
   /**
    * A lesson asked for from here, to be taken to once it starts: a topic's slug, or "*" when its topic isn't known
    * yet (a new one). Whichever page sees it start takes him there and clears it.
@@ -107,31 +113,12 @@ class LiveFeed {
   /** Missions, newest first. */
   missionList = $derived(Object.values(this.missions ?? {}).sort((a, b) => b.created.localeCompare(a.created)));
 
-  private source: EventSource | null = null;
-  /** When the live stream was last heard from: an event, a ping, or opening. */
-  private heard = 0;
-  /** A full reload is in flight: live events wait for it, then are applied on top of it in order. */
-  private reloading = false;
-  /** The connection came back while reloading: reload once more when this one is done. */
-  private again = false;
-  private held: FeedEvent[] = [];
   private settleTimer: ReturnType<typeof setTimeout> | undefined;
   /** /api/sessions, shared by everyone who asks until a topic, the session or an item changes. */
   private sessionList: Promise<SessionSummary[]> | null = null;
 
   start() {
-    this.open();
-    // The browser gives up on a stream for good after some failures, and a connection can die without either end
-    // noticing (the machine slept, the network changed): either way the page would sit on a stale sitting while Claude
-    // waits on a question it never showed. The server pings every 20 s, so a stream heard from in the last
-    // STALE_MS is alive; otherwise it is opened again, which reloads everything.
-    const check = () => {
-      if (this.source?.readyState === EventSource.CLOSED || Date.now() - this.heard > STALE_MS) this.open();
-    };
-    setInterval(check, 10_000);
-    addEventListener('online', check);
-    addEventListener('pageshow', check);
-    document.addEventListener('visibilitychange', () => document.visibilityState === 'visible' && check());
+    this.live.start();
     this.watchPresence();
   }
 
@@ -151,26 +138,6 @@ class LiveFeed {
         .then((res) => res.ok && (this.presentAt = Date.now()))
         .catch(() => {});
     }, PRESENCE_MS);
-  }
-
-  private open() {
-    this.source?.close();
-    const source = new EventSource('/api/events');
-    this.source = source;
-    this.heard = Date.now();
-    // Reload the whole state on every (re)connect, so nothing is missed while disconnected.
-    source.onopen = () => {
-      this.heard = Date.now();
-      void this.reload();
-    };
-    source.onerror = () => (this.connected = false);
-    source.addEventListener('ping', () => (this.heard = Date.now()));
-    source.onmessage = (e) => {
-      this.heard = Date.now();
-      const event = JSON.parse(e.data) as FeedEvent;
-      if (this.reloading) this.held.push(event);
-      else this.apply(event);
-    };
   }
 
   /** Marks that something was asked of Claude, so Home and the class can say so until the session starts. */
@@ -255,20 +222,13 @@ class LiveFeed {
    * picture without passing through empty states. Events that arrive meanwhile are applied after it, in order, so
    * an older snapshot never overwrites them.
    */
-  private async reload() {
-    if (this.reloading) {
-      this.again = true;
-      return;
-    }
-    this.reloading = true;
-    this.again = false;
-    this.held = [];
+  private async reload(): Promise<string | undefined> {
     // Back after a disconnection, anything may have changed; on the first load, a list asked for a moment ago is current.
     if (this.loaded) this.sessionList = null;
     try {
       const threads = Object.keys(this.chats);
       const [state, topics, roadmaps, missions, glosses, asides, notes, about, chats] = await Promise.all([
-        getJson<FeedState>('/api/state'),
+        getJson<FeedState & { build?: string }>('/api/state'),
         getJson<Topic[]>('/api/map'),
         getJson<Roadmap[]>('/api/roadmaps'),
         getJson<Mission[]>('/api/missions'),
@@ -290,19 +250,14 @@ class LiveFeed {
       this.notes = notes;
       this.about = about.text;
       for (const [i, t] of threads.entries()) this.chats[t] = chats[i];
-      this.connected = true;
-      this.loaded = true;
       this.topicVersion++;
-    } catch {
-      // The server went away mid-load; the next connection loads again.
+      return state.build;
     } finally {
-      this.reloading = false;
-      const held = this.held;
-      this.held = [];
-      for (const event of held) this.apply(event);
-      clearTimeout(this.settleTimer);
-      this.settled++;
-      if (this.again) void this.reload();
+      // Settled once the events held during the load are applied too (the stream applies them as this returns).
+      setTimeout(() => {
+        clearTimeout(this.settleTimer);
+        this.settled++;
+      });
     }
   }
 
